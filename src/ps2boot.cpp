@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <debug.h>
+#include <malloc.h>
 #include <unistd.h>
 
 // Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
@@ -55,6 +56,8 @@ void Ps2ShowExitScreen(int result)
 {
     init_scr();
     scr_printf("\n  Touhou 7 PS2 - the game exited (result %d)\n", result);
+    struct mallinfo mi = mallinfo();
+    scr_printf("  Heap: %d KB in use, %d KB free inside heap\n", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
     scr_printf("  Last messages (Japanese text is not shown):\n\n");
     // Keep only plain ASCII lines, last 24 of them
     static char lines[40][100];

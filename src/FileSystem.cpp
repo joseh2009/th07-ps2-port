@@ -52,7 +52,12 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
                 return NULL;
             }
 
-            g_Pbg4Archive.ReadDecompressEntry(filename, buf);
+            if (!g_Pbg4Archive.ReadDecompressEntry(filename, buf))
+            {
+                g_GameErrorContext.Fatal("error : %s could not be read from the archive (out of memory?)\n", filename);
+                free(buf);
+                return NULL;
+            }
             return buf;
         }
     }

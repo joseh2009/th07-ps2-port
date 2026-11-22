@@ -148,6 +148,19 @@ ma_result BufLength(ma_data_source *ds, ma_uint64 *l)
     return MA_SUCCESS;
 }
 const ma_data_source_vtable g_bufVtable = {BufRead, BufSeek, BufFormat, BufCursor, BufLength, nullptr, 0};
+// Decoded effects are kept as 16 bit (mono when the source is mono) to save RAM; remember each buffer's layout
+struct PcmInfo
+{
+    const void *ptr;
+    uint32_t channels;
+};
+PcmInfo g_pcmInfo[128];
+int g_pcmCount = 0;
+void RegisterPcm(const void *p, uint32_t ch)
+{
+    if (g_pcmCount < 128)
+        g_pcmInfo[g_pcmCount++] = {p, ch};
+}
 } // namespace
 
 float ma_volume_db_to_linear(float db)
@@ -163,6 +176,14 @@ void ma_free(void *p, const void *)
 ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
                                                    const void *pData, const void *)
 {
+    for (int i = 0; i < g_pcmCount; i++)
+    {
+        if (g_pcmInfo[i].ptr == pData)
+        {
+            format = ma_format_s16;
+            channels = g_pcmInfo[i].channels;
+        }
+    }
     return {format, channels, sizeInFrames, pData};
 }
 
@@ -190,9 +211,10 @@ static uint16_t Rd16(const uint8_t *p)
 // A sound that cannot be decoded becomes a short silence instead of an error, so one odd file cannot stop the game.
 static void MakeSilence(ma_uint64 *pFrameCount, void **ppFrames)
 {
-    float *buf = (float *)std::calloc(64, sizeof(float) * 2);
+    int16_t *buf = (int16_t *)std::calloc(64, sizeof(int16_t));
     *ppFrames = buf;
     *pFrameCount = 64;
+    RegisterPcm(buf, 1);
 }
 
 ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *, ma_uint64 *pFrameCount,
@@ -270,7 +292,8 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
     };
 
     const ma_uint64 outFrames = (ma_uint64)srcFrames * kRate / rate;
-    float *out = (float *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(float) * 2);
+    const uint32_t outCh = channels > 1 ? 2 : 1;
+    int16_t *out = (int16_t *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(int16_t) * outCh);
     if (!out)
     {
         MakeSilence(pFrameCount, ppFrames);
@@ -283,10 +306,12 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
         const size_t i1 = std::min(i0 + 1, srcFrames - 1);
         const float t = (float)(pos - (double)i0);
         float l = sampleAt(i0, 0) * (1 - t) + sampleAt(i1, 0) * t;
-        float r = channels > 1 ? sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t : l;
-        out[i * 2] = l;
-        out[i * 2 + 1] = r;
+        auto toS16 = [](float v) { return (int16_t)(std::clamp(v, -1.0f, 1.0f) * 32767.0f); };
+        out[i * outCh] = toS16(l);
+        if (outCh == 2)
+            out[i * 2 + 1] = toS16(sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t);
     }
+    RegisterPcm(out, outCh);
     *ppFrames = out;
     *pFrameCount = outFrames;
     return MA_SUCCESS;
