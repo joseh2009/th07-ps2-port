@@ -76,7 +76,11 @@ start:
 
     printf("th07 PS2: window/backend/rendering ready\n");
     fflush(stdout);
-    g_SoundPlayer.InitializeSound();
+    if (g_SoundPlayer.InitializeSound() != ZUN_SUCCESS)
+    {
+        // SoundPlayer checks its engine pointer everywhere, so the game runs silently; make that visible in the log.
+        Supervisor::DebugPrint("main: audio init FAILED, continuing without sound\n");
+    }
     Controller::ResetKeyboard();
     g_AnmManager = new AnmManager();
     if (!g_Supervisor.cfg.windowed)

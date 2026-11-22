@@ -101,7 +101,7 @@ inline void ma_audio_buffer_uninit(ma_audio_buffer *)
 {
 }
 
-// ---- WAV decoding to f32 stereo @ 44100 (malloc'd, release with ma_free) ----
+// ---- WAV decoding to s16 (mono or stereo) @ 44100; release the result with ma_free ----
 struct ma_decoder_config
 {
     ma_format format;
@@ -135,10 +135,9 @@ struct ma_sound
     bool fading;
     float fadeFrom, fadeTo;
     ma_uint64 fadeStartMs, fadeLenMs;
-    double srcPos; // for sample rate conversion of streams that are not 44100
 };
 
-ma_result ps2audio_engine_init(ma_engine *e); // opens the SDL audio device
+ma_result ps2audio_engine_init(ma_engine *e); // loads LIBSD + audsrv.irx, opens audsrv (44100 Hz, 16 bit, stereo)
 void ps2audio_engine_uninit(ma_engine *e);
 void ps2audio_pump(); // call once per frame: mixes and queues audio for the SPU2
 ma_uint64 ma_engine_get_time_in_milliseconds(ma_engine *e);

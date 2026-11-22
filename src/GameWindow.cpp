@@ -1,3 +1,6 @@
+#ifdef __PS2__
+#include "ps2audio.hpp"
+#endif
 #include "GameWindow.hpp"
 
 #include <SDL2/SDL.h>
@@ -75,6 +78,12 @@ RenderResult GameWindow::Render()
     {
         return RENDER_RESULT_KEEP_RUNNING;
     }
+
+#ifdef __PS2__
+    // Audio is mixed here, once per call, so it keeps flowing in every game state (the sound command queue is only
+    // processed on logic frames).
+    ps2audio_pump();
+#endif
 
     if (this->curFrame == 0)
     {

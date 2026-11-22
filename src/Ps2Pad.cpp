@@ -58,16 +58,20 @@ u16 Ps2Pad::GetButtons()
         out |= TH_BUTTON_LEFT;
     if (held & PAD_RIGHT)
         out |= TH_BUTTON_RIGHT;
+    // Layout: Cross = shoot/confirm (Z), Circle = bomb/cancel (X), L1 = focus (Shift), R1 = skip dialogue (Ctrl),
+    // Select = pause/back (Esc), Start = Enter. Cancel in menus is MENU|BOMB, so Circle and Select both back out.
     if (held & PAD_CROSS)
-        out |= TH_BUTTON_SHOOT | TH_BUTTON_ENTER;
-    if (held & (PAD_CIRCLE | PAD_TRIANGLE))
+        out |= TH_BUTTON_SHOOT;
+    if (held & PAD_CIRCLE)
         out |= TH_BUTTON_BOMB;
-    if (held & (PAD_SQUARE | PAD_L1 | PAD_R1 | PAD_L2 | PAD_R2))
+    if (held & PAD_L1)
         out |= TH_BUTTON_FOCUS;
-    if (held & PAD_START)
-        out |= TH_BUTTON_MENU;
-    if (held & PAD_SELECT)
+    if (held & PAD_R1)
         out |= TH_BUTTON_SKIP;
+    if (held & PAD_SELECT)
+        out |= TH_BUTTON_MENU;
+    if (held & PAD_START)
+        out |= TH_BUTTON_ENTER;
 
     if (pad.mode >> 4 == 0x7 || pad.mode >> 4 == 0x5) // analog stick mirrors the d-pad
     {
