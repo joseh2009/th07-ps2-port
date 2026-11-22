@@ -82,17 +82,19 @@ struct ma_audio_buffer_config
 {
     ma_format format;
     ma_uint32 channels;
-    ma_uint64 sizeInFrames;
+    ma_uint64 sizeInFrames; // frames as stored in memory
     const void *pData;
+    ma_uint32 rateDiv; // stored data is at 44100/rateDiv Hz and is upsampled while mixing
 };
 struct ma_audio_buffer
 {
     ma_data_source_base base;
     ma_format format;
     ma_uint32 channels;
-    ma_uint64 frames;
+    ma_uint64 frames; // frames at 44100 Hz (stored frames * rateDiv)
     const void *pData;
-    ma_uint64 cursor;
+    ma_uint64 cursor; // in 44100 Hz frames
+    ma_uint32 rateDiv;
 };
 ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
                                                    const void *pData, const void *allocationCallbacks);
