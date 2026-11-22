@@ -58,6 +58,7 @@ class PS2GS : public ZunGraphics
     {
         GSTEXTURE gs;
         bool alive = false;
+        f32 scaleU = 1.0f, scaleV = 1.0f; // image size / (power of two) texture size
     };
 
     // Vertex after the transform, before the perspective divide.

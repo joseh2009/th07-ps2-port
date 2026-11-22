@@ -536,8 +536,14 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
 
     ReleaseTextureMemory(tex);
 
-    const u32 w = std::max<u32>(width, kMinTexSize);
-    const u32 h = std::max<u32>(height, kMinTexSize);
+    // The GS wraps/addresses textures in powers of two: pad the allocation and scale the UVs to match
+    u32 w = kMinTexSize, h = kMinTexSize;
+    while (w < width)
+        w <<= 1;
+    while (h < height)
+        h <<= 1;
+    tex->scaleU = (f32)width / (f32)w;
+    tex->scaleV = (f32)height / (f32)h;
     const u32 bytes = gsKit_texture_size_ee(w, h, TH07_TEX_PSM);
 
     std::memset(&tex->gs, 0, sizeof(GSTEXTURE));
@@ -626,6 +632,12 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
             o.u = in.u * t.m[0][0] + in.v * t.m[1][0] + t.m[2][0];
             o.v = in.u * t.m[0][1] + in.v * t.m[1][1] + t.m[2][1];
         }
+    }
+
+    if (textured && boundTexture)
+    {
+        o.u *= boundTexture->scaleU;
+        o.v *= boundTexture->scaleV;
     }
 
     // Texture stage "argument 2": diffuse colour, texture factor, or nothing
