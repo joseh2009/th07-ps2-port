@@ -26,10 +26,15 @@ void AnmManager::TakeScreenshotIfRequested()
     }
 }
 
+#ifdef __PS2__
+void Ps2BootScreen(int argc, char **argv);
+#endif
+
 int main(int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
+#ifdef __PS2__
+    Ps2BootScreen(argc, argv);
+#endif
 
     i32 res;
 
