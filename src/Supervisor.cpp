@@ -42,10 +42,24 @@ char g_FpsCounterBuffer[256];
 u32 g_NumFramesSinceLastTime;
 u64 g_PerformanceCounter;
 
+#ifdef __PS2__
+void Ps2LogAppend(const char *text);
+#endif
+
 void Supervisor::DebugPrint(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+#ifdef __PS2__
+    {
+        char tmp[512];
+        va_list args2;
+        va_copy(args2, args);
+        vsnprintf(tmp, sizeof(tmp), fmt, args2);
+        va_end(args2);
+        Ps2LogAppend(tmp);
+    }
+#endif
     vprintf(fmt, args);
     va_end(args);
 #ifdef __PS2__

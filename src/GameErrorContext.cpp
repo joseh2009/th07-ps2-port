@@ -4,6 +4,10 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef __PS2__
+void Ps2LogAppend(const char *text);
+#endif
+
 GameErrorContext g_GameErrorContext;
 
 const char *GameErrorContext::Log(const char *fmt, ...)
@@ -16,6 +20,7 @@ const char *GameErrorContext::Log(const char *fmt, ...)
     vsprintf(tmp, fmt, args);
     tmpSize = strlen(tmp);
 #ifdef __PS2__
+    Ps2LogAppend(tmp);
     printf("LOG: %s", tmp);
     fflush(stdout);
 #endif
@@ -40,6 +45,8 @@ const char *GameErrorContext::Fatal(const char *fmt, ...)
     vsprintf(tmp, fmt, args);
     tmpSize = strlen(tmp);
 #ifdef __PS2__
+    Ps2LogAppend("FATAL: ");
+    Ps2LogAppend(tmp);
     printf("FATAL: %s", tmp);
     fflush(stdout);
 #endif

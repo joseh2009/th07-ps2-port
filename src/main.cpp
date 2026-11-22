@@ -29,6 +29,7 @@ void AnmManager::TakeScreenshotIfRequested()
 #ifdef __PS2__
 #include "Ps2Pad.hpp"
 void Ps2BootScreen(int argc, char **argv);
+void Ps2ShowExitScreen(int result);
 #endif
 
 int main(int argc, char *argv[])
@@ -47,6 +48,7 @@ int main(int argc, char *argv[])
     fflush(stdout);
     if (g_Supervisor.LoadConfig("th07.cfg") != ZUN_SUCCESS)
     {
+        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
         goto stop;
     }
 
@@ -56,16 +58,19 @@ int main(int argc, char *argv[])
 start:
     if (GameWindow::CreateGameWindow())
     {
+        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
         goto stop;
     }
 
     if (GameWindow::InitInterface())
     {
+        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
         goto stop;
     }
 
     if (GameWindow::InitRendering())
     {
+        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
         goto stop;
     }
 
@@ -83,9 +88,11 @@ start:
     {
         if (res == ZUN_ERROR)
         {
-            goto cleanup;
+            Supervisor::DebugPrint("main: leaving through cleanup (line %d)\n", __LINE__);
+        goto cleanup;
         }
         res = RENDER_RESULT_EXIT_ERROR;
+        Supervisor::DebugPrint("main: leaving through cleanup (line %d)\n", __LINE__);
         goto cleanup;
     }
     res = RENDER_RESULT_KEEP_RUNNING;
@@ -178,5 +185,8 @@ stop:
     }
     FileSystem::WriteDataToFile("th07.cfg", &g_Supervisor.cfg, sizeof(GameConfiguration));
     g_GameErrorContext.Flush();
+#ifdef __PS2__
+    Ps2ShowExitScreen(res);
+#endif
     return 0;
 }

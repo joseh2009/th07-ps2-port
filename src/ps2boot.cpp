@@ -28,6 +28,66 @@ extern "C" FILE *__wrap_fopen(const char *path, const char *mode)
     return f;
 }
 
+// Last few KB of everything the game logged, so the reason for an early exit can be shown on screen
+static char s_LogTail[3072];
+static size_t s_LogLen = 0;
+
+void Ps2LogAppend(const char *text)
+{
+    size_t n = strlen(text);
+    if (n >= sizeof(s_LogTail))
+    {
+        text += n - (sizeof(s_LogTail) - 1);
+        n = sizeof(s_LogTail) - 1;
+    }
+    if (s_LogLen + n >= sizeof(s_LogTail))
+    {
+        size_t drop = s_LogLen + n - (sizeof(s_LogTail) - 1);
+        memmove(s_LogTail, s_LogTail + drop, s_LogLen - drop);
+        s_LogLen -= drop;
+    }
+    memcpy(s_LogTail + s_LogLen, text, n);
+    s_LogLen += n;
+    s_LogTail[s_LogLen] = 0;
+}
+
+void Ps2ShowExitScreen(int result)
+{
+    init_scr();
+    scr_printf("\n  Touhou 7 PS2 - the game exited (result %d)\n", result);
+    scr_printf("  Last messages (Japanese text is not shown):\n\n");
+    // Keep only plain ASCII lines, last 24 of them
+    static char lines[40][100];
+    int count = 0;
+    char cur[100];
+    size_t ci = 0;
+    for (size_t i = 0; i <= s_LogLen; i++)
+    {
+        char ch = s_LogTail[i];
+        if (ch == '\n' || ch == 0)
+        {
+            cur[ci] = 0;
+            if (ci > 0)
+            {
+                strncpy(lines[count % 40], cur, 99);
+                lines[count % 40][99] = 0;
+                count++;
+            }
+            ci = 0;
+        }
+        else if (ch >= 32 && ch < 127 && ci < 96)
+            cur[ci++] = ch;
+        else if (ch < 0 && ci < 96)
+            cur[ci++] = '?';
+    }
+    int start = count > 24 ? count - 24 : 0;
+    for (int i = start; i < count; i++)
+        scr_printf("  %s\n", lines[i % 40]);
+    scr_printf("\n  Halted. Close the emulator window.\n");
+    for (;;)
+        sleep(1);
+}
+
 static bool CanOpen(const char *prefix, const char *name, long *size)
 {
     char full[320];
