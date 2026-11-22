@@ -1,3 +1,6 @@
+#ifdef __PS2__
+void Ps2HeapLog(const char *where);
+#endif
 #include "Pbg4Archive.hpp"
 
 #include <SDL2/SDL_stdinc.h>
@@ -93,6 +96,10 @@ u8 *Pbg4Archive::ReadDecompressEntry(const char *filename, u8 *buf)
     srcBuf = (u8 *)malloc(dwBytes);
     if (!srcBuf)
     {
+#ifdef __PS2__
+        Ps2HeapLog("pbg4 src");
+        Supervisor::DebugPrint("info : cannot allocate %u bytes for compressed %s\n", (unsigned)dwBytes, filename);
+#endif
         goto err;
     }
 

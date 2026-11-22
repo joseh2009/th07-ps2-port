@@ -369,8 +369,9 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
         AudioLog("audio: wav contains no samples\n");
         return MA_ERROR;
     }
-    // Effects are kept at half rate (22050 Hz) to fit the 32 MB of RAM; BufRead upsamples them while mixing.
-    const uint32_t div = kSfxRateDiv;
+    // Effects are kept at half rate (22050 Hz, quarter for long ones) to fit the 32 MB of RAM; BufRead upsamples them while mixing.
+    // Long effects (> 1 s) go to quarter rate: they are the bulk of the memory and mostly noise/low frequency anyway.
+    const uint32_t div = (srcFrames * 1000 / rate > 1000) ? kSfxRateDiv * 2 : kSfxRateDiv;
     const uint32_t storeRate = kRate / div;
     const uint64_t outFrames = srcFrames * storeRate / rate;
     const uint32_t outCh = channels > 1 ? 2 : 1;
