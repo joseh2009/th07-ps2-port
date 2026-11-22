@@ -540,6 +540,13 @@ ZunResult SoundPlayer::LoadSound(i32 idx, const char *path)
     }
 
     i32 fileSize = *(u32 *)(soundFileDat + 4) + 8;
+#ifdef __PS2__
+    // trust the real size of the file over the RIFF header (which may be wrong or too large)
+    if (g_LastFileSize >= 12 && (u32)fileSize > g_LastFileSize)
+    {
+        fileSize = g_LastFileSize;
+    }
+#endif
 
     ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 44100);
     if (ma_decode_memory(soundFileDat, fileSize, &decoderConfig, &frameCount, &frames) !=
