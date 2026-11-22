@@ -49,6 +49,7 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
             buf = (u8 *)malloc(fsize);
             if (!buf)
             {
+                g_GameErrorContext.Fatal("error : out of memory loading %s (%u bytes)\n", filename, fsize);
                 return NULL;
             }
 

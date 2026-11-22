@@ -261,7 +261,13 @@ struct Enemy
     Enemy *next;
 };
 
+#ifdef __PS2__
+// The PS2 only has 32 MB of RAM and EnemyManager is a static array of full Enemy structs (~20 KB each):
+// 480 of them take ~10 MB. 160 simultaneous enemies is plenty for normal play.
+#define MAX_ENEMIES 160
+#else
 #define MAX_ENEMIES 480
+#endif
 
 struct EnemyManager
 {
