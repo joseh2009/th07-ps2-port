@@ -181,3 +181,14 @@ void Ps2BootScreen(int argc, char **argv)
     sleep(4);
 }
 #endif
+
+// Log how much of the heap is in use and the largest free block (for out-of-memory diagnosis)
+void Ps2HeapLog(const char *where)
+{
+    struct mallinfo mi = mallinfo();
+    char tmp[160];
+    snprintf(tmp, sizeof(tmp), "heap@%s: used %d KB, free %d KB, arena %d KB, top %d KB\n", where,
+             (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024), (int)(mi.arena / 1024), (int)(mi.keepcost / 1024));
+    Ps2LogAppend(tmp);
+    printf("%s", tmp);
+}

@@ -1,3 +1,6 @@
+#ifdef __PS2__
+void Ps2HeapLog(const char *where);
+#endif
 #include "SoundPlayer.hpp"
 
 #include <cstdio>
@@ -745,6 +748,9 @@ ZunResult SoundPlayer::InitSoundBuffers()
     {
         this->soundQueue[i] = -1;
     }
+#ifdef __PS2__
+    Ps2HeapLog("before sfx");
+#endif
     for (i = 0; i < ARRAY_SIZE_SIGNED(g_SFXList); i++)
     {
         if (LoadSound(i, g_SFXList[i]) != ZUN_SUCCESS)
@@ -754,6 +760,9 @@ ZunResult SoundPlayer::InitSoundBuffers()
             return ZUN_ERROR;
         }
     }
+#ifdef __PS2__
+    Ps2HeapLog("after sfx");
+#endif
     for (i = 0; i < ARRAY_SIZE(SOUND_BUFFER_IDX_VOL); i++)
     {
         i32 bufIdx = SOUND_BUFFER_IDX_VOL[i].bufferIdx;

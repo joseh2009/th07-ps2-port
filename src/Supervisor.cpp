@@ -1001,6 +1001,9 @@ ZunResult Supervisor::LoadConfig(const char *configFilename)
     {
         g_GameErrorContext.Log("画面周りを毎回描画します\n");
     }
+#ifdef __PS2__
+    this->cfg.preloadBgm = 0; // BGM is streamed from the archive: preloading a whole track would eat the 11 MB heap
+#endif
     if (this->cfg.preloadBgm)
     {
         g_GameErrorContext.Log("ＢＧＭをメモリに読み込みます\n");

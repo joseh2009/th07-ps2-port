@@ -1,3 +1,6 @@
+#ifdef __PS2__
+void Ps2HeapLog(const char *where);
+#endif
 #include "FileSystem.hpp"
 
 #include <cstdio>
@@ -49,6 +52,9 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
             buf = (u8 *)malloc(fsize);
             if (!buf)
             {
+#ifdef __PS2__
+                Ps2HeapLog("oom");
+#endif
                 g_GameErrorContext.Fatal("error : out of memory loading %s (%u bytes)\n", filename, fsize);
                 return NULL;
             }

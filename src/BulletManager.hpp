@@ -242,7 +242,11 @@ struct Bullet
     BulletCommandState commandStates[5];
 };
 
+#ifdef __PS2__
+#define MAX_BULLETS 512 // 32 MB RAM: halves the 3.6 MB pool
+#else
 #define MAX_BULLETS 1024
+#endif
 
 struct BulletManager
 {
