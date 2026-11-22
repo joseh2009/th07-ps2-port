@@ -27,13 +27,16 @@ void AnmManager::TakeScreenshotIfRequested()
 }
 
 #ifdef __PS2__
+#include "Ps2Pad.hpp"
 void Ps2BootScreen(int argc, char **argv);
 #endif
 
 int main(int argc, char *argv[])
 {
 #ifdef __PS2__
+    setbuf(stdout, NULL);
     Ps2BootScreen(argc, argv);
+    Ps2Pad::Init();
 #endif
 
     i32 res;

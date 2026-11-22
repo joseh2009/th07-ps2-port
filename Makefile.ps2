@@ -24,7 +24,7 @@ SRCS = \
 	src/MidiOutput.cpp src/MusicRoom.cpp src/Player.cpp src/ReplayManager.cpp src/ResultScreen.cpp \
 	src/Rng.cpp src/ScreenEffect.cpp src/SoundPlayer.cpp src/Stage.cpp src/Supervisor.cpp \
 	src/TextHelper.cpp src/main.cpp src/utils.cpp \
-	src/ps2audio.cpp src/ps2boot.cpp src/graphics/PS2GS.cpp \
+	src/ps2audio.cpp src/ps2boot.cpp src/Ps2Pad.cpp src/audsrv_irx.cpp src/graphics/PS2GS.cpp \
 	src/pbg4/Lzss.cpp src/pbg4/Pbg4Archive.cpp src/pbg4/Pbg4File.cpp
 
 EE_OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
@@ -43,7 +43,7 @@ EE_LDFLAGS += -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
 
 # order matters: SDL2main first, SDL2 after the libraries that depend on it
 EE_LIBS += -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static \
-	-lm -lpatches -lgskit -ldmakit -lps2_drivers -lpthreadglue -lpthread -ldebug
+	-lm -lpatches -lgskit -ldmakit -lpadx -laudsrv -lps2_drivers -lpthreadglue -lpthread -ldebug
 
 all: $(EE_BIN)
 

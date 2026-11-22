@@ -181,7 +181,7 @@ ZunResult GameWindow::CreateGameWindow()
 {
 #ifdef __PS2__
     // Only input: SDL's own PS2 video driver would fight the gsKit backend for the GS
-    if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0)
+    if (SDL_Init(SDL_INIT_EVENTS) < 0)
 #else
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
 #endif

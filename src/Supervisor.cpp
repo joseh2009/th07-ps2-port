@@ -365,6 +365,9 @@ ZunResult Supervisor::SetupInput()
         return ZUN_ERROR;
     }
 
+#ifdef __PS2__
+    return ZUN_SUCCESS; // the pad is read through libpad (Ps2Pad), see main()
+#endif
     if (SDL_Init(SDL_INIT_GAMECONTROLLER) == 0)
     {
         g_Supervisor.controller = SDL_GameControllerOpen(0);

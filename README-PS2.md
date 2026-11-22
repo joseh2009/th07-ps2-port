@@ -11,6 +11,7 @@ This is a derivative work. All game logic comes from the people who did the real
 * [N0zoM1z0/th07](https://github.com/N0zoM1z0/th07) – the th07 decompilation project.
 * [GensokyoClub/th06](https://github.com/GensokyoClub/th06) and [GensokyoClub/th08](https://github.com/GensokyoClub/th08) – the th06/th08 decompilations that th07's structure and naming derive from.
 * Touhou Project / 東方妖々夢 are by ZUN (Team Shanghai Alice). This repository contains **no game data**.
+* [sammwyy/th06-ps2](https://github.com/sammwyy/th06-ps2) and [makmal0962/th06-ps2](https://github.com/makmal0962/th06-ps2) – th06 PS2 ports; the native libpad input and the audsrv audio set-up follow their approach.
 * PS2 toolchain: [ps2dev](https://github.com/ps2dev), ps2sdk, gsKit, ps2sdk-ports (SDL2, SDL2_ttf, SDL2_image).
 
 Files added for the PS2: `src/graphics/PS2GS.*` (GS backend), `src/ps2audio.*` (SDL2 based replacement for the

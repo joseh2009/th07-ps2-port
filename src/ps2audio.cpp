@@ -1,6 +1,9 @@
 #include "ps2audio.hpp"
 
 #include <SDL2/SDL.h>
+#include <audsrv.h>
+#include <loadfile.h>
+#include <sifrpc.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -13,23 +16,13 @@ namespace
 constexpr int kRate = 44100;
 constexpr int kChunk = 512; // frames mixed per step
 
-SDL_AudioDeviceID g_dev = 0;
+bool g_dev = false;
 std::vector<ma_sound *> g_sounds;
 volatile ma_uint64 g_framesMixed = 0;
 
 struct Lock
 {
-    Lock()
-    {
-        if (g_dev)
-            SDL_LockAudioDevice(g_dev);
-    }
-    ~Lock()
-    {
-        if (g_dev)
-            SDL_UnlockAudioDevice(g_dev);
-    }
-};
+}; // single threaded: audio is mixed from the main loop (ps2audio_pump)
 
 float Gain(ma_sound *s, ma_uint64 nowMs)
 {
@@ -76,10 +69,8 @@ ma_uint64 ReadSound(ma_sound *s, float *out, ma_uint64 frames)
     return got;
 }
 
-void AudioCallback(void *, Uint8 *stream, int len)
+void MixFrames(int16_t *dst, int frames)
 {
-    int16_t *dst = (int16_t *)stream;
-    int frames = len / 4;
     static float mix[kChunk * 2];
     static float tmp[kChunk * 2];
 
@@ -221,40 +212,64 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
     return MA_SUCCESS;
 }
 
+extern "C" unsigned char audsrv_irx[];
+extern "C" unsigned int size_audsrv_irx;
+
 ma_result ps2audio_engine_init(ma_engine *e)
 {
-    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+    SifInitRpc(0);
+    int r = SifLoadModule("rom0:LIBSD", 0, NULL);
+    std::printf("audio: LIBSD -> %d\n", r);
+    int ret = 0;
+    r = SifExecModuleBuffer(audsrv_irx, size_audsrv_irx, 0, NULL, &ret);
+    std::printf("audio: audsrv.irx -> %d (ret %d)\n", r, ret);
+    if (r < 0)
+        return MA_ERROR;
+    if (audsrv_init() != AUDSRV_ERR_NOERROR)
     {
-        std::printf("SDL audio init failed: %s\n", SDL_GetError());
+        std::printf("audio: audsrv_init failed: %d\n", audsrv_get_error());
         return MA_ERROR;
     }
-    SDL_AudioSpec want, have;
-    SDL_zero(want);
-    want.freq = kRate;
-    want.format = AUDIO_S16SYS;
-    want.channels = 2;
-    want.samples = 1024;
-    want.callback = AudioCallback;
-    g_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
-    if (!g_dev)
+    audsrv_fmt_t fmt;
+    fmt.freq = kRate;
+    fmt.bits = 16;
+    fmt.channels = 2;
+    if (audsrv_set_format(&fmt) != 0)
     {
-        std::printf("SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
+        std::printf("audio: audsrv_set_format failed\n");
+        audsrv_quit();
         return MA_ERROR;
     }
-    if (have.freq != kRate || have.format != AUDIO_S16SYS || have.channels != 2)
-        std::printf("audio: got %d Hz fmt %x ch %d (wanted 44100 S16 stereo)\n", have.freq, have.format,
-                    have.channels);
+    audsrv_set_volume(MAX_VOLUME);
+    g_dev = true;
     e->running = true;
-    SDL_PauseAudioDevice(g_dev, 0);
+    std::printf("audio: audsrv ready\n");
     return MA_SUCCESS;
+}
+
+void ps2audio_pump()
+{
+    if (!g_dev)
+        return;
+    static int16_t out[kChunk * 2];
+    // Feed the SPU2 queue with as much audio as it has room for (bounded so a slow frame cannot stall for long)
+    for (int i = 0; i < 8; i++)
+    {
+        int avail = audsrv_available();
+        if (avail < (int)sizeof(out))
+            break;
+        MixFrames(out, kChunk);
+        audsrv_play_audio((const char *)out, sizeof(out));
+    }
 }
 
 void ps2audio_engine_uninit(ma_engine *e)
 {
     if (g_dev)
     {
-        SDL_CloseAudioDevice(g_dev);
-        g_dev = 0;
+        audsrv_stop_audio();
+        audsrv_quit();
+        g_dev = false;
     }
     g_sounds.clear();
     e->running = false;

@@ -812,6 +812,9 @@ i32 SoundPlayer::ProcessQueues()
     {
         return 0;
     }
+#ifdef __PS2__
+    ps2audio_pump();
+#endif
 
     commandCursor = this->commandQueue;
 loop:

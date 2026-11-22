@@ -1,4 +1,5 @@
 #include "Controller.hpp"
+#include "Ps2Pad.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_events.h>
@@ -188,6 +189,9 @@ u16 Controller::GetInput()
     buttons |= KEY_PRESSED(SDL_SCANCODE_R, TH_BUTTON_RESET);
     buttons |= KEY_PRESSED(SDL_SCANCODE_RETURN, TH_BUTTON_ENTER);
 
+#ifdef __PS2__
+    buttons |= Ps2Pad::GetButtons();
+#endif
     return GetControllerInput(buttons);
 }
 

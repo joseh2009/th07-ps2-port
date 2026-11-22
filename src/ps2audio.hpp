@@ -140,6 +140,7 @@ struct ma_sound
 
 ma_result ps2audio_engine_init(ma_engine *e); // opens the SDL audio device
 void ps2audio_engine_uninit(ma_engine *e);
+void ps2audio_pump(); // call once per frame: mixes and queues audio for the SPU2
 ma_uint64 ma_engine_get_time_in_milliseconds(ma_engine *e);
 ma_result ma_sound_init_from_data_source(ma_engine *e, ma_data_source *ds, ma_uint32 flags, void *group,
                                          ma_sound *sound);
