@@ -8,8 +8,10 @@
 #include "dxutil.hpp"
 #include "utils.hpp"
 
+#ifndef __PS2__
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
+#endif
 
 SoundBufferIdxVolume SOUND_BUFFER_IDX_VOL[38] = {
     {0, -2000, 0},   {0, -2500, 0},   {1, -1200, 5},   {1, -1500, 5},   {2, -1000, 100},
@@ -342,6 +344,26 @@ SoundPlayer::SoundPlayer()
     }
 }
 
+#ifdef __PS2__
+ZunResult SoundPlayer::InitializeSound()
+{
+    memset(this, 0, sizeof(SoundPlayer));
+    for (i32 i = 0; i < ARRAY_SIZE_SIGNED(this->unusedSoundVolRelated); i++)
+    {
+        this->unusedSoundVolRelated[i] = -1;
+    }
+
+    this->engine = new ma_engine;
+    if (ps2audio_engine_init(this->engine) != MA_SUCCESS)
+    {
+        g_GameErrorContext.Log("DirectSound オブジェクトの初期化が失敗したよ\n");
+        SAFE_DELETE(this->engine);
+        return ZUN_ERROR;
+    }
+    g_GameErrorContext.Log("DirectSound は正常に初期化されました\n");
+    return ZUN_SUCCESS;
+}
+#else
 ZunResult SoundPlayer::InitializeSound()
 {
     ma_engine_config engineConfig;
@@ -400,6 +422,7 @@ ZunResult SoundPlayer::InitializeSound()
     g_GameErrorContext.Log("DirectSound は正常に初期化されました\n");
     return ZUN_SUCCESS;
 }
+#endif
 
 ZunResult SoundPlayer::Release()
 {
@@ -431,10 +454,15 @@ ZunResult SoundPlayer::Release()
 
     StopBGM();
 
+#ifdef __PS2__
+    ps2audio_engine_uninit(this->engine);
+    SAFE_DELETE(this->engine);
+#else
     ma_device_uninit(this->device);
     SAFE_DELETE(this->device);
     ma_engine_uninit(this->engine);
     SAFE_DELETE(this->engine);
+#endif
     for (i = 0; i < ARRAY_SIZE_SIGNED(this->bgmPreloadData); i++)
     {
         SAFE_FREE(this->bgmPreloadData[i]);

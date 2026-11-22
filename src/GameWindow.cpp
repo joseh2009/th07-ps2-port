@@ -15,7 +15,11 @@
 #include "SoundPlayer.hpp"
 #include "Stage.hpp"
 #include "Supervisor.hpp"
+#ifdef __PS2__
+#include "graphics/PS2GS.hpp"
+#else
 #include "graphics/Gles.hpp"
+#endif
 #include "graphics/ZunGraphics.hpp"
 
 GameWindow g_GameWindow;
@@ -24,7 +28,11 @@ f64 g_LastFrameTime;
 u64 g_LastPerfCounter;
 
 static GfxInit g_RenderingBackends[] = {
+#ifdef __PS2__
+    PS2GS::Init,
+#else
     GlesGraphics::Init,
+#endif
 };
 
 void GameWindow::Present()
@@ -171,12 +179,24 @@ ZunResult GameWindow::InitInterface()
 
 ZunResult GameWindow::CreateGameWindow()
 {
+#ifdef __PS2__
+    // Only input: SDL's own PS2 video driver would fight the gsKit backend for the GS
+    if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0)
+#else
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
+#endif
     {
         g_GameErrorContext.Fatal("Direct3D オブジェクトは何故か作成出来なかった\n");
         return ZUN_ERROR;
     }
 
+#ifdef __PS2__
+    // There is no window system on the PS2: the GS backend owns the screen. Input still goes through SDL.
+    g_GameWindow.isAppActive = 1;
+    g_GameWindow.isAppInactive = 0;
+    g_LastPerfCounter = SDL_GetPerformanceCounter();
+    return ZUN_SUCCESS;
+#endif
     u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
     if (!g_Supervisor.cfg.windowed)
     {

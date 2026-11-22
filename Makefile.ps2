@@ -1,0 +1,60 @@
+# PlayStation 2 build of th07 (ps2dev / ps2sdk)
+#
+#   export PS2DEV=/usr/local/ps2dev
+#   export PS2SDK=$PS2DEV/ps2sdk
+#   export GSKIT=$PS2DEV/gsKit
+#   export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2DEV/iop/bin:$PS2DEV/dvp/bin:$PS2SDK/bin
+#   make -f Makefile.ps2          # -> th07.elf
+#   make -f Makefile.ps2 clean
+#
+# Needs the ps2sdk ports SDL2, SDL2_image, SDL2_ttf, freetype, libpng, libjpeg and zlib
+# (all part of the prebuilt ps2dev toolchain).
+#
+# Options:
+#   make -f Makefile.ps2 CT32=1   32 bit frame buffer instead of 16 bit (needs ~1.2 MB more VRAM)
+
+EE_BIN = th07.elf
+OBJDIR = obj/ps2
+
+SRCS = \
+	src/AnmManager.cpp src/AnmVm.cpp src/AsciiManager.cpp src/BombData.cpp src/BulletManager.cpp \
+	src/Chain.cpp src/Controller.cpp src/EclManager.cpp src/EffectManager.cpp src/Ending.cpp \
+	src/EnemyEclInstr.cpp src/EnemyManager.cpp src/FileSystem.cpp src/GameErrorContext.cpp \
+	src/GameManager.cpp src/GameWindow.cpp src/Gui.cpp src/ItemManager.cpp src/MainMenu.cpp \
+	src/MidiOutput.cpp src/MusicRoom.cpp src/Player.cpp src/ReplayManager.cpp src/ResultScreen.cpp \
+	src/Rng.cpp src/ScreenEffect.cpp src/SoundPlayer.cpp src/Stage.cpp src/Supervisor.cpp \
+	src/TextHelper.cpp src/main.cpp src/utils.cpp \
+	src/ps2audio.cpp src/graphics/PS2GS.cpp \
+	src/pbg4/Lzss.cpp src/pbg4/Pbg4Archive.cpp src/pbg4/Pbg4File.cpp
+
+EE_OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
+
+EE_INCS += -Isrc -I$(PS2SDK)/ports/include -I$(PS2SDK)/ports/include/SDL2 -I$(GSKIT)/include
+
+EE_CXXFLAGS += -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi \
+	-Wno-unused-parameter -Wno-missing-field-initializers
+EE_OPTFLAGS = -O2
+
+ifeq ($(CT32),1)
+EE_CXXFLAGS += -DTH07_PS2_CT32
+endif
+
+EE_LDFLAGS += -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
+
+# order matters: SDL2main first, SDL2 after the libraries that depend on it
+EE_LIBS += -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static \
+	-lm -lpatches -lgskit -ldmakit -lps2_drivers -lpthreadglue -lpthread -ldebug
+
+all: $(EE_BIN)
+
+clean:
+	rm -rf $(OBJDIR) $(EE_BIN)
+
+include $(PS2SDK)/Defs.make
+include $(PS2SDK)/samples/Makefile.pref
+include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+
+# objects live in $(OBJDIR), mirroring the source tree
+$(OBJDIR)/%.o: %.cpp
+	@mkdir -p $(@D)
+	$(EE_CXX) $(EE_CXXFLAGS) $(EE_INCS) -c $< -o $@

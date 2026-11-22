@@ -35,6 +35,8 @@ int main(int argc, char *argv[])
 
     res = RENDER_RESULT_KEEP_RUNNING;
 
+    printf("th07 PS2: main() reached\n");
+    fflush(stdout);
     if (g_Supervisor.LoadConfig("th07.cfg") != ZUN_SUCCESS)
     {
         goto stop;
@@ -59,6 +61,8 @@ start:
         goto stop;
     }
 
+    printf("th07 PS2: window/backend/rendering ready\n");
+    fflush(stdout);
     g_SoundPlayer.InitializeSound();
     Controller::ResetKeyboard();
     g_AnmManager = new AnmManager();

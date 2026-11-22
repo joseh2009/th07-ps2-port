@@ -5,7 +5,11 @@
 #include "GameErrorContext.hpp"
 #include "ZunResult.hpp"
 #include "inttypes.hpp"
+#ifdef __PS2__
+#include "ps2audio.hpp"
+#else
 #include "miniaudio.h"
+#endif
 
 enum AudioOpcode
 {
@@ -132,7 +136,11 @@ struct SoundPlayer
     }
 
     ma_engine *engine;
+#ifdef __PS2__
+    void *device;
+#else
     ma_device *device;
+#endif
     ma_audio_buffer *duplicateSfxData[128];
     ma_audio_buffer *sfxData[128];
     void *sfxPCMData[128];

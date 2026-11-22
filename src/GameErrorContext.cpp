@@ -15,6 +15,10 @@ const char *GameErrorContext::Log(const char *fmt, ...)
     va_start(args, fmt);
     vsprintf(tmp, fmt, args);
     tmpSize = strlen(tmp);
+#ifdef __PS2__
+    printf("LOG: %s", tmp);
+    fflush(stdout);
+#endif
     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
     {
         strcpy(this->m_BufferEnd, tmp);
@@ -35,6 +39,10 @@ const char *GameErrorContext::Fatal(const char *fmt, ...)
     va_start(args, fmt);
     vsprintf(tmp, fmt, args);
     tmpSize = strlen(tmp);
+#ifdef __PS2__
+    printf("FATAL: %s", tmp);
+    fflush(stdout);
+#endif
     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
     {
         strcpy(this->m_BufferEnd, tmp);
