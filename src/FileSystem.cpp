@@ -48,6 +48,10 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
         }
         if (fsize != 0)
         {
+#ifdef __PS2__
+            /* Per-file size table for memory budgeting (printed only when verbose). */
+            Supervisor::DebugPrint("size %s: %u KB\n", filename, fsize / 1024);
+#endif
             Supervisor::DebugPrint("%s Decode ... \n", filename);
             buf = (u8 *)malloc(fsize);
             if (!buf)
