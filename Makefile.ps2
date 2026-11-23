@@ -39,6 +39,10 @@ EE_OPTFLAGS = -O2
 # every message is slow on real hardware. The on-screen exit log is always kept.
 EE_CXXFLAGS += -DTH07_PS2_VERBOSE
 
+# Store every embedded texture as CT16 (A1B5G5R5): half the EE RAM and VRAM, but 8 bit colours drop to 5 bits
+# and semi-transparent sprites become cut-outs. Use only if the default build still runs out of memory.
+# EE_CXXFLAGS += -DTH07_PS2_TEX16_ALL
+
 ifeq ($(CT32),1)
 EE_CXXFLAGS += -DTH07_PS2_CT32
 endif

@@ -31,6 +31,12 @@
 size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
 unsigned g_Ps2TexCount = 0;
 bool g_Ps2TexAllocFailed = false; // set when a texture could not be allocated; AnmManager turns it into a load error
+static bool g_Ps2NextTexture16 = false; // one-shot: the next SetTextureImage stores A1B5G5R5 (CT16), half the RAM
+
+void Ps2SetNextTexture16(bool on)
+{
+    g_Ps2NextTexture16 = on;
+}
 
 namespace
 {
@@ -384,6 +390,8 @@ void PS2GS::ApplyRenderState()
     gs->PrimAlphaEnable = blend ? GS_SETTING_ON : GS_SETTING_OFF;
 
     // Alpha test (alpha is in the 0..128 GS range) + depth test
+    PushRegister(GS_SETREG_TEXA(0, 0, 128), GS_TEXA);
+
     gs->Test->ATE = alphaTest ? 1 : 0;
     gs->Test->ATST = 5; // GEQUAL
     gs->Test->AREF = (alphaRef + 1) >> 1;
@@ -490,46 +498,69 @@ void PS2GS::DeleteTexture(GfxTextureHandle handle)
 void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fmt, PixelDataType type, const void *data)
 {
     const i32 stride = (i32)tex->gs.Width;
+    const bool ct16 = (tex->gs.PSM == GS_PSM_CT16);
     const u8 *src = (const u8 *)data;
 
     for (i32 row = 0; row < h; row++)
     {
-        u32 *dst = tex->gs.Mem + (size_t)(y + row) * stride + x;
-        if (type == PIXEL_UNSIGNED_BYTE)
+        u32 *dst32 = tex->gs.Mem + (size_t)(y + row) * stride + x;
+        u16 *dst16 = (u16 *)tex->gs.Mem + (size_t)(y + row) * stride + x;
+        for (i32 i = 0; i < w; i++)
         {
-            if (fmt == PIXEL_RGB)
+            u32 r, g, b, a8;
+            if (type == PIXEL_UNSIGNED_BYTE)
             {
-                const u8 *s = src + (size_t)row * w * 3;
-                for (i32 i = 0; i < w; i++, s += 3)
-                    dst[i] = PackGS(s[0], s[1], s[2], 255);
+                if (fmt == PIXEL_RGB)
+                {
+                    const u8 *s = src + ((size_t)row * w + i) * 3;
+                    r = s[0];
+                    g = s[1];
+                    b = s[2];
+                    a8 = 255;
+                }
+                else
+                {
+                    const u8 *s = src + ((size_t)row * w + i) * 4;
+                    r = s[0];
+                    g = s[1];
+                    b = s[2];
+                    a8 = s[3];
+                }
             }
             else
             {
-                const u8 *s = src + (size_t)row * w * 4;
-                for (i32 i = 0; i < w; i++, s += 4)
-                    dst[i] = PackGS(s[0], s[1], s[2], s[3]);
-            }
-        }
-        else
-        {
-            const u16 *s = (const u16 *)src + (size_t)row * w;
-            for (i32 i = 0; i < w; i++)
-            {
-                const u32 p = s[i];
+                const u32 p = ((const u16 *)src)[(size_t)row * w + i];
                 switch (type)
                 {
                 case PIXEL_UNSIGNED_SHORT_4_4_4_4:
-                    dst[i] = PackGS(Expand(p >> 12, 4), Expand((p >> 8) & 15, 4), Expand((p >> 4) & 15, 4),
-                                    Expand(p & 15, 4));
+                    r = Expand(p >> 12, 4);
+                    g = Expand((p >> 8) & 15, 4);
+                    b = Expand((p >> 4) & 15, 4);
+                    a8 = Expand(p & 15, 4);
                     break;
                 case PIXEL_UNSIGNED_SHORT_5_5_5_1:
-                    dst[i] = PackGS(Expand(p >> 11, 5), Expand((p >> 6) & 31, 5), Expand((p >> 1) & 31, 5),
-                                    Expand(p & 1, 1));
+                    r = Expand(p >> 11, 5);
+                    g = Expand((p >> 6) & 31, 5);
+                    b = Expand((p >> 1) & 31, 5);
+                    a8 = Expand(p & 1, 1);
                     break;
                 default: // 5_6_5
-                    dst[i] = PackGS(Expand(p >> 11, 5), Expand((p >> 5) & 63, 6), Expand(p & 31, 5), 255);
+                    r = Expand(p >> 11, 5);
+                    g = Expand((p >> 5) & 63, 6);
+                    b = Expand(p & 31, 5);
+                    a8 = 255;
                     break;
                 }
+            }
+
+            if (ct16)
+            {
+                // A1 B5 G5 R5. Alpha is binary here: anything at or above one half is opaque.
+                dst16[i] = (u16)((a8 >= 128 ? 0x8000u : 0u) | ((b >> 3) << 10) | ((g >> 3) << 5) | (r >> 3));
+            }
+            else
+            {
+                dst32[i] = PackGS(r, g, b, a8);
             }
         }
     }
@@ -537,6 +568,9 @@ void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fm
 
 void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataType type, const void *data)
 {
+    const u32 psm = g_Ps2NextTexture16 ? GS_PSM_CT16 : TH07_TEX_PSM;
+    g_Ps2NextTexture16 = false; // one-shot, even when the call below is ignored
+
     Tex *tex = boundTexture;
     if (tex == nullptr)
         return;
@@ -551,7 +585,7 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
         h <<= 1;
     tex->scaleU = (f32)width / (f32)w;
     tex->scaleV = (f32)height / (f32)h;
-    const u32 bytes = gsKit_texture_size_ee(w, h, TH07_TEX_PSM);
+    const u32 bytes = gsKit_texture_size_ee(w, h, psm);
 
     std::memset(&tex->gs, 0, sizeof(GSTEXTURE));
     tex->gs.Mem = (u32 *)memalign(128, bytes);
@@ -566,7 +600,7 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
     g_Ps2TexCount++;
     tex->gs.Width = w;
     tex->gs.Height = h;
-    tex->gs.PSM = TH07_TEX_PSM;
+    tex->gs.PSM = psm;
     tex->gs.Filter = GS_FILTER_LINEAR;
     tex->alive = true;
 
@@ -585,7 +619,7 @@ void PS2GS::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height, 
 
     ConvertAndStore(tex, xoffset, yoffset, width, height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, data);
 
-    SyncDCache(tex->gs.Mem, (u8 *)tex->gs.Mem + gsKit_texture_size_ee(tex->gs.Width, tex->gs.Height, TH07_TEX_PSM));
+    SyncDCache(tex->gs.Mem, (u8 *)tex->gs.Mem + gsKit_texture_size_ee(tex->gs.Width, tex->gs.Height, tex->gs.PSM));
     gsKit_TexManager_invalidate(gs, &tex->gs);
 }
 

@@ -1,6 +1,7 @@
 #ifdef __PS2__
 void Ps2HeapLog(const char *where);
 extern bool g_Ps2TexAllocFailed; // PS2GS.cpp
+void Ps2SetNextTexture16(bool on);       // PS2GS.cpp
 #endif
 #include "AnmManager.hpp"
 
@@ -282,6 +283,19 @@ static void ConvertEmbeddedRows(const ZunImageInfoEmbedded *info, u32 y0, u32 ro
     }
 }
 
+// Which GS format an embedded texture gets. ARGB1555 is stored exactly in CT16; RGB565 loses one bit of green. The
+// 8 bit formats and ARGB4444 keep CT32 so their colours and semi-transparency are not cut down. Build with
+// -DTH07_PS2_TEX16_ALL to store everything as CT16 (half the RAM, visible loss on semi-transparent sprites).
+static bool Ps2UseCt16ForFormat(i16 format)
+{
+#ifdef TH07_PS2_TEX16_ALL
+    (void)format;
+    return true;
+#else
+    return format == 2 || format == 3;
+#endif
+}
+
 // PS2: the texture is created empty on the GS and filled a strip at a time (about 64 KB of temporary RAM instead of a
 // full-size RGBA copy). Only the two textures that CopyTexture() blits between keep a CPU copy.
 ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *imageInfo)
@@ -316,6 +330,7 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
     }
     else
     {
+        Ps2SetNextTexture16(Ps2UseCt16ForFormat(imageInfo->format));
         g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, NULL);
         const u32 stripRows = (u32)std::max<size_t>(1, 65536 / ((size_t)w * 4));
         u8 *strip = (u8 *)malloc((size_t)stripRows * w * 4);
@@ -341,6 +356,8 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
     textureWidths[textureIdx] = w;
     textureHeights[textureIdx] = h;
     texturePitches[textureIdx] = w * 4;
+    Supervisor::DebugPrint("embedded tex %u: format %d, %ux%u, %s\n", textureIdx, (i32)imageInfo->format, w, h,
+                           Ps2UseCt16ForFormat(imageInfo->format) ? "CT16" : "CT32");
     Ps2HeapLog("embedded tex");
     return ZUN_SUCCESS;
 }
