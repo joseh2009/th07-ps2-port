@@ -14,6 +14,8 @@
 
 void Ps2LogAppend(const char *text); // ps2boot.cpp
 
+size_t g_Ps2AudioBytes = 0; // EE RAM held by decoded effects (read by Ps2HeapLog)
+
 namespace
 {
 constexpr int kRate = 44100;
@@ -194,7 +196,7 @@ struct PcmHeader
     uint32_t magic;
     uint32_t channels; // 1 or 2, samples are always signed 16 bit
     uint32_t rateDiv; // stored sample rate is 44100 / rateDiv
-    uint32_t reserved;
+    uint32_t sampleBytes; // size of the sample area, used for the memory statistics
 };
 static_assert(sizeof(PcmHeader) == 16, "keep the samples 16 byte aligned");
 
@@ -206,10 +208,11 @@ int16_t *AllocPcm(ma_uint64 frames, uint32_t channels, uint32_t rateDiv)
     PcmHeader *h = (PcmHeader *)std::malloc(sizeof(PcmHeader) + (size_t)bytes);
     if (!h)
         return nullptr;
+    g_Ps2AudioBytes += sizeof(PcmHeader) + (size_t)bytes;
     h->magic = kPcmMagic;
     h->channels = channels;
     h->rateDiv = rateDiv;
-    h->reserved = 0;
+    h->sampleBytes = (uint32_t)bytes;
     return (int16_t *)(h + 1);
 }
 
@@ -233,6 +236,7 @@ void ma_free(void *p, const void *)
     if (h)
     {
         PcmHeader *base = (PcmHeader *)h;
+        g_Ps2AudioBytes -= sizeof(PcmHeader) + base->sampleBytes;
         base->magic = 0; // a stale pointer can no longer be mistaken for a live buffer
         std::free(base);
     }

@@ -1,3 +1,6 @@
+#ifdef __PS2__
+void Ps2HeapLog(const char *where);
+#endif
 #include "AnmManager.hpp"
 
 #include <SDL2/SDL_image.h>
@@ -243,14 +246,16 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
     g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
                                             PIXEL_UNSIGNED_BYTE, converted->pixels);
 
-    this->imageDataArray[textureIdx] = malloc(converted->pitch * converted->h);
-    memcpy(this->imageDataArray[textureIdx], converted->pixels, converted->pitch * converted->h);
+    // The converted buffer itself becomes the CPU-side copy (no second allocation + memcpy).
+    this->imageDataArray[textureIdx] = rgba;
 
     textureWidths[textureIdx] = converted->w;
     textureHeights[textureIdx] = converted->h;
     texturePitches[textureIdx] = converted->pitch;
 
-    free(rgba);
+#ifdef __PS2__
+    Ps2HeapLog("embedded tex");
+#endif
     return ZUN_SUCCESS;
 }
 
@@ -436,6 +441,16 @@ i32 AnmManager::LoadAnm(i32 textureIdx, AnmRawEntry *rawEntry, i32 spriteIdxOffs
             return ZUN_ERROR;
         }
     }
+#ifdef __PS2__
+    // The GS copy already holds the pixels. The CPU copy (kept by the PC build for later compositing) is only needed
+    // for textures that are blitted into (AnmManager::CopyTexture: sources/destinations 21 and 22) and for the alpha
+    // channel merge above, which is finished by now. Dropping it saves w*h*4 bytes per texture.
+    if (data->textureIdx != 21 && data->textureIdx != 22 && !(*(char *)((u8 *)data + data->nameOffset) == '@'))
+    {
+        free(this->imageDataArray[data->textureIdx]);
+        this->imageDataArray[data->textureIdx] = NULL;
+    }
+#endif
     this->textureNames[textureIdx] = (char *)((u8 *)data + data->nameOffset);
 
     u32 texWidth = this->textureWidths[textureIdx] ? this->textureWidths[textureIdx] : data->width;

@@ -27,6 +27,9 @@
 // Everything is uploaded as RGBA32 (alpha scaled to the GS range 0..128)
 #define TH07_TEX_PSM GS_PSM_CT32
 
+size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
+unsigned g_Ps2TexCount = 0;
+
 namespace
 {
 constexpr int kMaxBatchVerts = 3 * 256;
@@ -438,6 +441,8 @@ void PS2GS::ReleaseTextureMemory(Tex *tex)
         gsKit_TexManager_free(gs, &tex->gs);
     if (tex->gs.Mem)
     {
+        g_Ps2TexBytes -= gsKit_texture_size_ee(tex->gs.Width, tex->gs.Height, tex->gs.PSM);
+        g_Ps2TexCount--;
         free(tex->gs.Mem);
         tex->gs.Mem = nullptr;
     }
@@ -554,6 +559,8 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
         return;
     }
     std::memset(tex->gs.Mem, 0, bytes);
+    g_Ps2TexBytes += bytes;
+    g_Ps2TexCount++;
     tex->gs.Width = w;
     tex->gs.Height = h;
     tex->gs.PSM = TH07_TEX_PSM;

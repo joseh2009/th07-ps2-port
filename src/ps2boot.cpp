@@ -182,13 +182,19 @@ void Ps2BootScreen(int argc, char **argv)
 }
 #endif
 
-// Log how much of the heap is in use and the largest free block (for out-of-memory diagnosis)
+extern size_t g_Ps2TexBytes;   // PS2GS.cpp
+extern unsigned g_Ps2TexCount; // PS2GS.cpp
+extern size_t g_Ps2AudioBytes; // ps2audio.cpp
+
+// Log the EE heap (malloc) state together with the big consumers tracked separately: GS texture copies and decoded
+// effects. This is EE RAM only; the 4 MB of GS VRAM is managed by gsKit and is not covered by mallinfo().
 void Ps2HeapLog(const char *where)
 {
     struct mallinfo mi = mallinfo();
-    char tmp[160];
-    snprintf(tmp, sizeof(tmp), "heap@%s: used %d KB, free %d KB, arena %d KB, top %d KB\n", where,
-             (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024), (int)(mi.arena / 1024), (int)(mi.keepcost / 1024));
+    char tmp[200];
+    snprintf(tmp, sizeof(tmp), "heap@%s: used %dK free %dK arena %dK | tex %dK (%u) sfx %dK\n", where,
+             (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024), (int)(mi.arena / 1024),
+             (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount, (int)(g_Ps2AudioBytes / 1024));
     Ps2LogAppend(tmp);
     printf("%s", tmp);
 }
