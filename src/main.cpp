@@ -37,7 +37,10 @@ int main(int argc, char *argv[])
 #ifdef __PS2__
     setbuf(stdout, NULL);
     Ps2BootScreen(argc, argv);
-    Ps2Pad::Init();
+    if (!Ps2Pad::Init())
+    {
+        Supervisor::DebugPrint("main: pad init failed, the game will have no controller input\n");
+    }
 #endif
 
     i32 res;

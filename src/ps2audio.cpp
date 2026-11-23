@@ -13,6 +13,7 @@
 #include <vector>
 
 void Ps2LogAppend(const char *text); // ps2boot.cpp
+void Ps2SifInitOnce();              // ps2boot.cpp
 
 size_t g_Ps2AudioBytes = 0; // EE RAM held by decoded effects (read by Ps2HeapLog)
 
@@ -242,7 +243,8 @@ void ma_free(void *p, const void *)
     }
     else
     {
-        std::free(p);
+        // Not one of ours: freeing it could corrupt the heap, so report it and leave it alone
+        AudioLog("audio: ma_free of a pointer that was not made by ma_decode_memory (%p), not freed\n", p);
     }
 }
 
@@ -377,7 +379,7 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
     // Long effects (> 1 s) go to quarter rate: they are the bulk of the memory and mostly noise/low frequency anyway.
     const uint32_t div = (srcFrames * 1000 / rate > 1000) ? kSfxRateDiv * 2 : kSfxRateDiv;
     const uint32_t storeRate = kRate / div;
-    const uint64_t outFrames = srcFrames * storeRate / rate;
+    const uint64_t outFrames = std::max<uint64_t>(1, srcFrames * storeRate / rate);
     const uint32_t outCh = 1; // effects are stored mono (stereo sources are averaged) to save RAM
     int16_t *out = outFrames ? AllocPcm(outFrames, outCh, div) : nullptr;
     if (!out)
@@ -434,7 +436,7 @@ extern "C" unsigned int size_audsrv_irx;
 
 ma_result ps2audio_engine_init(ma_engine *e)
 {
-    SifInitRpc(0);
+    Ps2SifInitOnce();
     int r = SifLoadModule("rom0:LIBSD", 0, NULL);
     if (r < 0)
         AudioLog("audio: LIBSD load returned %d (continuing: it may already be resident)\n", r);
@@ -480,7 +482,14 @@ void ps2audio_pump()
         if (avail < (int)sizeof(out))
             break;
         MixFrames(out, kChunk);
-        audsrv_play_audio((const char *)out, sizeof(out));
+        const int wrote = audsrv_play_audio((const char *)out, sizeof(out));
+        if (wrote != (int)sizeof(out))
+        {
+            static unsigned shortWrites = 0;
+            if (shortWrites++ < 5)
+                AudioLog("audio: audsrv accepted %d of %u bytes (%u short writes so far)\n", wrote,
+                         (unsigned)sizeof(out), shortWrites);
+        }
     }
 }
 

@@ -42,3 +42,10 @@ Controls: standard pad (cross = shoot, circle = bomb, ...).
 * MIDI output and 16 bit colour options are not available.
 * Audio is mixed in the SDL audio thread; BGM is streamed from `thbgm.dat` (enable "preload BGM" if it stutters).
 * Memory (32 MB) and VRAM (4 MB, textures are swapped by gsKit's texture manager) are tight.
+
+## Build options
+
+- `CT32=1`: 32 bit frame buffer (more VRAM use, no 16 bit dithering).
+- `TH07_PS2_VERBOSE` (on by default in `Makefile.ps2`): also prints every log line to the EE console (`printf` +
+  flush). This is slow on real hardware; remove the line from `Makefile.ps2` for release builds. The on-screen exit
+  log is kept either way.

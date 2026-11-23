@@ -534,6 +534,12 @@ ZunResult SoundPlayer::LoadSound(i32 idx, const char *path)
     {
         return ZUN_ERROR;
     }
+    if (g_LastFileSize < 12) // the RIFF header below is 12 bytes; reading it from a shorter buffer is out of bounds
+    {
+        g_GameErrorContext.Log("Wav ファイルが短すぎる %s (%u bytes)\n", path, (unsigned)g_LastFileSize);
+        free(soundFileDat);
+        return ZUN_ERROR;
+    }
 
     if (strncmp((char *)soundFileDat, "RIFF", 4) != 0)
     {
@@ -757,7 +763,12 @@ ZunResult SoundPlayer::InitSoundBuffers()
         {
             g_GameErrorContext.Log("error : Sound ファイルが読み込めない データを確認 %s\n",
                                    g_SFXList[i]);
+#ifdef __PS2__
+            // Keep going: the effects that use this buffer stay silent (their sound stays NULL, see below)
+            continue;
+#else
             return ZUN_ERROR;
+#endif
         }
     }
 #ifdef __PS2__
@@ -766,6 +777,15 @@ ZunResult SoundPlayer::InitSoundBuffers()
     for (i = 0; i < ARRAY_SIZE(SOUND_BUFFER_IDX_VOL); i++)
     {
         i32 bufIdx = SOUND_BUFFER_IDX_VOL[i].bufferIdx;
+#ifdef __PS2__
+        if (!this->sfxPCMData[bufIdx])
+        {
+            // no PCM data for this effect: leave soundBuffers[i] NULL (ProcessQueues checks it before playing)
+            this->duplicateSfxData[i] = NULL;
+            this->soundBuffers[i] = NULL;
+            continue;
+        }
+#endif
 
         this->duplicateSfxData[i] = new ma_audio_buffer;
         ma_audio_buffer_config bufCfg = ma_audio_buffer_config_init(

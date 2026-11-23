@@ -1,6 +1,7 @@
 #include "PS2GS.hpp"
 
 #include "AnmManager.hpp"
+#include "GameErrorContext.hpp"
 #include "GameWindow.hpp"
 #include "Supervisor.hpp"
 
@@ -29,6 +30,7 @@
 
 size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
 unsigned g_Ps2TexCount = 0;
+bool g_Ps2TexAllocFailed = false; // set when a texture could not be allocated; AnmManager turns it into a load error
 
 namespace
 {
@@ -119,7 +121,7 @@ ZunGraphics *PS2GS::Init()
     self->mvp.Identity();
     self->textures.emplace_back(); // reserve handle 0
 
-    GSGLOBAL *gs = gsKit_init_global_custom(1536 * 1024, 128 * 1024);
+    GSGLOBAL *gs = gsKit_init_global_custom(512 * 1024, 128 * 1024);
     if (gs == nullptr)
     {
         delete self;
@@ -555,7 +557,8 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
     tex->gs.Mem = (u32 *)memalign(128, bytes);
     if (tex->gs.Mem == nullptr)
     {
-        printf("PS2GS: out of memory for a %ux%u texture\n", width, height);
+        g_Ps2TexAllocFailed = true;
+        g_GameErrorContext.Fatal("error : out of EE memory for a %ux%u texture (%u bytes)\n", width, height, bytes);
         return;
     }
     std::memset(tex->gs.Mem, 0, bytes);
@@ -703,7 +706,8 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
         const f32 sx = (((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX - 0.5f;
         const f32 sy = (((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY - 0.5f;
 
-        f32 depth = (ndcZ * 0.5f + 0.5f) * (viewport.maxZ - viewport.minZ) + viewport.minZ;
+        // PerspectiveFovLH (ZunMath.hpp) and the 2D projections already produce ndcZ in [0,1] (D3D convention)
+        f32 depth = ndcZ * (viewport.maxZ - viewport.minZ) + viewport.minZ;
         depth = std::clamp(depth, 0.0f, 1.0f);
         const int iz = (int)((1.0f - depth) * 65535.0f); // inverted: the GS test is GEQUAL
 
@@ -890,7 +894,8 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
         return;
     }
 
-    std::vector<InVert> in(count);
+    upVerts.resize(count);
+    InVert *in = upVerts.data();
     const u8 *base = (const u8 *)vertexData;
     for (i32 i = 0; i < count; i++)
     {
@@ -915,15 +920,17 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
                  v->diffuse.bytes.r, v->diffuse.bytes.g, v->diffuse.bytes.b, v->diffuse.bytes.a};
         }
     }
-    DrawVertices(type, in.data(), count, hasTex, screenSpace);
+    DrawVertices(type, in, count, hasTex, screenSpace);
 }
 
 void PS2GS::SwapBuffers()
 {
     static int frame = 0;
+#ifdef TH07_PS2_VERBOSE
     if (frame < 5)
         printf("PS2GS: SwapBuffers frame %d (queue used: %d bytes)\n", frame,
                (int)((u8 *)gs->CurQueue->pool_cur - (u8 *)gs->CurQueue->pool[gs->CurQueue->dbuf]));
+#endif
     frame++;
 
     gsKit_queue_exec(gs);

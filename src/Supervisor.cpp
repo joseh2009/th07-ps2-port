@@ -60,9 +60,11 @@ void Supervisor::DebugPrint(const char *fmt, ...)
         Ps2LogAppend(tmp);
     }
 #endif
+#if !defined(__PS2__) || defined(TH07_PS2_VERBOSE)
     vprintf(fmt, args);
+#endif
     va_end(args);
-#ifdef __PS2__
+#if !defined(__PS2__) || defined(TH07_PS2_VERBOSE)
     fflush(stdout);
 #endif
 }
@@ -545,7 +547,10 @@ ZunResult Supervisor::AddedCallback(Supervisor *arg)
     {
         arg->midiOutput->ReadFileData(30, "bgm/init.mid");
     }
-    g_SoundPlayer.InitSoundBuffers();
+    if (g_SoundPlayer.InitSoundBuffers() != ZUN_SUCCESS)
+    {
+        g_GameErrorContext.Log("sound: InitSoundBuffers failed, some effects may be missing\n");
+    }
     if (g_AnmManager->LoadAnms(ANM_FILE_TEXT, "data/text.anm", ANM_OFFSET_TEXT) != ZUN_SUCCESS)
     {
         return ZUN_ERROR;

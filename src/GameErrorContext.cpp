@@ -21,8 +21,10 @@ const char *GameErrorContext::Log(const char *fmt, ...)
     tmpSize = strlen(tmp);
 #ifdef __PS2__
     Ps2LogAppend(tmp);
+#ifdef TH07_PS2_VERBOSE
     printf("LOG: %s", tmp);
     fflush(stdout);
+#endif
 #endif
     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
     {
@@ -47,8 +49,10 @@ const char *GameErrorContext::Fatal(const char *fmt, ...)
 #ifdef __PS2__
     Ps2LogAppend("FATAL: ");
     Ps2LogAppend(tmp);
+#ifdef TH07_PS2_VERBOSE
     printf("FATAL: %s", tmp);
     fflush(stdout);
+#endif
 #endif
     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
     {

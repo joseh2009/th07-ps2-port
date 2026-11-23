@@ -1,5 +1,6 @@
 #ifdef __PS2__
 void Ps2HeapLog(const char *where);
+extern bool g_Ps2TexAllocFailed; // PS2GS.cpp
 #endif
 #include "AnmManager.hpp"
 
@@ -153,44 +154,86 @@ ZunResult AnmManager::LoadTexture(i32 textureIdx, const char *texturePath, u32 c
     return ZUN_SUCCESS;
 }
 
+#ifndef __PS2__
 ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *imageInfo)
 {
-    SDL_Surface *surface = NULL;
+    SDL_Surface *surface;
 
     ReleaseTexture(textureIdx);
 
-    if (imageInfo->format < 1 || imageInfo->format > 5)
-    {
-        Supervisor::DebugPrint("embedded texture: bad format %u\n", (u32)imageInfo->format);
-        return ZUN_ERROR;
-    }
     u32 bpp = g_TextureBytesPerPixel[imageInfo->format];
+    u32 depth = bpp * 8;
     u32 pitch = imageInfo->width * bpp;
 
-    // Convert to RGBA32 by hand (no dependency on SDL's blitter / pixel format support)
-    if (imageInfo->format < 1 || imageInfo->format > 5 || imageInfo->width == 0 || imageInfo->height == 0)
+    u32 sdlFormat = SDL_PIXELFORMAT_UNKNOWN;
+    switch (imageInfo->format)
     {
-        Supervisor::DebugPrint("embedded texture: bad format %u (%ux%u)\n", (u32)imageInfo->format,
-                               (u32)imageInfo->width, (u32)imageInfo->height);
+    case 1:
+        sdlFormat = SDL_PIXELFORMAT_ARGB8888;
+        break;
+    case 2:
+        sdlFormat = SDL_PIXELFORMAT_ARGB1555;
+        break;
+    case 3:
+        sdlFormat = SDL_PIXELFORMAT_RGB565;
+        break;
+    case 4:
+        sdlFormat = SDL_PIXELFORMAT_BGR24;
+        break;
+    case 5:
+        sdlFormat = SDL_PIXELFORMAT_ARGB4444;
+        break;
+    default:
         return ZUN_ERROR;
     }
-    u8 *rgba = (u8 *)malloc((size_t)imageInfo->width * imageInfo->height * 4);
-    if (!rgba)
+
+    surface = SDL_CreateRGBSurfaceWithFormatFrom(imageInfo->data, imageInfo->width,
+                                                 imageInfo->height, depth, pitch, sdlFormat);
+    if (!surface)
     {
-        Supervisor::DebugPrint("embedded texture: out of memory (%ux%u)\n", (u32)imageInfo->width,
-                               (u32)imageInfo->height);
         return ZUN_ERROR;
     }
-    for (u32 y = 0; y < (u32)imageInfo->height; y++)
+
+    SDL_Surface *converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+    SDL_FreeSurface(surface);
+
+    if (!converted)
     {
-        const u8 *src = (const u8 *)imageInfo->data + (size_t)y * pitch;
-        u8 *dst = rgba + (size_t)y * imageInfo->width * 4;
-        for (u32 x = 0; x < (u32)imageInfo->width; x++, dst += 4)
+        return ZUN_ERROR;
+    }
+
+    this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
+    g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
+    g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
+                                            PIXEL_UNSIGNED_BYTE, converted->pixels);
+
+    this->imageDataArray[textureIdx] = malloc(converted->pitch * converted->h);
+    memcpy(this->imageDataArray[textureIdx], converted->pixels, converted->pitch * converted->h);
+
+    textureWidths[textureIdx] = converted->w;
+    textureHeights[textureIdx] = converted->h;
+    texturePitches[textureIdx] = converted->pitch;
+
+    SDL_FreeSurface(converted);
+    return ZUN_SUCCESS;
+}
+#else
+// Pixel conversion for the five embedded formats, written to RGBA32. Bit replication (x<<3 | x>>2, ...) gives the same
+// colours as SDL's own expansion, so the PS2 build matches the PC build.
+static void ConvertEmbeddedRows(const ZunImageInfoEmbedded *info, u32 y0, u32 rows, u8 *dst)
+{
+    const u32 w = (u32)info->width;
+    const u32 bpp = g_TextureBytesPerPixel[info->format];
+    for (u32 y = 0; y < rows; y++)
+    {
+        const u8 *src = (const u8 *)info->data + (size_t)(y0 + y) * w * bpp;
+        u8 *out = dst + (size_t)y * w * 4;
+        for (u32 x = 0; x < w; x++, out += 4)
         {
             u32 r, g, b, a;
-            switch (imageInfo->format)
+            switch (info->format)
             {
-            case 1: // ARGB8888 (B,G,R,A in memory)
+            case 1: // ARGB8888, bytes B,G,R,A
                 b = src[x * 4];
                 g = src[x * 4 + 1];
                 r = src[x * 4 + 2];
@@ -199,17 +242,17 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
             case 2: { // ARGB1555
                 u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
                 a = (v & 0x8000) ? 255 : 0;
-                r = ((v >> 10) & 31) * 255 / 31;
-                g = ((v >> 5) & 31) * 255 / 31;
-                b = (v & 31) * 255 / 31;
+                r = (((v >> 10) & 31) << 3) | (((v >> 10) & 31) >> 2);
+                g = (((v >> 5) & 31) << 3) | (((v >> 5) & 31) >> 2);
+                b = ((v & 31) << 3) | ((v & 31) >> 2);
                 break;
             }
             case 3: { // RGB565
                 u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
                 a = 255;
-                r = ((v >> 11) & 31) * 255 / 31;
-                g = ((v >> 5) & 63) * 255 / 63;
-                b = (v & 31) * 255 / 31;
+                r = (((v >> 11) & 31) << 3) | (((v >> 11) & 31) >> 2);
+                g = (((v >> 5) & 63) << 2) | (((v >> 5) & 63) >> 4);
+                b = ((v & 31) << 3) | ((v & 31) >> 2);
                 break;
             }
             case 4: // BGR24
@@ -220,44 +263,88 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
                 break;
             default: { // 5: ARGB4444
                 u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
-                a = ((v >> 12) & 15) * 17;
-                r = ((v >> 8) & 15) * 17;
-                g = ((v >> 4) & 15) * 17;
-                b = (v & 15) * 17;
+                a = (v >> 12) & 15;
+                r = (v >> 8) & 15;
+                g = (v >> 4) & 15;
+                b = v & 15;
+                a = (a << 4) | a;
+                r = (r << 4) | r;
+                g = (g << 4) | g;
+                b = (b << 4) | b;
                 break;
             }
             }
-            dst[0] = (u8)r;
-            dst[1] = (u8)g;
-            dst[2] = (u8)b;
-            dst[3] = (u8)a;
+            out[0] = (u8)r;
+            out[1] = (u8)g;
+            out[2] = (u8)b;
+            out[3] = (u8)a;
         }
     }
-    struct
+}
+
+// PS2: the texture is created empty on the GS and filled a strip at a time (about 64 KB of temporary RAM instead of a
+// full-size RGBA copy). Only the two textures that CopyTexture() blits between keep a CPU copy.
+ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *imageInfo)
+{
+    ReleaseTexture(textureIdx);
+
+    if (imageInfo->format < 1 || imageInfo->format > 5 || imageInfo->width <= 0 || imageInfo->height <= 0)
     {
-        i32 w, h, pitch;
-        u8 *pixels;
-    } conv = {(i32)imageInfo->width, (i32)imageInfo->height, (i32)imageInfo->width * 4, rgba};
-    auto *converted = &conv;
-    (void)surface;
+        Supervisor::DebugPrint("embedded texture: bad format %u (%dx%d)\n", (u32)imageInfo->format,
+                               (i32)imageInfo->width, (i32)imageInfo->height);
+        return ZUN_ERROR;
+    }
+    const u32 w = (u32)imageInfo->width;
+    const u32 h = (u32)imageInfo->height;
+    const bool keepCpuCopy = (textureIdx == 21 || textureIdx == 22);
 
     this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
-    g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
-                                            PIXEL_UNSIGNED_BYTE, converted->pixels);
 
-    // The converted buffer itself becomes the CPU-side copy (no second allocation + memcpy).
-    this->imageDataArray[textureIdx] = rgba;
+    g_Ps2TexAllocFailed = false;
+    if (keepCpuCopy)
+    {
+        u8 *cpu = (u8 *)malloc((size_t)w * h * 4);
+        if (!cpu)
+        {
+            Supervisor::DebugPrint("embedded texture %u: out of memory (%ux%u)\n", textureIdx, w, h);
+            return ZUN_ERROR;
+        }
+        ConvertEmbeddedRows(imageInfo, 0, h, cpu);
+        g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, cpu);
+        this->imageDataArray[textureIdx] = cpu;
+    }
+    else
+    {
+        g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, NULL);
+        const u32 stripRows = (u32)std::max<size_t>(1, 65536 / ((size_t)w * 4));
+        u8 *strip = (u8 *)malloc((size_t)stripRows * w * 4);
+        if (!strip)
+        {
+            Supervisor::DebugPrint("embedded texture: out of memory for a strip (%ux%u)\n", w, h);
+            return ZUN_ERROR;
+        }
+        for (u32 y0 = 0; y0 < h; y0 += stripRows)
+        {
+            const u32 rows = std::min(stripRows, h - y0);
+            ConvertEmbeddedRows(imageInfo, y0, rows, strip);
+            g_Supervisor.gfxDevice->SetTextureSubImage(0, (i32)y0, (i32)w, (i32)rows, strip);
+        }
+        free(strip);
+        this->imageDataArray[textureIdx] = NULL;
+    }
+    if (g_Ps2TexAllocFailed)
+    {
+        return ZUN_ERROR; // already reported by PS2GS
+    }
 
-    textureWidths[textureIdx] = converted->w;
-    textureHeights[textureIdx] = converted->h;
-    texturePitches[textureIdx] = converted->pitch;
-
-#ifdef __PS2__
+    textureWidths[textureIdx] = w;
+    textureHeights[textureIdx] = h;
+    texturePitches[textureIdx] = w * 4;
     Ps2HeapLog("embedded tex");
-#endif
     return ZUN_SUCCESS;
 }
+#endif
 
 ZunResult AnmManager::LoadTextureAlphaChannel(i32 textureIdx, const char *texturePath)
 {
@@ -325,7 +412,12 @@ ZunResult AnmManager::CreateEmptyTexture(i32 textureIdx, u32 width, u32 height)
     ReleaseTexture(textureIdx);
     this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
 
+#ifdef __PS2__
+    // The GS allocates a zeroed texture itself; a CPU copy is only needed for the blitted textures (21, 22)
+    void *emptyData = (textureIdx == 21 || textureIdx == 22) ? calloc(width * height, 4) : NULL;
+#else
     void *emptyData = calloc(width * height, 4);
+#endif
     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
     g_Supervisor.gfxDevice->SetTextureImage(width, height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
                                             emptyData);

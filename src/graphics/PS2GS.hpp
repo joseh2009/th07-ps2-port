@@ -112,6 +112,7 @@ class PS2GS : public ZunGraphics
     std::vector<ClipVert> clipVerts;
     std::vector<GSPRIMSTQPOINT> texBatch;
     std::vector<GSPRIMPOINT> flatBatch;
+    std::vector<InVert> upVerts; // DrawPrimitiveUP input, reused (a per-call heap vector fragmented the 32 MB heap)
 
     void ApplyRenderState();
     void PushRegister(u64 data, u64 address);

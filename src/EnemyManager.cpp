@@ -105,6 +105,15 @@ Enemy *EnemyManager::SpawnEnemy(i32 eclSubId, ZunVec3 *pos, i32 life, i32 itemDr
         }
         break;
     }
+#ifdef __PS2__
+    if (i >= MAX_ENEMIES)
+    {
+        // Pool full: the caller gets the spare slot, which is not in the active list, so the spawn has no effect
+        static unsigned overflows = 0;
+        if (overflows++ < 5)
+            Supervisor::DebugPrint("EnemyManager: pool full (%d enemies), spawn ignored\n", MAX_ENEMIES);
+    }
+#endif
     return enemy;
 }
 
@@ -150,6 +159,15 @@ Enemy *EnemyManager::SpawnEnemyEx(i32 eclSubId, ZunVec3 *pos, i32 life, i32 item
         }
         break;
     }
+#ifdef __PS2__
+    if (i >= MAX_ENEMIES)
+    {
+        // Pool full: the caller gets the spare slot, which is not in the active list, so the spawn has no effect
+        static unsigned overflows = 0;
+        if (overflows++ < 5)
+            Supervisor::DebugPrint("EnemyManager: pool full (%d enemies), spawn ignored\n", MAX_ENEMIES);
+    }
+#endif
     return enemy;
 }
 

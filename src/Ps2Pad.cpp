@@ -7,6 +7,8 @@
 #include <loadfile.h>
 #include <sifrpc.h>
 
+void Ps2SifInitOnce(); // ps2boot.cpp
+
 // The pad DMA buffer must be 64-byte aligned and 256 bytes long.
 static char s_PadBuf[256] __attribute__((aligned(64)));
 static bool s_Ready = false;
@@ -15,7 +17,7 @@ static bool s_Ready = false;
 
 bool Ps2Pad::Init()
 {
-    SifInitRpc(0);
+    Ps2SifInitOnce();
     // The newer X modules go with libpadx; the old rom0:PADMAN can hang padInit under emulation.
     if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) < 0)
     {

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <debug.h>
 #include <malloc.h>
+#include <sifrpc.h>
 #include <unistd.h>
 
 // Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
@@ -72,8 +73,9 @@ void Ps2ShowExitScreen(int result)
             cur[ci] = 0;
             if (ci > 0)
             {
-                strncpy(lines[count % 40], cur, 99);
-                lines[count % 40][99] = 0;
+                const size_t len = ci < 99 ? ci : 99;
+                memcpy(lines[count % 40], cur, len);
+                lines[count % 40][len] = 0;
                 count++;
             }
             ci = 0;
@@ -197,4 +199,15 @@ void Ps2HeapLog(const char *where)
              (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount, (int)(g_Ps2AudioBytes / 1024));
     Ps2LogAppend(tmp);
     printf("%s", tmp);
+}
+
+// SifInitRpc must run once: the pad and the audio driver both call it at start-up
+void Ps2SifInitOnce()
+{
+    static bool done = false;
+    if (!done)
+    {
+        SifInitRpc(0);
+        done = true;
+    }
 }
