@@ -61,7 +61,7 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
 
             if (!g_Pbg4Archive.ReadDecompressEntry(filename, buf))
             {
-                g_GameErrorContext.Fatal("error : %s could not be read from the archive (out of memory?)\n", filename);
+                g_GameErrorContext.Fatal("error : %s could not be read or decompressed from the archive (corrupt data, file error or out of memory)\n", filename);
                 free(buf);
                 return NULL;
             }

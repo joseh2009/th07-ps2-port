@@ -179,6 +179,10 @@ u8 *Lzss::Compress(u8 *src, i32 srcLen, i32 *outSize)
     }
 
 #define DEC_WRITE_BYTE(data)                                                                       \
+    if (dstCursor >= dstEnd)                                                                       \
+    {                                                                                              \
+        goto dst_overflow;                                                                         \
+    }                                                                                              \
     *dstCursor++ = data;                                                                           \
     g_LzssDictionary[dictHead] = data;                                                             \
     dictHead = LZSS_DICTPOS_MOD(dictHead, 1);
@@ -233,6 +237,7 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
     (void)checksum;
     i32 size = srcLen;
 
+    const bool ownsDst = (dst == NULL);
     if (dst == NULL)
     {
         dst = (u8 *)malloc(decompressedSize);
@@ -241,6 +246,7 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
             return NULL;
         }
     }
+    u8 *const dstEnd = dst + decompressedSize;
 
     u8 *srcCursor = src;
     u8 *dstCursor = dst;
@@ -286,6 +292,14 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
     }
 
     return dst;
+
+dst_overflow:
+    // Corrupt or mismatching archive: the stream wants to write past the size recorded in the header
+    if (ownsDst)
+    {
+        free(dst);
+    }
+    return NULL;
 }
 
 void Lzss::InitTree(i32 root)
