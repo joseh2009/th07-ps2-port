@@ -2,6 +2,9 @@
 
 #include <SDL2/SDL_surface.h>
 #include <SDL2/SDL_ttf.h>
+#ifdef __PS2__
+#include "Ps2ShiftJis.hpp"
+#endif
 
 #include "GameErrorContext.hpp"
 #include "Supervisor.hpp"
@@ -255,7 +258,12 @@ void TextHelper::RenderTextToTextureBold(i32 xPos, i32 yPos, i32 spriteWidth, i3
     bool needsFree = false;
     if (!IsUtf8(string))
     {
+#ifdef __PS2__
+        // The PS2 SDL2 build cannot convert SHIFT_JIS (see Ps2ShiftJis.hpp)
+        char *tmp = Ps2SjisToUtf8(string);
+#else
         char *tmp = SDL_iconv_string("UTF-8", "SHIFT_JIS", string, SDL_strlen(string) + 1);
+#endif
         if (tmp)
         {
             convStr = tmp;
