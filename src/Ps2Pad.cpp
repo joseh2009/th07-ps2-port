@@ -53,12 +53,25 @@ bool Ps2Pad::Init()
     return true;
 }
 
+static int s_stuckFrames = 0; // frames in a state other than stable / find
+
 u16 Ps2Pad::GetButtons()
 {
     if (!s_Ready)
         return 0;
     int state = padGetState(0, 0);
-    if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1)
+    if (state == PAD_STATE_STABLE || state == PAD_STATE_FINDCTP1)
+    {
+        s_stuckFrames = 0;
+    }
+    else if (++s_stuckFrames == 600)
+    {
+        // About 10 seconds without a ready pad (for example a clone that never finishes a command): reopen the port once
+        padPortClose(0, 0);
+        padPortOpen(0, 0, UNCACHED_SEG(s_PadBuf));
+    }
+    // EXECCMD means the pad is busy with a command (for example after padSetMainMode); the data can still be read
+    if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1 && state != PAD_STATE_EXECCMD)
     {
         g_Ps2PadHeld = 0x20000 | (u32)state; // diagnostic: pad not ready yet
         return 0;
