@@ -9,6 +9,7 @@
 // Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
 // relative names, so every relative fopen() of the game is redirected through this prefix (see __wrap_fopen).
 char g_Ps2BasePrefix[160] = "";
+int g_Ps2FilesOk = 0; // 1 once the boot check found all required files
 
 extern "C" FILE *__real_fopen(const char *path, const char *mode);
 
@@ -179,6 +180,7 @@ void Ps2BootScreen(int argc, char **argv)
         for (;;)
             sleep(1);
     }
+    g_Ps2FilesOk = 1; // only reached when every required file was found; shown on the title screen
     scr_printf("  All required files found. Starting game...\n");
     sleep(4);
 }

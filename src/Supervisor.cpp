@@ -43,6 +43,8 @@ extern u64 g_Ps2GsMsTotal;
 extern u32 g_Ps2GsFrames;
 extern u32 g_Ps2PadHeld;
 extern u32 g_Ps2PadMode;
+extern int g_Ps2PadInit;  // Ps2Pad.cpp
+extern int g_Ps2FilesOk;  // ps2boot.cpp
 #endif
 char g_FpsCounterBuffer[256];
 u32 g_NumFramesSinceLastTime;
@@ -779,6 +781,29 @@ LAB_00439350:
         fpsCounterPos.y = 464.0f;
         fpsCounterPos.z = 0.0f;
         g_AsciiManager.AddString(&fpsCounterPos, g_FpsCounterBuffer);
+#ifdef __PS2__
+        // Start-up status, top left. Shown whatever the controller does, so it tells whether the files and the pad
+        // were set up even when no buttons work.
+        {
+            static char s_StatusBuffer[96];
+            const char *padText = "NOT TRIED";
+            if (g_Ps2PadInit == 1)
+                padText = "NO MODULES";
+            else if (g_Ps2PadInit == 2)
+                padText = "PORT FAILED";
+            else if (g_Ps2PadInit == 3)
+                padText = "OK";
+            sprintf(s_StatusBuffer, "FILES %s  PAD %s", g_Ps2FilesOk ? "OK" : "?", padText);
+            ZunVec3 statusPos;
+            statusPos.x = 8.0f;
+            statusPos.y = 8.0f;
+            statusPos.z = 0.0f;
+            u32 savedColor = g_AsciiManager.color;
+            g_AsciiManager.color = 0xffffffff;
+            g_AsciiManager.AddString(&statusPos, s_StatusBuffer);
+            g_AsciiManager.color = savedColor;
+        }
+#endif
         if (g_GameManager.replay && g_GameManager.notInMenu)
         {
             replayFpsCounterPos.x = 384.0f;

@@ -20,6 +20,8 @@ static bool s_Ready = false;
 // The console log is not visible on hardware, so this is the only way to see it there.
 u32 g_Ps2PadHeld = 0;
 u32 g_Ps2PadMode = 0; // pad.mode from the last successful read (0x41 digital, 0x73 analog, ...)
+// Result of Ps2Pad::Init, shown on the title screen: 0 not tried, 1 no pad modules, 2 port open failed, 3 ready
+int g_Ps2PadInit = 0;
 
 bool Ps2Pad::Init()
 {
@@ -40,6 +42,7 @@ bool Ps2Pad::Init()
     if (!modulesOk)
     {
         printf("Ps2Pad: no pad modules could be loaded\n");
+        g_Ps2PadInit = 1;
         return false;
     }
     padInit(0);
@@ -48,8 +51,12 @@ bool Ps2Pad::Init()
     int r = padPortOpen(0, 0, UNCACHED_SEG(s_PadBuf));
     printf("Ps2Pad: padPortOpen -> %d\n", r);
     if (r == 0)
+    {
+        g_Ps2PadInit = 2;
         return false;
+    }
     s_Ready = true; // the pad settles over the next few frames; GetButtons just polls
+    g_Ps2PadInit = 3;
     return true;
 }
 
