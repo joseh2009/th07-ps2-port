@@ -757,8 +757,12 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
         const f32 ndcY = v.y * invW;
         const f32 ndcZ = v.z * invW;
 
-        const f32 sx = (((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX - 0.5f;
-        const f32 sy = (((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY - 0.5f;
+        // Snap to the framebuffer pixel grid. The game is 640x480 but the NTSC framebuffer is 448 rows, so
+        // scaleY is not an integer and sprite edges would land on fractional rows. Neighbouring quads then
+        // leave a gap or overlap on a shared edge, which shows as light horizontal lines. Snapping gives
+        // shared vertices identical coordinates.
+        const f32 sx = std::floor((((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX + 0.5f) - 0.5f;
+        const f32 sy = std::floor((((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY + 0.5f) - 0.5f;
 
         // PerspectiveFovLH (ZunMath.hpp) and the 2D projections already produce ndcZ in [0,1] (D3D convention)
         f32 depth = ndcZ * (viewport.maxZ - viewport.minZ) + viewport.minZ;
