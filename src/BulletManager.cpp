@@ -17,6 +17,10 @@
 // Normal bullets drawn per frame before the flicker/rotation kicks in (see BulletManager::OnDraw).
 #define TH07_PS2_BULLET_DRAW_LIMIT 256
 #endif
+#ifndef TH07_PS2_BULLET_CULL_MARGIN
+// Bullets further than this outside the play field (384x448) are not drawn; they reappear when they come back.
+#define TH07_PS2_BULLET_CULL_MARGIN 64.0f
+#endif
 #endif
 #include "utils.hpp"
 
@@ -1279,6 +1283,13 @@ u32 BulletManager::OnDraw(BulletManager *arg)
         while (bullet)
         {
 #ifdef __PS2__
+            // Off-screen bullets are not drawn (drawing only: movement and collision are untouched)
+            if (bullet->pos.x < -TH07_PS2_BULLET_CULL_MARGIN || bullet->pos.x > 384.0f + TH07_PS2_BULLET_CULL_MARGIN ||
+                bullet->pos.y < -TH07_PS2_BULLET_CULL_MARGIN || bullet->pos.y > 448.0f + TH07_PS2_BULLET_CULL_MARGIN)
+            {
+                bullet = bullet->next;
+                continue;
+            }
             const bool effect = bullet->state == BULLET_SPAWNING_FAST ||
                                 bullet->state == BULLET_SPAWNING_NORMAL ||
                                 bullet->state == BULLET_SPAWNING_SLOW || bullet->state == BULLET_DESPAWN;
