@@ -370,6 +370,17 @@ struct AnmManager
     SDL_Surface *surfaces[MAX_SURFACES];
     SDL_Surface *surfacesBis[MAX_SURFACES];
     u32 textureWidths[MAX_TEXTURES];
+
+    // Text cache (PS2 speed): DrawStringFormat re-renders the same string into the same texture every frame. A texture
+    // keeps its last text key; the key is reused only while no other texture write happened (textureWriteGen).
+    struct TextCacheEntry
+    {
+        u64 key;
+        u32 gen;
+        bool valid;
+    };
+    TextCacheEntry textCache[MAX_TEXTURES];
+    u32 textureWriteGen;
     u32 textureHeights[MAX_TEXTURES];
     u32 texturePitches[MAX_TEXTURES];
     ZunImageInfo surfaceSourceInfo[MAX_SURFACES];
