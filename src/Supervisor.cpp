@@ -38,6 +38,10 @@ u16 g_NumOfFramesInputsWereHeld;
 Supervisor g_Supervisor;
 u32 g_FpsUpdateCounter;
 char g_ReplayFpsBuffer[256];
+#ifdef __PS2__
+extern u64 g_Ps2GsMsTotal;
+extern u32 g_Ps2GsFrames;
+#endif
 char g_FpsCounterBuffer[256];
 u32 g_NumFramesSinceLastTime;
 u64 g_PerformanceCounter;
@@ -694,7 +698,15 @@ void Supervisor::DrawFpsCounter(i32 param_1)
             MERGE:
                 fps = (f32)g_NumFramesSinceLastTime / elapsedTimeInSecs;
                 g_NumFramesSinceLastTime = 0;
+#ifdef __PS2__
+                // Diagnostic: fps, then the average ms per frame spent in SwapBuffers (GS) since the last update
+                sprintf(g_FpsCounterBuffer, "%.01ffps gs%.0f", (f64)fps,
+                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0);
+                g_Ps2GsMsTotal = 0;
+                g_Ps2GsFrames = 0;
+#else
                 sprintf(g_FpsCounterBuffer, "%.02ffps", (f64)fps);
+#endif
                 if (g_GameManager.notInMenu && param_1 != 0)
                 {
                     targetFps = 60.0f;

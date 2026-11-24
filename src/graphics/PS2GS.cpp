@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <SDL2/SDL_timer.h>
 #include <dmaKit.h>
 #include <gsInline.h>
 #include <gsToolkit.h>
@@ -995,6 +996,10 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
     DrawVertices(type, in, count, hasTex, screenSpace);
 }
 
+// Diagnostic for the on-screen fps counter: time spent in SwapBuffers (GS work plus waiting for it), in ms.
+u64 g_Ps2GsMsTotal;
+u32 g_Ps2GsFrames;
+
 void PS2GS::SwapBuffers()
 {
     FlushPending();
@@ -1006,8 +1011,11 @@ void PS2GS::SwapBuffers()
 #endif
     frame++;
 
+    const u64 gsStart = SDL_GetTicks64();
     gsKit_queue_exec(gs);
     gsKit_finish();
     gsKit_sync_flip(gs);
     gsKit_TexManager_nextFrame(gs);
+    g_Ps2GsMsTotal += SDL_GetTicks64() - gsStart;
+    g_Ps2GsFrames++;
 }
