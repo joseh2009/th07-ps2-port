@@ -55,11 +55,17 @@ u16 Ps2Pad::GetButtons()
         return 0;
     int state = padGetState(0, 0);
     if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1)
+    {
+        g_Ps2PadHeld = 0x20000 | (u32)state; // diagnostic: pad not ready yet
         return 0;
+    }
 
     struct padButtonStatus pad;
     if (padRead(0, 0, &pad) == 0)
+    {
+        g_Ps2PadHeld = 0x10000; // diagnostic: padRead returned no data
         return 0;
+    }
 
     u16 held = ~pad.btns; // active low
     g_Ps2PadHeld = held;
