@@ -296,6 +296,21 @@ static void InitBgmData(ThBgmDataSource *pBgm, ThBgmFormat *pFmt)
     pBgm->format = ma_format_s16;
 }
 
+// Streamed BGM reads are small (the mixer asks for about 2 KB at a time). A larger stdio buffer turns them into a
+// few big reads from the disk instead of one synchronous read per mixer step (PS2 only).
+#define TH07_BGM_FILE_BUFFER_SIZE (32 * 1024)
+
+static void ThBgmDataSource_closeFile(ThBgmDataSource *pBgm)
+{
+    if (pBgm->file)
+    {
+        fclose(pBgm->file);
+        pBgm->file = NULL;
+    }
+    free(pBgm->fileBuf);
+    pBgm->fileBuf = NULL;
+}
+
 static bool ThBgmDataSource_init_file(ThBgmDataSource *pBgm, const char *path, ThBgmFormat *pFmt)
 {
     memset(pBgm, 0, sizeof(*pBgm));
@@ -307,6 +322,13 @@ static bool ThBgmDataSource_init_file(ThBgmDataSource *pBgm, const char *path, T
     {
         return false;
     }
+#ifdef __PS2__
+    pBgm->fileBuf = (u8 *)malloc(TH07_BGM_FILE_BUFFER_SIZE);
+    if (pBgm->fileBuf)
+    {
+        setvbuf(pBgm->file, (char *)pBgm->fileBuf, _IOFBF, TH07_BGM_FILE_BUFFER_SIZE);
+    }
+#endif
 
     fseek(pBgm->file, g_SoundPlayer.bgmSeekOffset + pFmt->startOffset, SEEK_SET);
 
@@ -314,7 +336,7 @@ static bool ThBgmDataSource_init_file(ThBgmDataSource *pBgm, const char *path, T
     config.vtable = &g_ThBgmDataSourceVtable;
     if (ma_data_source_init(&config, &pBgm->base) != MA_SUCCESS)
     {
-        fclose(pBgm->file);
+        ThBgmDataSource_closeFile(pBgm);
         return false;
     }
     return true;
@@ -610,10 +632,7 @@ ZunResult SoundPlayer::ReopenBGM(const char *name)
                                        this->backgroundMusic) != MA_SUCCESS)
     {
         SAFE_DELETE(this->backgroundMusic);
-        if (this->bgmDataSource->file)
-        {
-            fclose(this->bgmDataSource->file);
-        }
+        ThBgmDataSource_closeFile(this->bgmDataSource);
         ma_data_source_uninit(&this->bgmDataSource->base);
         SAFE_DELETE(this->bgmDataSource);
         return ZUN_ERROR;
@@ -732,10 +751,7 @@ void SoundPlayer::StopBGM()
     }
     if (this->bgmDataSource)
     {
-        if (this->bgmDataSource->file)
-        {
-            fclose(this->bgmDataSource->file);
-        }
+        ThBgmDataSource_closeFile(this->bgmDataSource);
         ma_data_source_uninit(&this->bgmDataSource->base);
         SAFE_DELETE(this->bgmDataSource);
     }

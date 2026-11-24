@@ -97,6 +97,7 @@ struct ThBgmDataSource
     bool isMemory;
 
     FILE *file;
+    u8 *fileBuf; // stdio buffer given to file (PS2 only), freed after fclose
     const u8 *pData;
     u32 dataSize;
     u32 currentOffset;
