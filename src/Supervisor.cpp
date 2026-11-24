@@ -39,8 +39,16 @@ Supervisor g_Supervisor;
 u32 g_FpsUpdateCounter;
 char g_ReplayFpsBuffer[256];
 #ifdef __PS2__
+#include <malloc.h>
 extern u64 g_Ps2GsMsTotal;
 extern u32 g_Ps2GsFrames;
+extern size_t g_Ps2TexBytes;   // PS2GS.cpp
+extern unsigned g_Ps2TexCount; // PS2GS.cpp
+extern size_t g_Ps2AudioBytes; // ps2audio.cpp
+// Diagnostic panel, toggled with R3 (right stick press). Values are refreshed at each fps update.
+static bool g_Ps2DiagOn = false;
+static f32 g_Ps2DiagFps = 0.0f;
+static f64 g_Ps2DiagGsMs = 0.0;
 extern u32 g_Ps2PadHeld;
 extern u32 g_Ps2PadMode;
 extern int g_Ps2PadInit;  // Ps2Pad.cpp
@@ -709,6 +717,8 @@ void Supervisor::DrawFpsCounter(i32 param_1)
                 // Short on purpose: the counter is drawn at the right edge of the screen, so longer text is cut off.
                 // Fields: fps, pad buttons (hex), pad mode (hex). GS ms is left out for now to fit.
                 sprintf(g_FpsCounterBuffer, "%.0f %X m%02X", (f64)fps, g_Ps2PadHeld, g_Ps2PadMode);
+                g_Ps2DiagFps = fps;
+                g_Ps2DiagGsMs = g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0;
                 g_Ps2GsMsTotal = 0;
                 g_Ps2GsFrames = 0;
 #else
@@ -807,6 +817,32 @@ LAB_00439350:
             g_AsciiManager.color = 0xffffffff;
             g_AsciiManager.AddString(&statusPos, s_StatusBuffer);
             g_AsciiManager.color = savedColor;
+        }
+        // R3 toggles the panel on the rising edge. Bits 0x30000 mark "no pad data this frame", so they must not count.
+        {
+            static u32 s_prevHeld = 0;
+            const bool padValid = (g_Ps2PadHeld & 0x30000) == 0;
+            if (padValid && (g_Ps2PadHeld & 0x0004) && !(s_prevHeld & 0x0004) && (s_prevHeld & 0x30000) == 0)
+                g_Ps2DiagOn = !g_Ps2DiagOn;
+            s_prevHeld = g_Ps2PadHeld;
+        }
+        if (g_Ps2DiagOn)
+        {
+            static char s_Diag[4][96];
+            struct mallinfo mi = mallinfo();
+            sprintf(s_Diag[0], "FPS %.0f   GS %.2f ms/frame", (f64)g_Ps2DiagFps, g_Ps2DiagGsMs);
+            sprintf(s_Diag[1], "RAM heap used %dK  free %dK", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
+            sprintf(s_Diag[2], "TEX %dK in %u textures   SFX %dK", (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount,
+                    (int)(g_Ps2AudioBytes / 1024));
+            sprintf(s_Diag[3], "PAD %04X  mode %02X  reads %u", g_Ps2PadHeld & 0xffff, g_Ps2PadMode, g_Ps2PadReads);
+            ZunVec3 diagPos;
+            diagPos.z = 0.0f;
+            for (int i = 0; i < 4; i++)
+            {
+                diagPos.x = 8.0f;
+                diagPos.y = 24.0f + 16.0f * i;
+                g_AsciiManager.AddString(&diagPos, s_Diag[i]);
+            }
         }
 #endif
         if (g_GameManager.replay && g_GameManager.notInMenu)
