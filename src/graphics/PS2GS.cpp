@@ -273,6 +273,9 @@ void PS2GS::GetViewport(ZunViewport &out)
 
 void PS2GS::SetViewport(const ZunViewport &vp)
 {
+    /* Batched triangles derive their scissor from the viewport at flush time,
+       so flush them under the viewport they were submitted with. */
+    FlushPending();
     viewport = vp;
 }
 
