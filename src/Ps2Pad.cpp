@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <libpad.h>
 #include <loadfile.h>
+#include <kernel.h>
 #include <sifrpc.h>
 
 void Ps2SifInitOnce(); // ps2boot.cpp
@@ -41,7 +42,9 @@ bool Ps2Pad::Init()
         return false;
     }
     padInit(0);
-    int r = padPortOpen(0, 0, s_PadBuf);
+    // The IOP writes pad data straight into this buffer by DMA. Read it through the uncached alias, otherwise the EE
+    // can keep returning the first (idle) value from its data cache.
+    int r = padPortOpen(0, 0, UNCACHED_SEG(s_PadBuf));
     printf("Ps2Pad: padPortOpen -> %d\n", r);
     if (r == 0)
         return false;
