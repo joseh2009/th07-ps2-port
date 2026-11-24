@@ -15,8 +15,9 @@ static bool s_Ready = false;
 
 #define STICK_DEADZONE 48
 
-// Diagnostic shown next to the fps counter: 1 = pad ready, 0 = no pad (the console log is not visible on hardware).
-int g_Ps2PadReady = 0;
+// Diagnostic shown next to the fps counter: last padGetState() value (6 = stable), or -1 if the pad was never opened.
+// The console log is not visible on hardware, so this is the only way to see it there.
+int g_Ps2PadState = -1;
 
 bool Ps2Pad::Init()
 {
@@ -45,7 +46,6 @@ bool Ps2Pad::Init()
     if (r == 0)
         return false;
     s_Ready = true; // the pad settles over the next few frames; GetButtons just polls
-    g_Ps2PadReady = 1;
     return true;
 }
 
@@ -54,6 +54,7 @@ u16 Ps2Pad::GetButtons()
     if (!s_Ready)
         return 0;
     int state = padGetState(0, 0);
+    g_Ps2PadState = state;
     if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1)
         return 0;
 
