@@ -24,7 +24,7 @@ SRCS = \
 	src/MidiOutput.cpp src/MusicRoom.cpp src/Player.cpp src/ReplayManager.cpp src/ResultScreen.cpp \
 	src/Rng.cpp src/ScreenEffect.cpp src/SoundPlayer.cpp src/Stage.cpp src/Supervisor.cpp \
 	src/TextHelper.cpp src/main.cpp src/utils.cpp \
-	src/ps2audio.cpp src/ps2boot.cpp src/Ps2Pad.cpp src/audsrv_irx.cpp src/graphics/PS2GS.cpp \
+	src/ps2audio.cpp src/ps2boot.cpp src/Ps2Pad.cpp src/audsrv_irx.cpp src/padman_irx.cpp src/graphics/PS2GS.cpp \
 	src/pbg4/Lzss.cpp src/pbg4/Pbg4Archive.cpp src/pbg4/Pbg4File.cpp
 
 EE_OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)

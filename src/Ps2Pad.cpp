@@ -9,6 +9,8 @@
 #include <sifrpc.h>
 
 void Ps2SifInitOnce(); // ps2boot.cpp
+extern "C" unsigned char padman_irx[]; // padman_irx.cpp
+extern "C" unsigned int size_padman_irx;
 
 // The pad DMA buffer must be 64-byte aligned and 256 bytes long.
 static char s_PadBuf[256] __attribute__((aligned(64)));
@@ -34,11 +36,29 @@ bool Ps2Pad::Init()
     // consoles, only have SIO2MAN and PADMAN, so fall back to those when the X pair is missing.
     // The old pair alone is not used under emulation because PADMAN can hang padInit there.
     bool modulesOk = false;
-    if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:XPADMAN", 0, NULL) >= 0)
+    bool embedded = false;
+    // First try the open-source padman that ships in the ps2sdk and is embedded in this ELF (padman_irx.cpp). It
+    // replaces the ROM driver, which is strict about the SIO2 timing that some pads do not follow.
+    if (SifLoadModule("rom0:SIO2MAN", 0, NULL) >= 0)
+    {
+        int ret = 0;
+        int id = SifExecModuleBuffer(padman_irx, size_padman_irx, 0, NULL, &ret);
+        if (id >= 0 && ret != 1)
+        {
+            printf("Ps2Pad: using the embedded padman (ps2sdk)\n");
+            modulesOk = true;
+            embedded = true;
+        }
+        else
+        {
+            printf("Ps2Pad: embedded padman failed (id %d, ret %d)\n", id, ret);
+        }
+    }
+    if (!modulesOk && SifLoadModule("rom0:XSIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:XPADMAN", 0, NULL) >= 0)
     {
         modulesOk = true;
     }
-    else if (SifLoadModule("rom0:SIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:PADMAN", 0, NULL) >= 0)
+    else if (!modulesOk && SifLoadModule("rom0:SIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:PADMAN", 0, NULL) >= 0)
     {
         printf("Ps2Pad: using SIO2MAN/PADMAN (X modules not in this ROM)\n");
         modulesOk = true;
@@ -60,7 +80,7 @@ bool Ps2Pad::Init()
         return false;
     }
     s_Ready = true; // the pad settles over the next few frames; GetButtons just polls
-    g_Ps2PadInit = 3;
+    g_Ps2PadInit = embedded ? 4 : 3;
     return true;
 }
 

@@ -795,6 +795,8 @@ LAB_00439350:
                 padText = "PORT FAILED";
             else if (g_Ps2PadInit == 3)
                 padText = "OK";
+            else if (g_Ps2PadInit == 4)
+                padText = "OK EMB";
             sprintf(s_StatusBuffer, "FILES %s  PAD %s  RAW %02X %02X %04X #%u", g_Ps2FilesOk ? "OK" : "?", padText,
                     (g_Ps2PadRaw >> 24) & 0xff, (g_Ps2PadRaw >> 16) & 0xff, g_Ps2PadRaw & 0xffff, g_Ps2PadReads);
             ZunVec3 statusPos;
