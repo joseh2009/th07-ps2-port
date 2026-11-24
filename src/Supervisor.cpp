@@ -41,6 +41,7 @@ char g_ReplayFpsBuffer[256];
 #ifdef __PS2__
 extern u64 g_Ps2GsMsTotal;
 extern u32 g_Ps2GsFrames;
+extern int g_Ps2PadReady;
 #endif
 char g_FpsCounterBuffer[256];
 u32 g_NumFramesSinceLastTime;
@@ -700,8 +701,8 @@ void Supervisor::DrawFpsCounter(i32 param_1)
                 g_NumFramesSinceLastTime = 0;
 #ifdef __PS2__
                 // Diagnostic: fps, then the average ms per frame spent in SwapBuffers (GS) since the last update
-                sprintf(g_FpsCounterBuffer, "%.01ffps gs%.0f", (f64)fps,
-                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0);
+                sprintf(g_FpsCounterBuffer, "%.01ffps gs%.0f p%d", (f64)fps,
+                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0, g_Ps2PadReady);
                 g_Ps2GsMsTotal = 0;
                 g_Ps2GsFrames = 0;
 #else

@@ -15,18 +15,28 @@ static bool s_Ready = false;
 
 #define STICK_DEADZONE 48
 
+// Diagnostic shown next to the fps counter: 1 = pad ready, 0 = no pad (the console log is not visible on hardware).
+int g_Ps2PadReady = 0;
+
 bool Ps2Pad::Init()
 {
     Ps2SifInitOnce();
-    // The newer X modules go with libpadx; the old rom0:PADMAN can hang padInit under emulation.
-    if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) < 0)
+    // Newer ROMs have the X modules (libpadx), which the emulator also uses. Older ROMs, such as early SCPH-9000x
+    // consoles, only have SIO2MAN and PADMAN, so fall back to those when the X pair is missing.
+    // The old pair alone is not used under emulation because PADMAN can hang padInit there.
+    bool modulesOk = false;
+    if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:XPADMAN", 0, NULL) >= 0)
     {
-        printf("Ps2Pad: failed to load XSIO2MAN\n");
-        return false;
+        modulesOk = true;
     }
-    if (SifLoadModule("rom0:XPADMAN", 0, NULL) < 0)
+    else if (SifLoadModule("rom0:SIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:PADMAN", 0, NULL) >= 0)
     {
-        printf("Ps2Pad: failed to load XPADMAN\n");
+        printf("Ps2Pad: using SIO2MAN/PADMAN (X modules not in this ROM)\n");
+        modulesOk = true;
+    }
+    if (!modulesOk)
+    {
+        printf("Ps2Pad: no pad modules could be loaded\n");
         return false;
     }
     padInit(0);
@@ -35,6 +45,7 @@ bool Ps2Pad::Init()
     if (r == 0)
         return false;
     s_Ready = true; // the pad settles over the next few frames; GetButtons just polls
+    g_Ps2PadReady = 1;
     return true;
 }
 
