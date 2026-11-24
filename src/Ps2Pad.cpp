@@ -74,6 +74,24 @@ u16 Ps2Pad::GetButtons()
     u16 held = ~pad.btns; // active low
     g_Ps2PadHeld = held;
     g_Ps2PadMode = pad.mode;
+
+    // Some clone pads only send button data after they are switched to analog mode. If a digital pad has reported
+    // no buttons for about 3 seconds, ask it once to switch. A genuine DualShock is unaffected: it is already analog
+    // or it ignores the request, and buttons are read the same way either way.
+    static int s_idleDigitalFrames = 0;
+    static bool s_analogTried = false;
+    if (pad.mode == 0x41 && held == 0)
+    {
+        if (!s_analogTried && ++s_idleDigitalFrames > 180)
+        {
+            padSetMainMode(0, 0, 1, 0);
+            s_analogTried = true;
+        }
+    }
+    else
+    {
+        s_idleDigitalFrames = 0;
+    }
     u16 out = 0;
     if (held & PAD_UP)
         out |= TH_BUTTON_UP;
