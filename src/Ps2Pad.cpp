@@ -22,6 +22,10 @@ u32 g_Ps2PadHeld = 0;
 u32 g_Ps2PadMode = 0; // pad.mode from the last successful read (0x41 digital, 0x73 analog, ...)
 // Result of Ps2Pad::Init, shown on the title screen: 0 not tried, 1 no pad modules, 2 port open failed, 3 ready
 int g_Ps2PadInit = 0;
+// Raw data from the last successful padRead, for the title-screen status line: ok, mode and buttons, and a read counter.
+// If the counter keeps going up while the buttons never change, the pad is answering but sends the same data.
+u32 g_Ps2PadRaw = 0;
+u32 g_Ps2PadReads = 0;
 
 bool Ps2Pad::Init()
 {
@@ -94,6 +98,8 @@ u16 Ps2Pad::GetButtons()
     u16 held = ~pad.btns; // active low
     g_Ps2PadHeld = held;
     g_Ps2PadMode = pad.mode;
+    g_Ps2PadRaw = ((u32)pad.ok << 24) | ((u32)pad.mode << 16) | pad.btns;
+    g_Ps2PadReads++;
 
     // Some clone pads only send button data after they are switched to analog mode. If a digital pad has reported
     // no buttons for about 3 seconds, ask it once to switch. A genuine DualShock is unaffected: it is already analog

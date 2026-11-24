@@ -45,6 +45,8 @@ extern u32 g_Ps2PadHeld;
 extern u32 g_Ps2PadMode;
 extern int g_Ps2PadInit;  // Ps2Pad.cpp
 extern int g_Ps2FilesOk;  // ps2boot.cpp
+extern u32 g_Ps2PadRaw;   // Ps2Pad.cpp
+extern u32 g_Ps2PadReads; // Ps2Pad.cpp
 #endif
 char g_FpsCounterBuffer[256];
 u32 g_NumFramesSinceLastTime;
@@ -793,7 +795,8 @@ LAB_00439350:
                 padText = "PORT FAILED";
             else if (g_Ps2PadInit == 3)
                 padText = "OK";
-            sprintf(s_StatusBuffer, "FILES %s  PAD %s", g_Ps2FilesOk ? "OK" : "?", padText);
+            sprintf(s_StatusBuffer, "FILES %s  PAD %s  RAW %02X %02X %04X #%u", g_Ps2FilesOk ? "OK" : "?", padText,
+                    (g_Ps2PadRaw >> 24) & 0xff, (g_Ps2PadRaw >> 16) & 0xff, g_Ps2PadRaw & 0xffff, g_Ps2PadReads);
             ZunVec3 statusPos;
             statusPos.x = 8.0f;
             statusPos.y = 8.0f;
