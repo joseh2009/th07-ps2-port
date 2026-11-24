@@ -42,6 +42,7 @@ char g_ReplayFpsBuffer[256];
 extern u64 g_Ps2GsMsTotal;
 extern u32 g_Ps2GsFrames;
 extern u32 g_Ps2PadHeld;
+extern u32 g_Ps2PadMode;
 #endif
 char g_FpsCounterBuffer[256];
 u32 g_NumFramesSinceLastTime;
@@ -701,9 +702,9 @@ void Supervisor::DrawFpsCounter(i32 param_1)
                 g_NumFramesSinceLastTime = 0;
 #ifdef __PS2__
                 // Diagnostic: fps, then the average ms per frame spent in SwapBuffers (GS) since the last update
-                // Short on purpose: the counter is drawn at the right edge of the screen, so longer text is cut off
-                sprintf(g_FpsCounterBuffer, "%.0f g%.0f %X", (f64)fps,
-                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0, g_Ps2PadHeld);
+                // Short on purpose: the counter is drawn at the right edge of the screen, so longer text is cut off.
+                // Fields: fps, pad buttons (hex), pad mode (hex). GS ms is left out for now to fit.
+                sprintf(g_FpsCounterBuffer, "%.0f %X m%02X", (f64)fps, g_Ps2PadHeld, g_Ps2PadMode);
                 g_Ps2GsMsTotal = 0;
                 g_Ps2GsFrames = 0;
 #else

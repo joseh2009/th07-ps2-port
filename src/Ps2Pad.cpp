@@ -19,6 +19,7 @@ static bool s_Ready = false;
 // Diagnostic shown next to the fps counter: the buttons GetButtons() reports this frame, in hex (0 = none).
 // The console log is not visible on hardware, so this is the only way to see it there.
 u32 g_Ps2PadHeld = 0;
+u32 g_Ps2PadMode = 0; // pad.mode from the last successful read (0x41 digital, 0x73 analog, ...)
 
 bool Ps2Pad::Init()
 {
@@ -72,6 +73,7 @@ u16 Ps2Pad::GetButtons()
 
     u16 held = ~pad.btns; // active low
     g_Ps2PadHeld = held;
+    g_Ps2PadMode = pad.mode;
     u16 out = 0;
     if (held & PAD_UP)
         out |= TH_BUTTON_UP;
