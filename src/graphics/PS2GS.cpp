@@ -190,6 +190,7 @@ ZunGraphics *PS2GS::Init()
 
 void PS2GS::Exit()
 {
+    FlushPending();
     for (Tex &t : textures)
         ReleaseTextureMemory(&t);
     textures.clear();
@@ -218,6 +219,7 @@ void PS2GS::SetFogColor(ZunColor color)
 
 void PS2GS::SetColorOp(TextureOpComponent component, ColorOp op)
 {
+    FlushPending();
     if (component == COMPONENT_RGB)
         colorOpRgb = op;
     else
@@ -226,11 +228,13 @@ void PS2GS::SetColorOp(TextureOpComponent component, ColorOp op)
 
 void PS2GS::SetTextureFactor(ZunColor factor)
 {
+    FlushPending();
     textureFactor = factor;
 }
 
 void PS2GS::SetTextureArg(TextureArg arg)
 {
+    FlushPending();
     texArg = arg;
 }
 
@@ -274,6 +278,7 @@ void PS2GS::SetViewport(const ZunViewport &vp)
 
 void PS2GS::Enable(Capabilities cap)
 {
+    FlushPending();
     switch (cap)
     {
     case CAPS_BLEND:
@@ -292,6 +297,7 @@ void PS2GS::Enable(Capabilities cap)
 
 void PS2GS::Disable(Capabilities cap)
 {
+    FlushPending();
     switch (cap)
     {
     case CAPS_BLEND:
@@ -310,17 +316,20 @@ void PS2GS::Disable(Capabilities cap)
 
 void PS2GS::SetBlendMode(BlendMode srcMode, BlendMode dstMode)
 {
+    FlushPending();
     blendSrc = srcMode;
     blendDst = dstMode;
 }
 
 void PS2GS::SetDepthMask(bool enable)
 {
+    FlushPending();
     depthMask = enable;
 }
 
 void PS2GS::SetDepthFunc(DepthFunc func)
 {
+    FlushPending();
     depthFunc = func;
 }
 
@@ -338,6 +347,7 @@ void PS2GS::SetClearColor(ZunColor color)
 
 void PS2GS::SetAlphaTestRef(u8 ref)
 {
+    FlushPending();
     alphaRef = ref;
 }
 
@@ -418,6 +428,7 @@ void PS2GS::ApplyRenderState()
 
 void PS2GS::Clear(u32 clearBits)
 {
+    FlushPending();
     if (clearBits & CLEAR_COLOR_BUFFER)
     {
         // gsKit_clear() fills colour and writes Z = 0 (the far plane); make sure Z writes are enabled
@@ -447,6 +458,7 @@ void PS2GS::Clear(u32 clearBits)
 
 void PS2GS::ReleaseTextureMemory(Tex *tex)
 {
+    FlushPending();
     if (tex->alive && gs)
         gsKit_TexManager_free(gs, &tex->gs);
     if (tex->gs.Mem)
@@ -479,6 +491,7 @@ GfxTextureHandle PS2GS::CreateTexture()
 
 void PS2GS::BindTexture(GfxTextureHandle handle)
 {
+    FlushPending();
     if (handle.id >= textures.size())
         return;
     boundTexture = &textures[handle.id];
@@ -486,6 +499,7 @@ void PS2GS::BindTexture(GfxTextureHandle handle)
 
 void PS2GS::DeleteTexture(GfxTextureHandle handle)
 {
+    FlushPending();
     if (handle.id == 0 || handle.id >= textures.size())
         return;
     Tex *t = &textures[handle.id];
@@ -568,6 +582,7 @@ void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fm
 
 void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataType type, const void *data)
 {
+    FlushPending();
     const u32 psm = g_Ps2NextTexture16 ? GS_PSM_CT16 : TH07_TEX_PSM;
     g_Ps2NextTexture16 = false; // one-shot, even when the call below is ignored
 
@@ -613,6 +628,7 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
 
 void PS2GS::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height, const void *data)
 {
+    FlushPending();
     Tex *tex = boundTexture;
     if (tex == nullptr || !tex->alive || data == nullptr)
         return;
@@ -625,6 +641,7 @@ void PS2GS::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height, 
 
 void PS2GS::ReadPixels(i32 x, i32 y, i32 width, i32 height, void *pixels)
 {
+    FlushPending();
     // Reading the frame buffer back from the GS is not supported yet: return opaque black.
     u8 *dst = (u8 *)pixels;
     for (i32 i = 0; i < width * height; i++, dst += 4)
@@ -863,6 +880,14 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
         mvpDirty = false;
     }
 
+    // Consecutive draws with the same kind and texture share one batch (one ApplyRenderState and one bind for
+    // all of them). Order is kept because triangles are appended in submission order.
+    if ((!texBatch.empty() || !flatBatch.empty()) &&
+        (textured != batchTextured || (textured && boundTexture != batchTex)))
+        FlushPending();
+    batchTextured = textured;
+    batchTex = textured ? boundTexture : nullptr;
+
     clipVerts.resize(count);
     for (i32 i = 0; i < count; i++)
         clipVerts[i] = MakeVertex(verts[i], textured, screenSpace);
@@ -882,8 +907,14 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
         for (i32 i = 0; i + 2 < count; i += 3)
             ClipAndEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], textured);
     }
+}
 
-    FlushBatch(textured);
+void PS2GS::FlushPending()
+{
+    if (!texBatch.empty())
+        FlushBatch(true);
+    if (!flatBatch.empty())
+        FlushBatch(false);
 }
 
 static i32 VertexCount(PrimitiveType type, i32 primitiveCount)
@@ -959,6 +990,7 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
 
 void PS2GS::SwapBuffers()
 {
+    FlushPending();
     static int frame = 0;
 #ifdef TH07_PS2_VERBOSE
     if (frame < 5)

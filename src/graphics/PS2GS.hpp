@@ -112,11 +112,14 @@ class PS2GS : public ZunGraphics
     std::vector<ClipVert> clipVerts;
     std::vector<GSPRIMSTQPOINT> texBatch;
     std::vector<GSPRIMPOINT> flatBatch;
+    bool batchTextured = false; // kind of the batch currently being filled (textured or flat)
+    Tex *batchTex = nullptr;    // texture the textured batch was built for
     std::vector<InVert> upVerts; // DrawPrimitiveUP input, reused (a per-call heap vector fragmented the 32 MB heap)
 
     void ApplyRenderState();
     void PushRegister(u64 data, u64 address);
     void FlushBatch(bool textured);
+    void FlushPending(); // submit the deferred texture/flat batches before any state or memory change
     void EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
     void ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
     ClipVert MakeVertex(const InVert &in, bool textured, bool screenSpace) const;
