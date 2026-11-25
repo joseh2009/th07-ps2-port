@@ -73,10 +73,17 @@ inline u32 Ps2TimedChainCall(Ps2ChainFn cb, void *arg, Ps2CbStat *table)
 }
 // The chain runners set which table their callbacks are recorded in, then call every callback through CHAIN_CALL.
 extern Ps2CbStat *g_Ps2ActiveCbTable;
-#define PS2_SET_CB_TABLE(t) (g_Ps2ActiveCbTable = (t))
+// Restores the previous table when the runner returns. Chains can run inside other chains, so this must nest.
+struct Ps2CbTableScope
+{
+    Ps2CbStat *saved;
+    explicit Ps2CbTableScope(Ps2CbStat *t) : saved(g_Ps2ActiveCbTable) { g_Ps2ActiveCbTable = t; }
+    ~Ps2CbTableScope() { g_Ps2ActiveCbTable = saved; }
+};
+#define PS2_CB_TABLE_SCOPE(t) Ps2CbTableScope ps2CbTableScope_(t)
 #define CHAIN_CALL(cb, arg) Ps2TimedChainCall((Ps2ChainFn)(cb), (arg), g_Ps2ActiveCbTable)
 #else
 #define PS2_TIME(slot)
-#define PS2_SET_CB_TABLE(t)
+#define PS2_CB_TABLE_SCOPE(t)
 #define CHAIN_CALL(cb, arg) (cb)(arg)
 #endif

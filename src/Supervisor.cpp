@@ -896,36 +896,34 @@ LAB_00439350:
             sprintf(s_Diag[1], "RAM heap used %dK  free %dK", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
             sprintf(s_Diag[2], "TEX %dK in %u textures   SFX %dK", (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount,
                     (int)(g_Ps2AudioBytes / 1024));
-            sprintf(s_Diag[3], "PAD %04X  mode %02X  reads %u", g_Ps2PadHeld & 0xffff, g_Ps2PadMode, g_Ps2PadReads);
-            sprintf(s_Diag[4], "RENDER %.2f  audio %.2f  sndq %.2f  anm %.2f  present(GS) %.2f", t[PS2_T_RENDER],
-                    t[PS2_T_AUDIO], t[PS2_T_SNDQUEUE], t[PS2_T_ANM_FLUSH], t[PS2_T_PRESENT]);
-            sprintf(s_Diag[5], "CALC %.2f (pad %.2f)  DRAW %.2f  untimed %.2f ms", t[PS2_T_CALC_CHAIN], t[PS2_T_PAD],
-                    t[PS2_T_DRAW_CHAIN], untimed);
-            sprintf(s_Diag[6], "UPDATE bul %.2f  ene %.2f  eff %.2f ms", t[PS2_T_BULLET_UPD], t[PS2_T_ENEMY_UPD],
-                    t[PS2_T_EFFECT_UPD]);
-            sprintf(s_Diag[7], "DRAW   bul %.2f  ene %.2f  eff %.2f ms", t[PS2_T_BULLET_DRAW], t[PS2_T_ENEMY_DRAW],
-                    t[PS2_T_EFFECT_DRAW]);
-            sprintf(s_Diag[8], "CALC callbacks (address, ms/frame):");
+            sprintf(s_Diag[3], "PAD %04X mode %02X reads %u read %.2f ms", g_Ps2PadHeld & 0xffff, g_Ps2PadMode,
+                    g_Ps2PadReads, t[PS2_T_PAD]);
+            // Keep every line under 60 characters: AsciiManager drops longer strings silently.
+            sprintf(s_Diag[4], "RENDER %.2f aud %.2f snd %.2f anm %.2f GS %.2f", t[PS2_T_RENDER], t[PS2_T_AUDIO],
+                    t[PS2_T_SNDQUEUE], t[PS2_T_ANM_FLUSH], t[PS2_T_PRESENT]);
+            sprintf(s_Diag[5], "CALC %.2f  DRAW %.2f  untimed %.2f", t[PS2_T_CALC_CHAIN], t[PS2_T_DRAW_CHAIN],
+                    untimed);
+            sprintf(s_Diag[6], "CALC callbacks (address, ms/frame):");
             for (int k = 0; k < 6; k++)
             {
                 if (g_Ps2DiagCalcTop[k].fn)
-                    sprintf(s_Diag[9 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagCalcTop[k].fn,
+                    sprintf(s_Diag[7 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagCalcTop[k].fn,
                             g_Ps2DiagCalcTop[k].ms);
                 else
-                    sprintf(s_Diag[9 + k], "  -");
+                    sprintf(s_Diag[7 + k], "  -");
             }
-            sprintf(s_Diag[15], "DRAW callbacks (address, ms/frame):");
+            sprintf(s_Diag[13], "DRAW callbacks (address, ms/frame):");
             for (int k = 0; k < 6; k++)
             {
                 if (g_Ps2DiagDrawTop[k].fn)
-                    sprintf(s_Diag[16 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagDrawTop[k].fn,
+                    sprintf(s_Diag[14 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagDrawTop[k].fn,
                             g_Ps2DiagDrawTop[k].ms);
                 else
-                    sprintf(s_Diag[16 + k], "  -");
+                    sprintf(s_Diag[14 + k], "  -");
             }
             ZunVec3 diagPos;
             diagPos.z = 0.0f;
-            for (int i = 0; i < 22; i++)
+            for (int i = 0; i < 20; i++)
             {
                 diagPos.x = 8.0f;
                 diagPos.y = 24.0f + 14.0f * i;

@@ -130,7 +130,7 @@ ZunResult Chain::AddToDrawChain(ChainElem *elem, i32 priority)
 i32 Chain::RunCalcChain()
 {
     PS2_TIME(PS2_T_CALC_CHAIN);
-    PS2_SET_CB_TABLE(g_Ps2CalcStats);
+    PS2_CB_TABLE_SCOPE(g_Ps2CalcStats);
     ChainElem *next;
     ChainElem *current;
     i32 updateCount;
@@ -174,7 +174,7 @@ restart_from_first_job:
 i32 Chain::RunDrawChain()
 {
     PS2_TIME(PS2_T_DRAW_CHAIN);
-    PS2_SET_CB_TABLE(g_Ps2DrawStats);
+    PS2_CB_TABLE_SCOPE(g_Ps2DrawStats);
     ChainElem *next;
     ChainElem *current;
     i32 updateCount;
