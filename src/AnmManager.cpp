@@ -296,6 +296,12 @@ static bool Ps2UseCt16ForFormat(i16 format)
     (void)format;
     return true;
 #else
+#ifdef TH07_PS2_TEX16_FMT15
+    // Formats 1 and 5 as CT16 as well: half the RAM and VRAM for them, but semi-transparent pixels become cut-outs
+    // and colours drop to 5 bits. Opt-in, because it changes what the player sees. Off by default.
+    if (format == 1 || format == 5)
+        return true;
+#endif
     return format == 2 || format == 3;
 #endif
 }

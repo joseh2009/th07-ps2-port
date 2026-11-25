@@ -47,6 +47,10 @@
 
 size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
 unsigned g_Ps2TexCount = 0;
+// Texture work, measured for the R3 panel (item F). "This frame" counts up until SwapBuffers copies it to "last frame".
+// Binds: texture binds in batches. Upload: bytes of texel data written into EE RAM (CT16 = 2 bytes, CT32 = 4).
+u32 g_Ps2BindsThisFrame = 0, g_Ps2BindsLastFrame = 0;
+u32 g_Ps2UploadThisFrame = 0, g_Ps2UploadLastFrame = 0;
 bool g_Ps2TexAllocFailed = false; // set when a texture could not be allocated; AnmManager turns it into a load error
 static bool g_Ps2NextTexture16 = false; // one-shot: the next SetTextureImage stores A1B5G5R5 (CT16), half the RAM
 
@@ -580,6 +584,7 @@ void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fm
     const i32 stride = (i32)tex->gs.Width;
     const bool ct16 = (tex->gs.PSM == GS_PSM_CT16);
     const u8 *src = (const u8 *)data;
+    g_Ps2UploadThisFrame += (u32)w * (u32)h * (ct16 ? 2u : 4u);
 
     for (i32 row = 0; row < h; row++)
     {
@@ -941,6 +946,7 @@ void PS2GS::FlushBatch(bool textured)
             return;
         ApplyRenderState();
         boundTexture->gs.Filter = GS_FILTER_LINEAR;
+        g_Ps2BindsThisFrame++;
         gsKit_TexManager_bind(gs, &boundTexture->gs);
         gsKit_prim_list_triangle_goraud_texture_uv_3d(gs, &boundTexture->gs, (int)uvBatch.size(), uvBatch.data());
         uvBatch.clear();
@@ -956,6 +962,7 @@ void PS2GS::FlushBatch(bool textured)
     if (textured)
     {
         boundTexture->gs.Filter = GS_FILTER_LINEAR;
+        g_Ps2BindsThisFrame++;
         gsKit_TexManager_bind(gs, &boundTexture->gs);
         gsKit_prim_list_triangle_goraud_texture_stq_3d(gs, &boundTexture->gs, (int)count, texBatch.data());
         texBatch.clear();
@@ -1133,4 +1140,8 @@ void PS2GS::SwapBuffers()
 #endif
     g_Ps2GsMsTotal += SDL_GetTicks64() - gsStart;
     g_Ps2GsFrames++;
+    g_Ps2BindsLastFrame = g_Ps2BindsThisFrame;
+    g_Ps2UploadLastFrame = g_Ps2UploadThisFrame;
+    g_Ps2BindsThisFrame = 0;
+    g_Ps2UploadThisFrame = 0;
 }

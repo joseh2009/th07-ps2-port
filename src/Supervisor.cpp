@@ -46,6 +46,7 @@ extern u64 g_Ps2GsMsTotal;
 extern u32 g_Ps2GsFrames;
 extern size_t g_Ps2TexBytes;   // PS2GS.cpp
 extern unsigned g_Ps2TexCount; // PS2GS.cpp
+extern u32 g_Ps2BindsLastFrame, g_Ps2UploadLastFrame; // PS2GS.cpp: texture binds and texel bytes written last frame
 extern size_t g_Ps2AudioBytes; // ps2audio.cpp
 // Diagnostic panel, toggled with R3 (right stick press). Values are refreshed at each fps update.
 static bool g_Ps2DiagOn = false;
@@ -898,6 +899,8 @@ LAB_00439350:
                     (int)(g_Ps2AudioBytes / 1024));
             sprintf(s_Diag[3], "PAD %04X mode %02X reads %u read %.2f ms", g_Ps2PadHeld & 0xffff, g_Ps2PadMode,
                     g_Ps2PadReads, t[PS2_T_PAD]);
+            sprintf(s_Diag[20], "TEX binds %u  upload %dK per frame", g_Ps2BindsLastFrame,
+                    (int)(g_Ps2UploadLastFrame / 1024));
             // Keep every line under 60 characters: AsciiManager drops longer strings silently.
             sprintf(s_Diag[4], "RENDER %.2f aud %.2f snd %.2f anm %.2f GS %.2f", t[PS2_T_RENDER], t[PS2_T_AUDIO],
                     t[PS2_T_SNDQUEUE], t[PS2_T_ANM_FLUSH], t[PS2_T_PRESENT]);
@@ -923,7 +926,7 @@ LAB_00439350:
             }
             ZunVec3 diagPos;
             diagPos.z = 0.0f;
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 21; i++)
             {
                 diagPos.x = 8.0f;
                 diagPos.y = 24.0f + 14.0f * i;
