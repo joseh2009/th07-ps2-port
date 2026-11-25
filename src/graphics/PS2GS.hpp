@@ -111,9 +111,12 @@ class PS2GS : public ZunGraphics
     // Scratch buffers reused every draw call
     std::vector<ClipVert> clipVerts;
     std::vector<GSPRIMSTQPOINT> texBatch;
+    std::vector<GSPRIMUVPOINT> uvBatch;   // screen-space sprites: no Q, no perspective divide (see DrawVertices)
     std::vector<GSPRIMPOINT> flatBatch;
     bool batchTextured = false; // kind of the batch currently being filled (textured or flat)
+    bool batchUV = false;       // the textured batch is in uvBatch (UV form) instead of texBatch (STQ form)
     Tex *batchTex = nullptr;    // texture the textured batch was built for
+    bool drawScreen = false;    // the draw being emitted is screen space: w is 1, so the divide is skipped
     std::vector<InVert> upVerts; // DrawPrimitiveUP input, reused (a per-call heap vector fragmented the 32 MB heap)
 
     void ApplyRenderState();

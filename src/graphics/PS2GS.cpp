@@ -190,6 +190,7 @@ ZunGraphics *PS2GS::Init()
 
     self->clipVerts.reserve(1024);
     self->texBatch.reserve(kMaxBatchVerts);
+    self->uvBatch.reserve(kMaxBatchVerts);
     self->flatBatch.reserve(kMaxBatchVerts);
 
     printf("PS2 GS backend: %dx%d %s, %s framebuffer + 16 bit Z\n", (int)gs->Width, (int)gs->Height,
@@ -761,11 +762,16 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
 void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
 {
     const ClipVert *tri[3] = {&a, &b, &c};
+    // Texel size for the UV form: padded texture size * 16 (the UV register holds 4 fraction bits)
+    const bool uvForm = textured && batchUV;
+    const f32 uvScaleU = uvForm ? (f32)boundTexture->gs.Width * 16.0f : 0.0f;
+    const f32 uvScaleV = uvForm ? (f32)boundTexture->gs.Height * 16.0f : 0.0f;
 
     for (int i = 0; i < 3; i++)
     {
         const ClipVert &v = *tri[i];
-        const f32 invW = 1.0f / v.w;
+        // Screen-space vertices have w == 1 (MakeVertex, and clipping keeps it at 1), so the divide is skipped.
+        const f32 invW = drawScreen ? 1.0f : 1.0f / v.w;
         const f32 ndcX = v.x * invW;
         const f32 ndcY = v.y * invW;
         const f32 ndcZ = v.z * invW;
@@ -784,7 +790,19 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
 
         const u8 r = ToGS(v.r), g = ToGS(v.g), bl = ToGS(v.b), al = ToGS(v.a);
 
-        if (textured)
+        if (textured && batchUV)
+        {
+            // UV register: texel coordinate * 16 in an unsigned 14 bit field. The caller only uses this form when
+            // the texture is narrower than 1024 and all UVs are in [0,1], so the value fits and no wrap happens.
+            GSPRIMUVPOINT p;
+            p.rgbaq = color_to_RGBAQ(r, g, bl, al, 0.0f);
+            p.uv.coord.u = (u16)(std::clamp(v.u * uvScaleU, 0.0f, 16383.0f) + 0.5f);
+            p.uv.coord.v = (u16)(std::clamp(v.v * uvScaleV, 0.0f, 16383.0f) + 0.5f);
+            p.uv.tag = GS_UV;
+            p.xyz2 = vertex_to_XYZ2(gs, sx, sy, iz);
+            uvBatch.push_back(p);
+        }
+        else if (textured)
         {
             GSPRIMSTQPOINT p;
             p.rgbaq = color_to_RGBAQ(r, g, bl, al, invW);
@@ -803,7 +821,8 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
         }
     }
 
-    if ((textured ? texBatch.size() : flatBatch.size()) >= (size_t)kMaxBatchVerts)
+    const size_t pending = !textured ? flatBatch.size() : (batchUV ? uvBatch.size() : texBatch.size());
+    if (pending >= (size_t)kMaxBatchVerts)
         FlushBatch(textured);
 }
 
@@ -865,6 +884,18 @@ void PS2GS::ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c,
 
 void PS2GS::FlushBatch(bool textured)
 {
+    if (textured && batchUV)
+    {
+        if (uvBatch.empty())
+            return;
+        ApplyRenderState();
+        boundTexture->gs.Filter = GS_FILTER_LINEAR;
+        gsKit_TexManager_bind(gs, &boundTexture->gs);
+        gsKit_prim_list_triangle_goraud_texture_uv_3d(gs, &boundTexture->gs, (int)uvBatch.size(), uvBatch.data());
+        uvBatch.clear();
+        return;
+    }
+
     const size_t count = textured ? texBatch.size() : flatBatch.size();
     if (count == 0)
         return;
@@ -900,13 +931,21 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
         mvpDirty = false;
     }
 
+    // Screen-space sprites use the UV batch form (no Q, no perspective divide on the GS). The UV register cannot
+    // hold negative or wrapped coordinates and only 10 integer bits of texel, so anything else stays on STQ.
+    bool uvForm = textured && screenSpace && boundTexture->gs.Width < 1024 && boundTexture->gs.Height < 1024;
+    for (i32 i = 0; uvForm && i < count; i++)
+        uvForm = verts[i].u >= 0.0f && verts[i].u <= 1.0f && verts[i].v >= 0.0f && verts[i].v <= 1.0f;
+
     // Consecutive draws with the same kind and texture share one batch (one ApplyRenderState and one bind for
     // all of them). Order is kept because triangles are appended in submission order.
-    if ((!texBatch.empty() || !flatBatch.empty()) &&
-        (textured != batchTextured || (textured && boundTexture != batchTex)))
-        FlushPending();
+    if ((!texBatch.empty() || !uvBatch.empty() || !flatBatch.empty()) &&
+        (textured != batchTextured || (textured && (boundTexture != batchTex || uvForm != batchUV))))
+        FlushPending(); // uses the old batchUV, so it must run before batchUV changes
     batchTextured = textured;
     batchTex = textured ? boundTexture : nullptr;
+    batchUV = uvForm;
+    drawScreen = screenSpace;
 
     clipVerts.resize(count);
     for (i32 i = 0; i < count; i++)
@@ -931,7 +970,7 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
 
 void PS2GS::FlushPending()
 {
-    if (!texBatch.empty())
+    if (!texBatch.empty() || !uvBatch.empty()) // only one textured form is ever pending; FlushBatch picks it
         FlushBatch(true);
     if (!flatBatch.empty())
         FlushBatch(false);
