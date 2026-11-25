@@ -35,9 +35,8 @@ EE_CXXFLAGS += -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi \
 	-Wno-unused-parameter -Wno-missing-field-initializers
 EE_OPTFLAGS = -O2
 
-# Keep the EE console messages (printf per log line). Remove this for release builds: printing and flushing on
-# every message is slow on real hardware. The on-screen exit log is always kept.
-EE_CXXFLAGS += -DTH07_PS2_VERBOSE
+# Console printf logging is off by default: printing and flushing on every message is slow on real hardware.
+# Add -DTH07_PS2_VERBOSE here only when debugging with a console or emulator log. The on-screen log is always kept.
 
 # Store every embedded texture as CT16 (A1B5G5R5): half the EE RAM and VRAM, but 8 bit colours drop to 5 bits
 # and semi-transparent sprites become cut-outs. Use only if the default build still runs out of memory.
