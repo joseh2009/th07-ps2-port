@@ -23,6 +23,12 @@
 // Bullets further than this outside the play field (384x448) are not drawn; they reappear when they come back.
 #define TH07_PS2_BULLET_CULL_MARGIN 64.0f
 #endif
+// The cull test, shared by the flicker count and the draw loop (drawing only).
+static inline bool Ps2BulletOnScreen(const Bullet *b)
+{
+    return !(b->pos.x < -TH07_PS2_BULLET_CULL_MARGIN || b->pos.x > 384.0f + TH07_PS2_BULLET_CULL_MARGIN ||
+             b->pos.y < -TH07_PS2_BULLET_CULL_MARGIN || b->pos.y > 448.0f + TH07_PS2_BULLET_CULL_MARGIN);
+}
 #endif
 #include "utils.hpp"
 
@@ -1237,8 +1243,15 @@ u32 BulletManager::OnDraw(BulletManager *arg)
     // effects are always drawn. Only drawing changes; bullet movement and collision are untouched.
     static u32 drawFrame;
     drawFrame++;
-    const i32 drawStride = arg->bulletCount > TH07_PS2_BULLET_DRAW_LIMIT
-                               ? (arg->bulletCount + TH07_PS2_BULLET_DRAW_LIMIT - 1) / TH07_PS2_BULLET_DRAW_LIMIT
+    // Only bullets that pass the cull below take a slot. Counting the off-screen ones as well (bulletCount) would
+    // flicker the visible bullets for no reason when many are outside the play field.
+    i32 visibleCount = 0;
+    for (i = 0; i < ARRAY_SIZE_SIGNED(arg->bulletsPtrs); i++)
+        for (bullet = arg->bulletsPtrs[i]; bullet; bullet = bullet->next)
+            if (Ps2BulletOnScreen(bullet))
+                visibleCount++;
+    const i32 drawStride = visibleCount > TH07_PS2_BULLET_DRAW_LIMIT
+                               ? (visibleCount + TH07_PS2_BULLET_DRAW_LIMIT - 1) / TH07_PS2_BULLET_DRAW_LIMIT
                                : 1;
     u32 drawIdx = 0;
 #endif
@@ -1288,8 +1301,7 @@ u32 BulletManager::OnDraw(BulletManager *arg)
         {
 #ifdef __PS2__
             // Off-screen bullets are not drawn (drawing only: movement and collision are untouched)
-            if (bullet->pos.x < -TH07_PS2_BULLET_CULL_MARGIN || bullet->pos.x > 384.0f + TH07_PS2_BULLET_CULL_MARGIN ||
-                bullet->pos.y < -TH07_PS2_BULLET_CULL_MARGIN || bullet->pos.y > 448.0f + TH07_PS2_BULLET_CULL_MARGIN)
+            if (!Ps2BulletOnScreen(bullet))
             {
                 bullet = bullet->next;
                 continue;
