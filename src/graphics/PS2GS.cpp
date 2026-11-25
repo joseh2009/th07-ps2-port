@@ -111,6 +111,14 @@ inline f32 PlaneDist(int plane, f32 x, f32 y, f32 w)
     }
 }
 
+// Same result as std::floor for |v| < 2^30 (screen coordinates after clipping are far smaller). It is a
+// truncation plus one compare, so no libm call per vertex on the EE. w >= kNearW keeps v finite here.
+inline f32 FloorFast(f32 v)
+{
+    const int i = (int)v; // truncates toward zero
+    return (f32)(i - (v < (f32)i ? 1 : 0));
+}
+
 inline u32 OutCode(f32 x, f32 y, f32 w)
 {
     u32 code = 0;
@@ -780,8 +788,8 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
         // scaleY is not an integer and sprite edges would land on fractional rows. Neighbouring quads then
         // leave a gap or overlap on a shared edge, which shows as light horizontal lines. Snapping gives
         // shared vertices identical coordinates.
-        const f32 sx = std::floor((((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX + 0.5f) - 0.5f;
-        const f32 sy = std::floor((((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY + 0.5f) - 0.5f;
+        const f32 sx = FloorFast((((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX + 0.5f) - 0.5f;
+        const f32 sy = FloorFast((((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY + 0.5f) - 0.5f;
 
         // PerspectiveFovLH (ZunMath.hpp) and the 2D projections already produce ndcZ in [0,1] (D3D convention)
         f32 depth = ndcZ * (viewport.maxZ - viewport.minZ) + viewport.minZ;
