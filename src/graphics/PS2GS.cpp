@@ -31,6 +31,14 @@
 
 // With TH07_PS2_GS_PIPELINE the GS can still be reading last frame's packets, which point at texture memory in EE RAM.
 // Wait for it before changing or freeing a texture. Without the pipeline every frame already ends with a finish.
+// Render state cache (ApplyRenderState only pushes registers whose value changed). On by default; define
+// TH07_PS2_NO_STATE_CACHE to push every register each time, as the port did before.
+#ifdef TH07_PS2_NO_STATE_CACHE
+#define PS2_STATE_CACHE 0
+#else
+#define PS2_STATE_CACHE 1
+#endif
+
 #ifdef TH07_PS2_GS_PIPELINE
 #define PS2_WAIT_FOR_GS() gsKit_finish()
 #else
@@ -397,44 +405,70 @@ void PS2GS::ApplyRenderState()
         }
     }
 
+    // With the state cache a register is pushed only when its key differs from the last push. Without a valid
+    // cache (start, after Clear) everything is pushed, as before.
+    const bool fresh = !PS2_STATE_CACHE || !stateCacheValid;
+
     // Blending. GS: Cd' = (A - B) * C + D with A/B/D in {Cs, Cd, 0} and C in {As, Ad, FIX}
     bool blend = blendEnabled;
+    int blendSel = 3; // default: Cs * As + Cd * (1 - As)
     if (blendSrc == BLEND_ONE && blendDst == BLEND_NONE)
     {
-        blend = false; // replace
+        blend = false; // replace: the ALPHA register is not used
+        blendSel = -1;
     }
     else if (blendSrc == BLEND_ONE && blendDst == BLEND_ONE)
-    {
-        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 2, 1, 0x80), 0); // Cs + Cd
-    }
+        blendSel = 0; // Cs + Cd
     else if (blendSrc == BLEND_ALPHA && blendDst == BLEND_ONE)
-    {
-        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 0, 1, 0), 0); // Cs * As + Cd
-    }
+        blendSel = 1; // Cs * As + Cd
     else if (blendSrc == BLEND_ALPHA && blendDst == BLEND_NONE)
-    {
-        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 0, 2, 0), 0); // Cs * As
-    }
-    else
-    {
-        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 1, 0, 1, 0), 0); // Cs * As + Cd * (1 - As)
-    }
+        blendSel = 2; // Cs * As
     gs->PrimAlphaEnable = blend ? GS_SETTING_ON : GS_SETTING_OFF;
+    if (blendSel >= 0 && (fresh || blendSel != sentBlendSel))
+    {
+        switch (blendSel)
+        {
+        case 0:
+            gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 2, 1, 0x80), 0);
+            break;
+        case 1:
+            gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 0, 1, 0), 0);
+            break;
+        case 2:
+            gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 0, 2, 0), 0);
+            break;
+        default:
+            gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 1, 0, 1, 0), 0);
+            break;
+        }
+        sentBlendSel = blendSel;
+    }
 
-    // Alpha test (alpha is in the 0..128 GS range) + depth test
-    PushRegister(GS_SETREG_TEXA(0, 0, 128), GS_TEXA);
-
+    // Alpha test (alpha is in the 0..128 GS range) + depth test. The GS test state is written as one register.
+    const int zTest = (depthTest && depthFunc == DEPTH_FUNC_LEQUAL) ? 2 /*GEQUAL*/ : 1 /*ALWAYS*/;
     gs->Test->ATE = alphaTest ? 1 : 0;
     gs->Test->ATST = 5; // GEQUAL
     gs->Test->AREF = (alphaRef + 1) >> 1;
     gs->Test->AFAIL = 0; // KEEP
     gs->Test->ZTE = 1;
-    gs->Test->ZTST = (depthTest && depthFunc == DEPTH_FUNC_LEQUAL) ? 2 /*GEQUAL*/ : 1 /*ALWAYS*/;
-    gsKit_set_test(gs, 0);
+    gs->Test->ZTST = zTest;
+    const u32 testKey = (u32)gs->Test->ATE | ((u32)gs->Test->AREF << 1) | ((u32)zTest << 9);
+    if (fresh)
+        PushRegister(GS_SETREG_TEXA(0, 0, 128), GS_TEXA); // constant, so it is only sent after a reset
+    if (fresh || testKey != sentTestKey)
+    {
+        gsKit_set_test(gs, 0);
+        sentTestKey = testKey;
+    }
 
     // The GS Z buffer is inverted (0 = far), written only when depth test is on and the depth mask is set
     const bool zwrite = depthTest && depthMask;
-    PushRegister(GS_SETREG_ZBUF(gs->ZBuffer / 8192, gs->PSMZ, zwrite ? 0 : 1), GS_ZBUF_1 + gs->PrimContext);
+    const u64 zKey = ((u64)(gs->ZBuffer / 8192) << 8) | ((u64)(zwrite ? 1 : 0) << 4) | ((u64)gs->PrimContext & 0xF);
+    if (fresh || zKey != sentZKey)
+    {
+        PushRegister(GS_SETREG_ZBUF(gs->ZBuffer / 8192, gs->PSMZ, zwrite ? 0 : 1), GS_ZBUF_1 + gs->PrimContext);
+        sentZKey = zKey;
+    }
 
     // The viewport becomes a scissor rectangle
     int x0 = (int)(viewport.x * scaleX);
@@ -445,7 +479,14 @@ void PS2GS::ApplyRenderState()
     x1 = std::clamp(x1, x0, (int)gs->Width - 1);
     y0 = std::clamp(y0, 0, (int)gs->Height - 1);
     y1 = std::clamp(y1, y0, (int)gs->Height - 1);
-    gsKit_set_scissor(gs, GS_SETREG_SCISSOR(x0, x1, y0, y1));
+    const u64 scissorKey = (u64)x0 | ((u64)x1 << 12) | ((u64)y0 << 24) | ((u64)y1 << 36);
+    if (fresh || scissorKey != sentScissorKey)
+    {
+        gsKit_set_scissor(gs, GS_SETREG_SCISSOR(x0, x1, y0, y1));
+        sentScissorKey = scissorKey;
+    }
+
+    stateCacheValid = PS2_STATE_CACHE != 0;
 }
 
 void PS2GS::Clear(u32 clearBits)
@@ -472,6 +513,8 @@ void PS2GS::Clear(u32 clearBits)
         gsKit_prim_sprite(gs, 0, 0, gs->Width, gs->Height, 0, GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0));
         PushRegister(GS_SETREG_FRAME(fbp, gs->Width / 64, gs->PSM, 0), GS_FRAME_1 + gs->PrimContext);
     }
+    // Clear writes TEST, ZBUF and SCISSOR behind the cache's back: push them again on the next draw
+    stateCacheValid = false;
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -117,6 +117,14 @@ class PS2GS : public ZunGraphics
     bool batchUV = false;       // the textured batch is in uvBatch (UV form) instead of texBatch (STQ form)
     Tex *batchTex = nullptr;    // texture the textured batch was built for
     bool drawScreen = false;    // the draw being emitted is screen space: w is 1, so the divide is skipped
+
+    // Render state last written to the GS. ApplyRenderState pushes a register only when its key changed.
+    // Clear() writes some of the same registers, so it invalidates these (see PS2GS.cpp).
+    bool stateCacheValid = false;
+    int sentBlendSel = -1;
+    u32 sentTestKey = 0;
+    u64 sentZKey = 0;
+    u64 sentScissorKey = 0;
     std::vector<InVert> upVerts; // DrawPrimitiveUP input, reused (a per-call heap vector fragmented the 32 MB heap)
 
     void ApplyRenderState();
