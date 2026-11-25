@@ -1,6 +1,7 @@
 #ifdef __PS2__
 #include "ps2audio.hpp"
 #endif
+#include "Ps2Timing.hpp"
 #include "GameWindow.hpp"
 
 #include <SDL2/SDL.h>
@@ -74,6 +75,7 @@ RenderResult GameWindow::Render()
     u64 perfCounter;
     i32 chainRes;
 
+    PS2_TIME(PS2_T_RENDER);
     if (!this->isAppActive)
     {
         return RENDER_RESULT_KEEP_RUNNING;
@@ -82,7 +84,10 @@ RenderResult GameWindow::Render()
 #ifdef __PS2__
     // Audio is mixed here, once per call, so it keeps flowing in every game state (the sound command queue is only
     // processed on logic frames).
-    ps2audio_pump();
+    {
+        PS2_TIME(PS2_T_AUDIO);
+        ps2audio_pump();
+    }
 #endif
 
     if (this->curFrame == 0)
@@ -94,11 +99,17 @@ RenderResult GameWindow::Render()
             g_Supervisor.fogEnabled = 255;
             g_Supervisor.DisableFog();
             g_Chain.RunDrawChain();
-            g_AnmManager->Flush();
+            {
+                PS2_TIME(PS2_T_ANM_FLUSH);
+                g_AnmManager->Flush();
+            }
             g_Supervisor.gfxDevice->BindTexture({0});
         }
 
-        g_AnmManager->Flush();
+        {
+            PS2_TIME(PS2_T_ANM_FLUSH);
+            g_AnmManager->Flush();
+        }
         g_Supervisor.viewport.x = 0;
         g_Supervisor.viewport.y = 0;
         g_Supervisor.viewport.width = GAME_WINDOW_WIDTH;
@@ -106,7 +117,10 @@ RenderResult GameWindow::Render()
         g_Supervisor.gfxDevice->SetViewport(g_Supervisor.viewport);
 
         chainRes = g_Chain.RunCalcChain();
-        g_SoundPlayer.ProcessQueues();
+        {
+            PS2_TIME(PS2_T_SNDQUEUE);
+            g_SoundPlayer.ProcessQueues();
+        }
 
         if (!chainRes)
         {
@@ -156,12 +170,18 @@ RenderResult GameWindow::Render()
     {
         if ((i32)g_Supervisor.cfg.frameskipConfig >= (i32)this->curFrame)
         {
-            Present();
+            {
+                PS2_TIME(PS2_T_PRESENT);
+                Present();
+            }
             goto begin_loop;
         }
 
     LAB_00434a18:
-        Present();
+        {
+            PS2_TIME(PS2_T_PRESENT);
+            Present();
+        }
         this->curFrame = 0;
         g_FrameCount++;
     }

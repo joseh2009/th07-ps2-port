@@ -1,6 +1,7 @@
 #ifdef __PS2__
 #include "Ps2Pad.hpp"
 #include "Controller.hpp"
+#include "Ps2Timing.hpp"
 
 #include <cstdio>
 #include <libpad.h>
@@ -88,6 +89,7 @@ static int s_stuckFrames = 0; // frames in a state other than stable / find
 
 u16 Ps2Pad::GetButtons()
 {
+    PS2_TIME(PS2_T_PAD);
     if (!s_Ready)
         return 0;
     int state = padGetState(0, 0);

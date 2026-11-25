@@ -5,6 +5,12 @@
 
 Chain g_Chain;
 
+#ifdef __PS2__
+Ps2CbStat g_Ps2CalcStats[PS2_CB_SLOTS];
+Ps2CbStat g_Ps2DrawStats[PS2_CB_SLOTS];
+Ps2CbStat *g_Ps2ActiveCbTable = g_Ps2CalcStats;
+#endif
+
 Chain::~Chain()
 {
 }
@@ -124,6 +130,7 @@ ZunResult Chain::AddToDrawChain(ChainElem *elem, i32 priority)
 i32 Chain::RunCalcChain()
 {
     PS2_TIME(PS2_T_CALC_CHAIN);
+    PS2_SET_CB_TABLE(g_Ps2CalcStats);
     ChainElem *next;
     ChainElem *current;
     i32 updateCount;
@@ -136,7 +143,7 @@ restart_from_first_job:
         if (current->callback)
         {
         execute_again:
-            switch (current->callback(current->arg))
+            switch (CHAIN_CALL(current->callback, current->arg))
             {
             case CHAIN_CALLBACK_RESULT_CONTINUE_AND_REMOVE_JOB:
                 next = current;
@@ -167,6 +174,7 @@ restart_from_first_job:
 i32 Chain::RunDrawChain()
 {
     PS2_TIME(PS2_T_DRAW_CHAIN);
+    PS2_SET_CB_TABLE(g_Ps2DrawStats);
     ChainElem *next;
     ChainElem *current;
     i32 updateCount;
@@ -178,7 +186,7 @@ i32 Chain::RunDrawChain()
         if (current->callback)
         {
         execute_again:
-            switch (current->callback(current->arg))
+            switch (CHAIN_CALL(current->callback, current->arg))
             {
             case CHAIN_CALLBACK_RESULT_CONTINUE_AND_REMOVE_JOB:
                 next = current;
