@@ -29,6 +29,14 @@
 // Everything is uploaded as RGBA32 (alpha scaled to the GS range 0..128)
 #define TH07_TEX_PSM GS_PSM_CT32
 
+// With TH07_PS2_GS_PIPELINE the GS can still be reading last frame's packets, which point at texture memory in EE RAM.
+// Wait for it before changing or freeing a texture. Without the pipeline every frame already ends with a finish.
+#ifdef TH07_PS2_GS_PIPELINE
+#define PS2_WAIT_FOR_GS() gsKit_finish()
+#else
+#define PS2_WAIT_FOR_GS() ((void)0)
+#endif
+
 size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
 unsigned g_Ps2TexCount = 0;
 bool g_Ps2TexAllocFailed = false; // set when a texture could not be allocated; AnmManager turns it into a load error
@@ -192,6 +200,7 @@ ZunGraphics *PS2GS::Init()
 void PS2GS::Exit()
 {
     FlushPending();
+    PS2_WAIT_FOR_GS();
     for (Tex &t : textures)
         ReleaseTextureMemory(&t);
     textures.clear();
@@ -463,6 +472,7 @@ void PS2GS::Clear(u32 clearBits)
 void PS2GS::ReleaseTextureMemory(Tex *tex)
 {
     FlushPending();
+    PS2_WAIT_FOR_GS();
     if (tex->alive && gs)
         gsKit_TexManager_free(gs, &tex->gs);
     if (tex->gs.Mem)
@@ -587,6 +597,7 @@ void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fm
 void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataType type, const void *data)
 {
     FlushPending();
+    PS2_WAIT_FOR_GS();
     const u32 psm = g_Ps2NextTexture16 ? GS_PSM_CT16 : TH07_TEX_PSM;
     g_Ps2NextTexture16 = false; // one-shot, even when the call below is ignored
 
@@ -633,6 +644,7 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
 void PS2GS::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height, const void *data)
 {
     FlushPending();
+    PS2_WAIT_FOR_GS();
     Tex *tex = boundTexture;
     if (tex == nullptr || !tex->alive || data == nullptr)
         return;
@@ -996,7 +1008,9 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
     DrawVertices(type, in, count, hasTex, screenSpace);
 }
 
-// Diagnostic for the on-screen fps counter: time spent in SwapBuffers (GS work plus waiting for it), in ms.
+// Diagnostic for the on-screen fps counter: time spent in SwapBuffers, in ms.
+// Default build: GS work of this frame plus waiting for it. With TH07_PS2_GS_PIPELINE: waiting for the previous
+// frame, the flip and the kick of this one (the GS work of this frame is not waited for, so it is not counted).
 u64 g_Ps2GsMsTotal;
 u32 g_Ps2GsFrames;
 
@@ -1012,10 +1026,21 @@ void PS2GS::SwapBuffers()
     frame++;
 
     const u64 gsStart = SDL_GetTicks64();
+#ifdef TH07_PS2_GS_PIPELINE
+    // Overlap EE and GS: wait for the frame kicked by the previous call, show it, then kick this frame and return
+    // without waiting, so the EE can build the next frame while the GS draws this one. Costs one frame of latency.
+    // Unverified on hardware (gsKit source not available here): see the risk notes in the commit message.
+    gsKit_finish();
+    // The GS is idle here, so texture VRAM that nextFrame frees cannot still be read by a packet in flight.
+    gsKit_TexManager_nextFrame(gs);
+    gsKit_sync_flip(gs);
+    gsKit_queue_exec(gs);
+#else
     gsKit_queue_exec(gs);
     gsKit_finish();
     gsKit_sync_flip(gs);
     gsKit_TexManager_nextFrame(gs);
+#endif
     g_Ps2GsMsTotal += SDL_GetTicks64() - gsStart;
     g_Ps2GsFrames++;
 }
