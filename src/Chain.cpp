@@ -1,4 +1,5 @@
 #include "Chain.hpp"
+#include "Ps2Timing.hpp"
 
 #include <stddef.h>
 
@@ -122,6 +123,7 @@ ZunResult Chain::AddToDrawChain(ChainElem *elem, i32 priority)
 
 i32 Chain::RunCalcChain()
 {
+    PS2_TIME(PS2_T_CALC_CHAIN);
     ChainElem *next;
     ChainElem *current;
     i32 updateCount;
@@ -164,6 +166,7 @@ restart_from_first_job:
 
 i32 Chain::RunDrawChain()
 {
+    PS2_TIME(PS2_T_DRAW_CHAIN);
     ChainElem *next;
     ChainElem *current;
     i32 updateCount;

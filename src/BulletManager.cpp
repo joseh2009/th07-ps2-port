@@ -12,23 +12,7 @@
 #include "Supervisor.hpp"
 #include "ZunMath.hpp"
 
-#ifdef __PS2__
-#include <SDL2/SDL_timer.h>
-// Diagnostic timers for the R3 panel (Supervisor.cpp): ticks spent in BulletManager::OnUpdate / OnDraw since the
-// last panel refresh. Timing only; nothing here changes what the code does.
-u64 g_Ps2BulletUpdTicks = 0;
-u64 g_Ps2BulletDrawTicks = 0;
-struct Ps2ScopeTimer
-{
-    u64 *acc;
-    u64 start;
-    explicit Ps2ScopeTimer(u64 *a) : acc(a), start(SDL_GetPerformanceCounter()) {}
-    ~Ps2ScopeTimer() { *acc += SDL_GetPerformanceCounter() - start; }
-};
-#define TH07_PS2_TIME(acc) Ps2ScopeTimer ps2ScopeTimer_(&(acc))
-#else
-#define TH07_PS2_TIME(acc)
-#endif
+#include "Ps2Timing.hpp"
 
 #ifdef __PS2__
 #ifndef TH07_PS2_BULLET_DRAW_LIMIT
@@ -852,7 +836,7 @@ void Bullet::UpdateBulletBounce()
 
 u32 BulletManager::OnUpdate(BulletManager *arg)
 {
-    TH07_PS2_TIME(g_Ps2BulletUpdTicks);
+    PS2_TIME(PS2_T_BULLET_UPD);
     ZunVec3 laserCenter;
     Laser *laser;
     i32 alpha;
@@ -1240,7 +1224,7 @@ void Bullet::Draw()
 
 u32 BulletManager::OnDraw(BulletManager *arg)
 {
-    TH07_PS2_TIME(g_Ps2BulletDrawTicks);
+    PS2_TIME(PS2_T_BULLET_DRAW);
     Bullet *bullet;
     f32 cosine;
     f32 offset;

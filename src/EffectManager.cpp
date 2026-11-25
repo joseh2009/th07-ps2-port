@@ -1,6 +1,7 @@
 #include "EffectManager.hpp"
 
 #include "AnmIdx.hpp"
+#include "Ps2Timing.hpp"
 #include "AnmManager.hpp"
 #include "GameManager.hpp"
 #include "Player.hpp"
@@ -624,6 +625,7 @@ Effect *EffectManager::SpawnSpecialEffect(i32 effectId, ZunVec3 *pos, i32 effect
 
 u32 EffectManager::OnUpdate(EffectManager *arg)
 {
+    PS2_TIME(PS2_T_EFFECT_UPD);
     i32 i;
     Effect *effect;
 
@@ -696,6 +698,7 @@ u32 EffectManager::OnUpdate(EffectManager *arg)
 
 u32 EffectManager::OnDraw(EffectManager *arg)
 {
+    PS2_TIME(PS2_T_EFFECT_DRAW);
     Effect *effect;
 
     effect = arg->layer0.next;

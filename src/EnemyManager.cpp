@@ -1,6 +1,7 @@
 #include "EnemyManager.hpp"
 
 #include "AnmIdx.hpp"
+#include "Ps2Timing.hpp"
 #include "AsciiManager.hpp"
 #include "Chain.hpp"
 #include "EclManager.hpp"
@@ -599,6 +600,7 @@ void Enemy::CheckBulletPlayerCollision(ZunVec3 *bulletCenter, ZunVec3 *bulletSiz
 
 u32 EnemyManager::OnUpdate(EnemyManager *arg)
 {
+    PS2_TIME(PS2_T_ENEMY_UPD);
     ZunVec3 bossMarkerPos;
     i32 l;
     i32 removedScore;
@@ -1334,11 +1336,13 @@ u32 EnemyManager::ActualOnDraw(EnemyManager *arg, i32 first, i32 last)
 
 u32 EnemyManager::OnDraw1(EnemyManager *arg)
 {
+    PS2_TIME(PS2_T_ENEMY_DRAW);
     return ActualOnDraw(arg, 0, 2);
 }
 
 u32 EnemyManager::OnDraw2(EnemyManager *arg)
 {
+    PS2_TIME(PS2_T_ENEMY_DRAW);
     return ActualOnDraw(arg, 2, 4);
 }
 

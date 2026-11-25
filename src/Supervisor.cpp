@@ -40,6 +40,7 @@ u32 g_FpsUpdateCounter;
 char g_ReplayFpsBuffer[256];
 #ifdef __PS2__
 #include <malloc.h>
+#include "Ps2Timing.hpp"
 extern u64 g_Ps2GsMsTotal;
 extern u32 g_Ps2GsFrames;
 extern size_t g_Ps2TexBytes;   // PS2GS.cpp
@@ -49,10 +50,8 @@ extern size_t g_Ps2AudioBytes; // ps2audio.cpp
 static bool g_Ps2DiagOn = false;
 static f32 g_Ps2DiagFps = 0.0f;
 static f64 g_Ps2DiagGsMs = 0.0;
-static f64 g_Ps2DiagBulletUpdMs = 0.0;  // BulletManager.cpp
-static f64 g_Ps2DiagBulletDrawMs = 0.0;
-extern u64 g_Ps2BulletUpdTicks;         // BulletManager.cpp
-extern u64 g_Ps2BulletDrawTicks;
+static f64 g_Ps2DiagMs[PS2_T_COUNT]; // average ms per frame for each timer slot (Ps2Timing.hpp)
+u64 g_Ps2TimerTicks[PS2_T_COUNT];
 extern u32 g_Ps2PadHeld;
 extern u32 g_Ps2PadMode;
 extern int g_Ps2PadInit;  // Ps2Pad.cpp
@@ -725,10 +724,11 @@ void Supervisor::DrawFpsCounter(i32 param_1)
                 g_Ps2DiagGsMs = g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0;
                 {
                     const f64 msPerTick = 1000.0 / (f64)SDL_GetPerformanceFrequency();
-                    g_Ps2DiagBulletUpdMs = g_Ps2GsFrames ? (f64)g_Ps2BulletUpdTicks * msPerTick / g_Ps2GsFrames : 0.0;
-                    g_Ps2DiagBulletDrawMs = g_Ps2GsFrames ? (f64)g_Ps2BulletDrawTicks * msPerTick / g_Ps2GsFrames : 0.0;
-                    g_Ps2BulletUpdTicks = 0;
-                    g_Ps2BulletDrawTicks = 0;
+                    for (int i = 0; i < PS2_T_COUNT; i++)
+                    {
+                        g_Ps2DiagMs[i] = g_Ps2GsFrames ? (f64)g_Ps2TimerTicks[i] * msPerTick / g_Ps2GsFrames : 0.0;
+                        g_Ps2TimerTicks[i] = 0;
+                    }
                 }
                 g_Ps2GsMsTotal = 0;
                 g_Ps2GsFrames = 0;
@@ -839,17 +839,23 @@ LAB_00439350:
         }
         if (g_Ps2DiagOn)
         {
-            static char s_Diag[5][96];
+            static char s_Diag[6][96];
             struct mallinfo mi = mallinfo();
-            sprintf(s_Diag[0], "FPS %.0f   GS %.2f ms/frame", (f64)g_Ps2DiagFps, g_Ps2DiagGsMs);
+            // EE estimate: the frame time (1000 / fps) minus the GS time. An estimate, not a measurement.
+            const f64 frameMs = g_Ps2DiagFps > 0.0f ? 1000.0 / (f64)g_Ps2DiagFps : 0.0;
+            sprintf(s_Diag[0], "FPS %.0f  GS %.2f  EE~ %.1f ms/frame", (f64)g_Ps2DiagFps, g_Ps2DiagGsMs,
+                    frameMs - g_Ps2DiagGsMs);
             sprintf(s_Diag[1], "RAM heap used %dK  free %dK", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
             sprintf(s_Diag[2], "TEX %dK in %u textures   SFX %dK", (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount,
                     (int)(g_Ps2AudioBytes / 1024));
             sprintf(s_Diag[3], "PAD %04X  mode %02X  reads %u", g_Ps2PadHeld & 0xffff, g_Ps2PadMode, g_Ps2PadReads);
-            sprintf(s_Diag[4], "BULLETS update %.2f ms  draw %.2f ms", g_Ps2DiagBulletUpdMs, g_Ps2DiagBulletDrawMs);
+            sprintf(s_Diag[4], "UPDATE all %.2f  bul %.2f  ene %.2f  eff %.2f ms", g_Ps2DiagMs[PS2_T_CALC_CHAIN],
+                    g_Ps2DiagMs[PS2_T_BULLET_UPD], g_Ps2DiagMs[PS2_T_ENEMY_UPD], g_Ps2DiagMs[PS2_T_EFFECT_UPD]);
+            sprintf(s_Diag[5], "DRAW   all %.2f  bul %.2f  ene %.2f  eff %.2f ms", g_Ps2DiagMs[PS2_T_DRAW_CHAIN],
+                    g_Ps2DiagMs[PS2_T_BULLET_DRAW], g_Ps2DiagMs[PS2_T_ENEMY_DRAW], g_Ps2DiagMs[PS2_T_EFFECT_DRAW]);
             ZunVec3 diagPos;
             diagPos.z = 0.0f;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 6; i++)
             {
                 diagPos.x = 8.0f;
                 diagPos.y = 24.0f + 16.0f * i;
