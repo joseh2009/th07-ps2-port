@@ -965,6 +965,16 @@ void AnmManager::Flush()
 
 ZunResult AnmManager::PushSprite(VertexTex1DiffuseXyzrhw *spriteVertex)
 {
+    // The buffer holds 49152 vertices (8192 sprites). It has no bound check, and vertexBufferCurPtr sits right after
+    // it in the struct: a frame with more sprites wrote past the end, overwrote the pointer itself, and the next
+    // sprites went to small addresses (TLB miss). Submit what is pending and start again from the top.
+    if (this->vertexBufferCurPtr + 6 > this->spriteVertexBuffer + ARRAY_SIZE_SIGNED(this->spriteVertexBuffer))
+    {
+        this->Flush();
+        this->vertexBufferCurPtr = this->spriteVertexBuffer;
+        this->vertexBufferStartPtr = this->vertexBufferCurPtr;
+    }
+
     this->vertexBufferCurPtr[0] = spriteVertex[0];
     this->vertexBufferCurPtr[1] = spriteVertex[1];
     this->vertexBufferCurPtr[2] = spriteVertex[2];
