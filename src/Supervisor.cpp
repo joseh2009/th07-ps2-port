@@ -42,6 +42,41 @@ char g_ReplayFpsBuffer[256];
 #include <malloc.h>
 #include <stdint.h>
 #include "Ps2Timing.hpp"
+
+#ifdef TH07_PS2_TECHDEMO
+#include <cstring>
+extern const char *g_DemoReplayPaths[3];
+// Demo build: starts the next built-in demo replay the same way the title menu does (same file, same settings).
+// Returns false if the file cannot be read, and the caller then starts Stage 1 directly.
+static bool Ps2StartDemoReplay()
+{
+    g_GameManager.demoIdx++;
+    g_GameManager.demoIdx %= 3;
+    strcpy(g_GameManager.replayFilename, g_DemoReplayPaths[g_GameManager.demoIdx]);
+    ReplayFile *replay = (ReplayFile *)FileSystem::OpenFile(g_GameManager.replayFilename, 0);
+    replay = ReplayManager::ValidateReplayData(replay, g_LastFileSize);
+    if (!replay)
+    {
+        return false;
+    }
+    g_GameManager.SetIsReplay(TRUE);
+    g_GameManager.demo = 1;
+    g_GameManager.demoFrames = 0;
+    g_GameManager.difficulty = replay->data.difficulty;
+    g_GameManager.character = replay->data.shotType / 2;
+    g_GameManager.shotType = replay->data.shotType % 2;
+    g_GameManager.shotTypeAndCharacter = replay->data.shotType;
+    i32 i = 0;
+    while (!replay->stageReplayData[i])
+    {
+        i++;
+    }
+    g_GameManager.currentStage = i;
+    ReplayManager::FreeReplay(replay);
+    g_GameManager.replayStage = 0;
+    return true;
+}
+#endif
 extern u64 g_Ps2GsMsTotal;
 extern u32 g_Ps2GsFrames;
 extern size_t g_Ps2TexBytes;   // PS2GS.cpp
@@ -247,7 +282,17 @@ u32 Supervisor::OnUpdate(Supervisor *arg)
         case SUPERVISOR_STATE_INIT:
         CASE_SUPERVISOR_STATE_INIT:
 #ifdef TH07_PS2_TECHDEMO
-            // Demo build: skip the title menu and start Stage 1 directly (Reimu A, Normal, no practice)
+            // Demo build: skip the title menu. Play the built-in demo replays in turn (as the title does); if none
+            // can be read, start Stage 1 directly (Reimu A, Normal, no practice)
+            if (Ps2StartDemoReplay())
+            {
+                arg->curState = SUPERVISOR_STATE_GAMEMANAGER;
+                if (GameManager::RegisterChain() != ZUN_SUCCESS)
+                {
+                    return CHAIN_CALLBACK_RESULT_EXIT_GAME_SUCCESS;
+                }
+                break;
+            }
             g_GameManager.practice = 0;
             g_GameManager.difficulty = 1;
             g_GameManager.character = 0;
