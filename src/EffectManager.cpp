@@ -696,6 +696,38 @@ u32 EffectManager::OnUpdate(EffectManager *arg)
     }
 }
 
+#ifdef __PS2__
+#ifndef TH07_PS2_EFFECT_CULL_MARGIN
+// Effects in layers 0 and 3 further than this (plus their own size) outside the play field (384x448) are not
+// drawn. Same convention as the bullet and enemy culls. Drawing only: the effect keeps updating and timing out.
+#define TH07_PS2_EFFECT_CULL_MARGIN 64.0f
+#endif
+static inline bool Ps2EffectVisible(const Effect *effect)
+{
+#ifndef TH07_PS2_NO_EFFECT_CULL
+    const AnmVm *vm = &effect->vm;
+    if (vm->sprite == NULL)
+    {
+        return true;
+    }
+    const f32 r = 0.5f * (vm->sprite->widthPx * vm->scale.x + vm->sprite->heightPx * vm->scale.y) +
+                  TH07_PS2_EFFECT_CULL_MARGIN;
+    const f32 x = effect->pos.x;
+    const f32 y = effect->pos.y;
+    return !(x < -r || x > 384.0f + r || y < -r || y > 448.0f + r);
+#else
+    (void)effect;
+    return true;
+#endif
+}
+#else
+static inline bool Ps2EffectVisible(const Effect *effect)
+{
+    (void)effect;
+    return true;
+}
+#endif
+
 u32 EffectManager::OnDraw(EffectManager *arg)
 {
     PS2_TIME(PS2_T_EFFECT_DRAW);
@@ -707,7 +739,10 @@ u32 EffectManager::OnDraw(EffectManager *arg)
         effect->vm.pos = effect->pos;
         effect->vm.pos.x += g_GameManager.arcadeRegionTopLeftPos.x;
         effect->vm.pos.y += g_GameManager.arcadeRegionTopLeftPos.y;
-        g_AnmManager->Draw(&effect->vm);
+        if (Ps2EffectVisible(effect))
+        {
+            g_AnmManager->Draw(&effect->vm);
+        }
         effect = effect->next;
     }
     effect = arg->layer2.next;
@@ -723,7 +758,10 @@ u32 EffectManager::OnDraw(EffectManager *arg)
         effect->vm.pos = effect->pos;
         effect->vm.pos.x += g_GameManager.arcadeRegionTopLeftPos.x;
         effect->vm.pos.y += g_GameManager.arcadeRegionTopLeftPos.y;
-        g_AnmManager->Draw(&effect->vm);
+        if (Ps2EffectVisible(effect))
+        {
+            g_AnmManager->Draw(&effect->vm);
+        }
         effect = effect->next;
     }
     return CHAIN_CALLBACK_RESULT_CONTINUE;
