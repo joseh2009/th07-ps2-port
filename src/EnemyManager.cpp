@@ -14,6 +14,41 @@
 #include "ZunResult.hpp"
 #include "utils.hpp"
 
+#ifdef __PS2__
+#ifndef TH07_PS2_ENEMY_CULL_MARGIN
+// An enemy's main sprite is skipped when it is further than this (plus its own size) outside the play field
+// (384x448, same convention as the bullet cull). Drawing only: the enemy keeps updating and can still be hit.
+#define TH07_PS2_ENEMY_CULL_MARGIN 64.0f
+#endif
+// Returns false when the head sprite of an enemy with no trail is entirely outside the cull area.
+// Trails are drawn from the enemy history, so an enemy with a trail is always drawn (see ActualOnDraw).
+// Set TH07_PS2_NO_ENEMY_CULL to draw every enemy as before.
+static inline bool Ps2EnemyHeadVisible(const Enemy *enemy)
+{
+#ifndef TH07_PS2_NO_ENEMY_CULL
+    if (enemy->trailFlags != 0)
+    {
+        return true;
+    }
+    const AnmVm *vm = &enemy->primaryVm;
+    const f32 r = 0.5f * (vm->sprite->widthPx * vm->scale.x + vm->sprite->heightPx * vm->scale.y) +
+                  TH07_PS2_ENEMY_CULL_MARGIN;
+    const f32 x = enemy->pos.x + vm->offset.x;
+    const f32 y = enemy->pos.y + vm->offset.y;
+    return !(x < -r || x > 384.0f + r || y < -r || y > 448.0f + r);
+#else
+    (void)enemy;
+    return true;
+#endif
+}
+#else
+static inline bool Ps2EnemyHeadVisible(const Enemy *enemy)
+{
+    (void)enemy;
+    return true;
+}
+#endif
+
 u32 g_SpellcardScore[SPELLCARD_COUNT] = {
     2000000, 2000000, 2200000, 2200000, 2400000, 2400000, 2400000, 2400000, 2400000, 2400000,
     2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000,
@@ -1166,7 +1201,7 @@ u32 EnemyManager::ActualOnDraw(EnemyManager *arg, i32 first, i32 last)
             }
             enemy->primaryVm.pos = enemy->pos + enemy->primaryVm.offset;
             enemy->primaryVm.pos.z = 0.29f;
-            if ((enemy->trailFlags & 16) == 0 && !enemy->invisibleOnBomb)
+            if ((enemy->trailFlags & 16) == 0 && !enemy->invisibleOnBomb && Ps2EnemyHeadVisible(enemy))
             {
                 enemy->primaryVm.pos.x += g_GameManager.arcadeRegionTopLeftPos.x;
                 enemy->primaryVm.pos.y += g_GameManager.arcadeRegionTopLeftPos.y;
