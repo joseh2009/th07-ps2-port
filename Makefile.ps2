@@ -33,7 +33,7 @@ EE_INCS += -Isrc -I$(PS2SDK)/ports/include -I$(PS2SDK)/ports/include/SDL2 -I$(GS
 
 EE_CXXFLAGS += -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi \
 	-Wno-unused-parameter -Wno-missing-field-initializers
-EE_OPTFLAGS = -O2
+EE_OPTFLAGS = -O3
 
 # Console printf logging is off by default: printing and flushing on every message is slow on real hardware.
 # Add -DTH07_PS2_VERBOSE here only when debugging with a console or emulator log. The on-screen log is always kept.
