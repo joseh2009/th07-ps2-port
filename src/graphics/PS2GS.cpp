@@ -729,10 +729,10 @@ void PS2GS::ReadPixels(i32 x, i32 y, i32 width, i32 height, void *pixels)
 // Drawing
 // ------------------------------------------------------------------------------------------------
 
-PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSpace) const
+// Clip-space position of one vertex. Screen-space vertices (xyzrhw) map from game pixels to the viewport; 3D vertices
+// go through the model-view-projection matrix (D3D convention: row vector * matrix).
+void PS2GS::SetPosition(ClipVert &o, const InVert &in, bool screenSpace) const
 {
-    ClipVert o;
-
     if (screenSpace)
     {
         // The vertex position is already in game pixels: map it to clip space of the current viewport
@@ -740,8 +740,6 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
         o.y = 1.0f - (in.y - (f32)viewport.y) / (f32)viewport.height * 2.0f;
         o.z = in.z;
         o.w = 1.0f;
-        o.u = in.u;
-        o.v = in.v;
     }
     else
     {
@@ -754,18 +752,22 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
         o.y = c[1];
         o.z = c[2];
         o.w = c[3];
+    }
+}
 
-        if (textureMatrixIsIdentity)
-        {
-            o.u = in.u;
-            o.v = in.v;
-        }
-        else
-        {
-            const ZunMatrix &t = textureMatrix;
-            o.u = in.u * t.m[0][0] + in.v * t.m[1][0] + t.m[2][0];
-            o.v = in.u * t.m[0][1] + in.v * t.m[1][1] + t.m[2][1];
-        }
+// Texture coordinates and colour of one vertex. Called only for vertices that reach a triangle that is not rejected.
+void PS2GS::SetAttributes(ClipVert &o, const InVert &in, bool textured, bool screenSpace) const
+{
+    if (screenSpace || textureMatrixIsIdentity)
+    {
+        o.u = in.u;
+        o.v = in.v;
+    }
+    else
+    {
+        const ZunMatrix &t = textureMatrix;
+        o.u = in.u * t.m[0][0] + in.v * t.m[1][0] + t.m[2][0];
+        o.v = in.u * t.m[0][1] + in.v * t.m[1][1] + t.m[2][1];
     }
 
     if (textured && boundTexture)
@@ -812,7 +814,6 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
         o.b = arg[2];
         o.a = arg[3];
     }
-    return o;
 }
 
 void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
@@ -826,7 +827,7 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
     for (int i = 0; i < 3; i++)
     {
         const ClipVert &v = *tri[i];
-        // Screen-space vertices have w == 1 (MakeVertex, and clipping keeps it at 1), so the divide is skipped.
+        // Screen-space vertices have w == 1 (SetPosition, and clipping keeps it at 1), so the divide is skipped.
         const f32 invW = drawScreen ? 1.0f : 1.0f / v.w;
         const f32 ndcX = v.x * invW;
         const f32 ndcY = v.y * invW;
@@ -884,7 +885,12 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
 
 void PS2GS::ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
 {
-    const u32 oa = OutCode(a.x, a.y, a.w), ob = OutCode(b.x, b.y, b.w), oc = OutCode(c.x, c.y, c.w);
+    ClipEmit(a, b, c, OutCode(a.x, a.y, a.w), OutCode(b.x, b.y, b.w), OutCode(c.x, c.y, c.w), textured);
+}
+
+// ClipAndEmit with the outcodes already known (DrawVertices computes each vertex's code once).
+void PS2GS::ClipEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, u32 oa, u32 ob, u32 oc, bool textured)
+{
 
     if ((oa & ob & oc) != 0)
         return; // entirely outside one plane
@@ -1005,24 +1011,59 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
     batchUV = uvForm;
     drawScreen = screenSpace;
 
+    // Pass 1: clip-space position and outcode of every vertex. One matrix product each; no colour or UV work yet.
     clipVerts.resize(count);
+    vertCode.resize(count);
     for (i32 i = 0; i < count; i++)
-        clipVerts[i] = MakeVertex(verts[i], textured, screenSpace);
+    {
+        SetPosition(clipVerts[i], verts[i], screenSpace);
+        vertCode[i] = OutCode(clipVerts[i].x, clipVerts[i].y, clipVerts[i].w);
+    }
 
+    // Pass 2: a vertex needs its colour and UV only if a triangle that uses it is not trivially rejected (all three
+    // outside the same plane). The test is the one ClipEmit uses, so every emitted triangle has its attributes.
+    vertNeeded.assign(count, 0);
+    auto mark = [&](i32 a, i32 b, i32 c) {
+        if ((vertCode[a] & vertCode[b] & vertCode[c]) != 0)
+            return;
+        vertNeeded[a] = vertNeeded[b] = vertNeeded[c] = 1;
+    };
     if (type == PRIM_TRIANGLE_STRIP)
     {
         for (i32 i = 0; i + 2 < count; i++)
-            ClipAndEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], textured);
+            mark(i, i + 1, i + 2);
     }
     else if (type == PRIM_TRIANGLE_FAN)
     {
         for (i32 i = 1; i + 1 < count; i++)
-            ClipAndEmit(clipVerts[0], clipVerts[i], clipVerts[i + 1], textured);
+            mark(0, i, i + 1);
     }
     else
     {
         for (i32 i = 0; i + 2 < count; i += 3)
-            ClipAndEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], textured);
+            mark(i, i + 1, i + 2);
+    }
+
+    // Pass 3: colour and UV, only for the vertices that will be used.
+    for (i32 i = 0; i < count; i++)
+        if (vertNeeded[i])
+            SetAttributes(clipVerts[i], verts[i], textured, screenSpace);
+
+    // Pass 4: clip and emit, with the outcodes from pass 1.
+    if (type == PRIM_TRIANGLE_STRIP)
+    {
+        for (i32 i = 0; i + 2 < count; i++)
+            ClipEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], vertCode[i], vertCode[i + 1], vertCode[i + 2], textured);
+    }
+    else if (type == PRIM_TRIANGLE_FAN)
+    {
+        for (i32 i = 1; i + 1 < count; i++)
+            ClipEmit(clipVerts[0], clipVerts[i], clipVerts[i + 1], vertCode[0], vertCode[i], vertCode[i + 1], textured);
+    }
+    else
+    {
+        for (i32 i = 0; i + 2 < count; i += 3)
+            ClipEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], vertCode[i], vertCode[i + 1], vertCode[i + 2], textured);
     }
 }
 

@@ -110,6 +110,8 @@ class PS2GS : public ZunGraphics
 
     // Scratch buffers reused every draw call
     std::vector<ClipVert> clipVerts;
+    std::vector<u32> vertCode;   // per vertex outcode, filled once per draw (DrawVertices)
+    std::vector<u8> vertNeeded;  // per vertex: 1 if a triangle that is not trivially rejected uses it
     std::vector<GSPRIMSTQPOINT> texBatch;
     std::vector<GSPRIMUVPOINT> uvBatch;   // screen-space sprites: no Q, no perspective divide (see DrawVertices)
     std::vector<GSPRIMPOINT> flatBatch;
@@ -133,7 +135,9 @@ class PS2GS : public ZunGraphics
     void FlushPending(); // submit the deferred texture/flat batches before any state or memory change
     void EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
     void ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
-    ClipVert MakeVertex(const InVert &in, bool textured, bool screenSpace) const;
+    void SetPosition(ClipVert &o, const InVert &in, bool screenSpace) const;
+    void SetAttributes(ClipVert &o, const InVert &in, bool textured, bool screenSpace) const;
+    void ClipEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, u32 oa, u32 ob, u32 oc, bool textured);
     void DrawVertices(PrimitiveType type, const InVert *verts, i32 count, bool hasTex, bool screenSpace);
     void ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fmt, PixelDataType type, const void *data);
     void ReleaseTextureMemory(Tex *tex);
