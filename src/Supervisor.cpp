@@ -49,7 +49,11 @@ extern unsigned g_Ps2TexCount; // PS2GS.cpp
 extern u32 g_Ps2BindsLastFrame, g_Ps2UploadLastFrame; // PS2GS.cpp: texture binds and texel bytes written last frame
 extern size_t g_Ps2AudioBytes; // ps2audio.cpp
 // Diagnostic panel, toggled with R3 (right stick press). Values are refreshed at each fps update.
+#ifdef TH07_PS2_TECHDEMO
+static bool g_Ps2DiagOn = true; // demo build: panel on from the start
+#else
 static bool g_Ps2DiagOn = false;
+#endif
 static f32 g_Ps2DiagFps = 0.0f;
 static f64 g_Ps2DiagGsMs = 0.0;
 static f64 g_Ps2DiagMs[PS2_T_COUNT]; // average ms per frame for each timer slot (Ps2Timing.hpp)
@@ -242,12 +246,27 @@ u32 Supervisor::OnUpdate(Supervisor *arg)
         {
         case SUPERVISOR_STATE_INIT:
         CASE_SUPERVISOR_STATE_INIT:
+#ifdef TH07_PS2_TECHDEMO
+            // Demo build: skip the title menu and start Stage 1 directly (Reimu A, Normal, no practice)
+            g_GameManager.practice = 0;
+            g_GameManager.difficulty = 1;
+            g_GameManager.character = 0;
+            g_GameManager.shotType = 0;
+            g_GameManager.currentStage = 0;
+            arg->curState = SUPERVISOR_STATE_GAMEMANAGER;
+            if (GameManager::RegisterChain() != ZUN_SUCCESS)
+            {
+                return CHAIN_CALLBACK_RESULT_EXIT_GAME_SUCCESS;
+            }
+            break;
+#else
             arg->curState = SUPERVISOR_STATE_MAINMENU;
             if (MainMenu::RegisterChain() != ZUN_SUCCESS)
             {
                 return CHAIN_CALLBACK_RESULT_EXIT_GAME_SUCCESS;
             }
             break;
+#endif
         case SUPERVISOR_STATE_MAINMENU:
             switch (arg->curState)
             {

@@ -143,6 +143,10 @@ u32 Gui::OnDraw(Gui *arg)
 
     g_AnmManager->offset.y = 0.0f;
     g_AnmManager->offset.x = 0.0f;
+#ifdef TH07_PS2_TECHDEMO
+    // Demo build: HUD hidden so the diagnostic panel is easier to read (the offset above is still reset)
+    return CHAIN_CALLBACK_RESULT_CONTINUE;
+#endif
     if (arg->impl->finishedStage)
     {
         stringPos.x = 144.0f;

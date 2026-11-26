@@ -46,6 +46,12 @@ ifeq ($(CT32),1)
 EE_CXXFLAGS += -DTH07_PS2_CT32
 endif
 
+# TECHDEMO=1 (demo build only; the normal build is unchanged): skips the title menu and starts Stage 1 directly,
+# hides the HUD and starts with the R3 diagnostic panel on. Needs a clean build (no header dependencies).
+ifeq ($(TECHDEMO),1)
+EE_CXXFLAGS += -DTH07_PS2_TECHDEMO
+endif
+
 EE_LDFLAGS += -Wl,--wrap=fopen -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
 
 # order matters: SDL2main first, SDL2 after the libraries that depend on it
