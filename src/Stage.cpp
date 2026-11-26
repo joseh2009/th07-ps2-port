@@ -872,6 +872,71 @@ ZunResult Stage::UpdateObjects()
     return ZUN_SUCCESS;
 }
 
+#ifdef __PS2__
+#ifndef TH07_PS2_BG_CULL_MARGIN
+// Background quads whose projected box lies entirely outside the play field (plus this margin) are not drawn.
+// Drawing only: the quad is still updated every frame. Set TH07_PS2_NO_BG_CULL to draw every quad as before.
+#define TH07_PS2_BG_CULL_MARGIN 64.0f
+#endif
+// viewProj is view * projection for the current stage camera. The box is taken as the projected centre plus
+// a radius of width + height in world units along x and y, which covers rotation and anchor offsets.
+static inline bool Ps2BgQuadVisible(const AnmVm *vm, ZunMatrix *viewProj)
+{
+#ifndef TH07_PS2_NO_BG_CULL
+    if (vm->sprite == NULL)
+    {
+        return true;
+    }
+    const f32 radius = vm->sprite->widthPx * vm->scale.x + vm->sprite->heightPx * vm->scale.y;
+    ZunVec3 centre = vm->pos;
+    ZunVec3 offX = vm->pos;
+    ZunVec3 offY = vm->pos;
+    offX.x += radius;
+    offY.y += radius;
+
+    ZunVec3 sc;
+    ZunVec3 sx;
+    ZunVec3 sy;
+    sc.TransformCoord(&centre, viewProj);
+    sx.TransformCoord(&offX, viewProj);
+    sy.TransformCoord(&offY, viewProj);
+    if (sc.z < 0.0f || sc.z > 1.0f)
+    {
+        return true; // outside the depth range: the existing checks decide
+    }
+
+    const ZunViewport *vp = &g_Supervisor.viewport;
+    const f32 vx = (f32)vp->x;
+    const f32 vy = (f32)vp->y;
+    const f32 vw = (f32)vp->width;
+    const f32 vh = (f32)vp->height;
+    const f32 cx = vx + (1.0f + sc.x) * vw * 0.5f;
+    const f32 cy = vy + (1.0f - sc.y) * vh * 0.5f;
+    const f32 rx = fabsf(vx + (1.0f + sx.x) * vw * 0.5f - cx);
+    const f32 ry = fabsf(vy + (1.0f - sy.y) * vh * 0.5f - cy);
+    const f32 r = rx > ry ? rx : ry;
+
+    const f32 left = g_GameManager.arcadeRegionTopLeftPos.x;
+    const f32 top = g_GameManager.arcadeRegionTopLeftPos.y;
+    const f32 right = left + g_GameManager.arcadeRegionSize.x;
+    const f32 bottom = top + g_GameManager.arcadeRegionSize.y;
+    const f32 m = TH07_PS2_BG_CULL_MARGIN;
+    return !(cx + r < left - m || cx - r > right + m || cy + r < top - m || cy - r > bottom + m);
+#else
+    (void)vm;
+    (void)viewProj;
+    return true;
+#endif
+}
+#else
+static inline bool Ps2BgQuadVisible(const AnmVm *vm, ZunMatrix *viewProj)
+{
+    (void)vm;
+    (void)viewProj;
+    return true;
+}
+#endif
+
 i32 Stage::RenderObjects(i32 zLevel)
 {
     ZunColor origColor;
@@ -896,6 +961,7 @@ i32 Stage::RenderObjects(i32 zLevel)
     fogState = 255;
 
     UpdateCamera();
+    ZunMatrix viewProj = g_Supervisor.viewMatrix * g_Supervisor.projectionMatrix;
 
     AnmManager::SetCameraModeStatic(g_AnmManager, 1);
 
@@ -1036,7 +1102,10 @@ i32 Stage::RenderObjects(i32 zLevel)
                                         }
                                         fogState = 0;
                                     }
-                                    g_AnmManager->DrawFacingCamera(curQuadVm);
+                                    if (Ps2BgQuadVisible(curQuadVm, &viewProj))
+                                    {
+                                        g_AnmManager->DrawFacingCamera(curQuadVm);
+                                    }
                                 }
                                 curQuadVm->color = origColor;
                             }
@@ -1050,7 +1119,10 @@ i32 Stage::RenderObjects(i32 zLevel)
                                     }
                                     fogState = 1;
                                 }
-                                g_AnmManager->Draw3(curQuadVm);
+                                if (Ps2BgQuadVisible(curQuadVm, &viewProj))
+                                {
+                                    g_AnmManager->Draw3(curQuadVm);
+                                }
                             }
                             break;
                         }
