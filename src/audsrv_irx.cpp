@@ -1,7 +1,7 @@
 // audsrv.irx from ps2sdk (AFL-3.0 / ps2sdk licence), embedded so no extra file is needed next to the ELF.
 #ifdef __PS2__
 extern "C" {
-unsigned char audsrv_irx[] = {
+unsigned char audsrv_irx[] __attribute__((aligned(64))) = {
 127,69,76,70,1,1,1,0,0,0,0,0,0,0,0,0,
 128,255,8,0,1,0,0,0,36,9,0,0,52,0,0,0,
 188,59,0,0,1,16,0,0,52,0,32,0,2,0,40,0,
