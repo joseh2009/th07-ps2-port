@@ -1243,15 +1243,14 @@ u32 BulletManager::OnDraw(BulletManager *arg)
     // effects are always drawn. Only drawing changes; bullet movement and collision are untouched.
     static u32 drawFrame;
     drawFrame++;
-    // Only bullets that pass the cull below take a slot. Counting the off-screen ones as well (bulletCount) would
-    // flicker the visible bullets for no reason when many are outside the play field.
-    i32 visibleCount = 0;
-    for (i = 0; i < ARRAY_SIZE_SIGNED(arg->bulletsPtrs); i++)
-        for (bullet = arg->bulletsPtrs[i]; bullet; bullet = bullet->next)
-            if (Ps2BulletOnScreen(bullet))
-                visibleCount++;
-    const i32 drawStride = visibleCount > TH07_PS2_BULLET_DRAW_LIMIT
-                               ? (visibleCount + TH07_PS2_BULLET_DRAW_LIMIT - 1) / TH07_PS2_BULLET_DRAW_LIMIT
+    // Only bullets that pass the cull below take a slot. The stride uses the count from the previous call, so the
+    // bullet lists are walked once per frame (a one frame lag in the flicker pattern is not visible).
+    static i32 visibleLast;
+    static i32 visibleThis;
+    visibleLast = visibleThis;
+    visibleThis = 0;
+    const i32 drawStride = visibleLast > TH07_PS2_BULLET_DRAW_LIMIT
+                               ? (visibleLast + TH07_PS2_BULLET_DRAW_LIMIT - 1) / TH07_PS2_BULLET_DRAW_LIMIT
                                : 1;
     u32 drawIdx = 0;
 #endif
@@ -1306,6 +1305,7 @@ u32 BulletManager::OnDraw(BulletManager *arg)
                 bullet = bullet->next;
                 continue;
             }
+            visibleThis++;
             const bool effect = bullet->state == BULLET_SPAWNING_FAST ||
                                 bullet->state == BULLET_SPAWNING_NORMAL ||
                                 bullet->state == BULLET_SPAWNING_SLOW || bullet->state == BULLET_DESPAWN;
