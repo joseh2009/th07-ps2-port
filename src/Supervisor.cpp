@@ -1441,6 +1441,13 @@ i32 Supervisor::EnableFog()
 
 i32 Supervisor::DisableFog()
 {
+#ifdef __PS2__
+    if (!this->fogEnabled)
+    {
+        // Fog already off: nothing changes, so the anm batch need not be submitted here (DrawPopups calls this every frame)
+        return 0;
+    }
+#endif
     g_AnmManager->Flush();
     if (this->fogEnabled)
     {

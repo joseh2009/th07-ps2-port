@@ -310,8 +310,28 @@ void PS2GS::SetViewport(const ZunViewport &vp)
     viewport = vp;
 }
 
+// The setters below submit the pending batch only when the value really changes. The batch is drawn with the state
+// it sees at submit time, so an unchanged value needs no submit. Calls that repeat every frame (DrawPopups) were
+// splitting the batch each time.
 void PS2GS::Enable(Capabilities cap)
 {
+    switch (cap)
+    {
+    case CAPS_BLEND:
+        if (blendEnabled)
+            return;
+        break;
+    case CAPS_DEPTH_TEST:
+        if (depthTest)
+            return;
+        break;
+    case CAPS_ALPHA_TEST:
+        if (alphaTest)
+            return;
+        break;
+    case CAPS_FOG:
+        return; // fog is not a GS state here
+    }
     FlushPending();
     switch (cap)
     {
@@ -331,6 +351,23 @@ void PS2GS::Enable(Capabilities cap)
 
 void PS2GS::Disable(Capabilities cap)
 {
+    switch (cap)
+    {
+    case CAPS_BLEND:
+        if (!blendEnabled)
+            return;
+        break;
+    case CAPS_DEPTH_TEST:
+        if (!depthTest)
+            return;
+        break;
+    case CAPS_ALPHA_TEST:
+        if (!alphaTest)
+            return;
+        break;
+    case CAPS_FOG:
+        return; // fog is not a GS state here
+    }
     FlushPending();
     switch (cap)
     {
@@ -350,6 +387,8 @@ void PS2GS::Disable(Capabilities cap)
 
 void PS2GS::SetBlendMode(BlendMode srcMode, BlendMode dstMode)
 {
+    if (blendSrc == srcMode && blendDst == dstMode)
+        return;
     FlushPending();
     blendSrc = srcMode;
     blendDst = dstMode;
@@ -357,12 +396,16 @@ void PS2GS::SetBlendMode(BlendMode srcMode, BlendMode dstMode)
 
 void PS2GS::SetDepthMask(bool enable)
 {
+    if (depthMask == enable)
+        return;
     FlushPending();
     depthMask = enable;
 }
 
 void PS2GS::SetDepthFunc(DepthFunc func)
 {
+    if (depthFunc == func)
+        return;
     FlushPending();
     depthFunc = func;
 }
@@ -381,6 +424,8 @@ void PS2GS::SetClearColor(ZunColor color)
 
 void PS2GS::SetAlphaTestRef(u8 ref)
 {
+    if (alphaRef == ref)
+        return;
     FlushPending();
     alphaRef = ref;
 }
