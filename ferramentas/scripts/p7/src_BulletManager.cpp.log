@@ -1,0 +1,56 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/ItemManager.hpp:3,
+                 from src/BulletManager.hpp:3,
+                 from src/BulletManager.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/BulletManager.cpp: In member function 'void Bullet::UpdateBulletBurstSpeed()':
+src/BulletManager.cpp:663:33: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  663 |     this->commandStates[0].timer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BulletManager.cpp: In member function 'void Bullet::UpdateBulletTargetVelocity()':
+src/BulletManager.cpp:680:33: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  680 |     this->commandStates[1].timer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BulletManager.cpp: In member function 'void Bullet::UpdateBulletTargetAngle()':
+src/BulletManager.cpp:697:33: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  697 |     this->commandStates[2].timer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BulletManager.cpp: In member function 'void Bullet::UpdateBulletDirChangeAndResume()':
+src/BulletManager.cpp:727:33: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  727 |     this->commandStates[3].timer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BulletManager.cpp: In member function 'void Bullet::UpdateBulletDirChangeAbsoluteAndResume()':
+src/BulletManager.cpp:757:33: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  757 |     this->commandStates[3].timer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BulletManager.cpp: In member function 'void Bullet::UpdateBulletDirChangeAimAtPlayer()':
+src/BulletManager.cpp:788:33: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  788 |     this->commandStates[3].timer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BulletManager.cpp: In static member function 'static u32 BulletManager::OnUpdate(BulletManager*)':
+src/BulletManager.cpp:979:27: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  979 |             bullet->timer2--;
+      |             ~~~~~~~~~~~~~~^~
+src/BulletManager.cpp:988:27: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  988 |             bullet->timer2--;
+      |             ~~~~~~~~~~~~~~^~
+src/BulletManager.cpp:997:27: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  997 |             bullet->timer2--;
+      |             ~~~~~~~~~~~~~~^~
+src/BulletManager.cpp:1019:23: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1019 |         bullet->timer1++;
+      |         ~~~~~~~~~~~~~~^~
+src/BulletManager.cpp:1020:23: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1020 |         bullet->timer2++;
+      |         ~~~~~~~~~~~~~~^~
+src/BulletManager.cpp:1163:21: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1163 |         laser->timer++;
+      |         ~~~~~~~~~~~~^~
+src/BulletManager.cpp:1172:14: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1172 |     arg->time++;
+      |     ~~~~~~~~~^~

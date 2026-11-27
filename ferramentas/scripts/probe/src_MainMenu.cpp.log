@@ -1,0 +1,4 @@
+src/MainMenu.cpp: In member function 'i32 MainMenu::ReplayHandling()':
+src/MainMenu.cpp:1345:37: warning: NULL used in arithmetic [-Wpointer-arith]
+ 1345 |         if (this->replayFilesNum != NULL)
+      |                                     ^~~~

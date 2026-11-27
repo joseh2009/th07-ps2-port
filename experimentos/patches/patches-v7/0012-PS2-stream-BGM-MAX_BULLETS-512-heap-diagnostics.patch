@@ -1,0 +1,119 @@
+From b704469a00d8bbe7e931b8144df5511191962d21 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 20:53:56 -0300
+Subject: [PATCH 12/26] PS2: stream BGM, MAX_BULLETS 512, heap diagnostics
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/BulletManager.hpp |  4 ++++
+ src/FileSystem.cpp    |  6 ++++++
+ src/SoundPlayer.cpp   |  9 +++++++++
+ src/Supervisor.cpp    |  3 +++
+ src/ps2boot.cpp       | 11 +++++++++++
+ 5 files changed, 33 insertions(+)
+
+diff --git a/src/BulletManager.hpp b/src/BulletManager.hpp
+index 970432b..bb9c606 100644
+--- a/src/BulletManager.hpp
++++ b/src/BulletManager.hpp
+@@ -242,7 +242,11 @@ struct Bullet
+     BulletCommandState commandStates[5];
+ };
+ 
++#ifdef __PS2__
++#define MAX_BULLETS 512 // 32 MB RAM: halves the 3.6 MB pool
++#else
+ #define MAX_BULLETS 1024
++#endif
+ 
+ struct BulletManager
+ {
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index 416b166..06fff3e 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -1,3 +1,6 @@
++#ifdef __PS2__
++void Ps2HeapLog(const char *where);
++#endif
+ #include "FileSystem.hpp"
+ 
+ #include <cstdio>
+@@ -49,6 +52,9 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+             buf = (u8 *)malloc(fsize);
+             if (!buf)
+             {
++#ifdef __PS2__
++                Ps2HeapLog("oom");
++#endif
+                 g_GameErrorContext.Fatal("error : out of memory loading %s (%u bytes)\n", filename, fsize);
+                 return NULL;
+             }
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index 411024f..5d52927 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -1,3 +1,6 @@
++#ifdef __PS2__
++void Ps2HeapLog(const char *where);
++#endif
+ #include "SoundPlayer.hpp"
+ 
+ #include <cstdio>
+@@ -745,6 +748,9 @@ ZunResult SoundPlayer::InitSoundBuffers()
+     {
+         this->soundQueue[i] = -1;
+     }
++#ifdef __PS2__
++    Ps2HeapLog("before sfx");
++#endif
+     for (i = 0; i < ARRAY_SIZE_SIGNED(g_SFXList); i++)
+     {
+         if (LoadSound(i, g_SFXList[i]) != ZUN_SUCCESS)
+@@ -754,6 +760,9 @@ ZunResult SoundPlayer::InitSoundBuffers()
+             return ZUN_ERROR;
+         }
+     }
++#ifdef __PS2__
++    Ps2HeapLog("after sfx");
++#endif
+     for (i = 0; i < ARRAY_SIZE(SOUND_BUFFER_IDX_VOL); i++)
+     {
+         i32 bufIdx = SOUND_BUFFER_IDX_VOL[i].bufferIdx;
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 905643f..f11a55c 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -1001,6 +1001,9 @@ ZunResult Supervisor::LoadConfig(const char *configFilename)
+     {
+         g_GameErrorContext.Log("画面周りを毎回描画します\n");
+     }
++#ifdef __PS2__
++    this->cfg.preloadBgm = 0; // BGM is streamed from the archive: preloading a whole track would eat the 11 MB heap
++#endif
+     if (this->cfg.preloadBgm)
+     {
+         g_GameErrorContext.Log("ＢＧＭをメモリに読み込みます\n");
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index fd6327b..65e45b9 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -181,3 +181,14 @@ void Ps2BootScreen(int argc, char **argv)
+     sleep(4);
+ }
+ #endif
++
++// Log how much of the heap is in use and the largest free block (for out-of-memory diagnosis)
++void Ps2HeapLog(const char *where)
++{
++    struct mallinfo mi = mallinfo();
++    char tmp[160];
++    snprintf(tmp, sizeof(tmp), "heap@%s: used %d KB, free %d KB, arena %d KB, top %d KB\n", where,
++             (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024), (int)(mi.arena / 1024), (int)(mi.keepcost / 1024));
++    Ps2LogAppend(tmp);
++    printf("%s", tmp);
++}
+-- 
+2.43.0
+

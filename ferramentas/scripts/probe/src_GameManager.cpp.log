@@ -1,0 +1,3 @@
+src/GameManager.cpp:323:32: warning: multi-character character constant [-Wmultichar]
+  323 |             catk->base.magic = CATK_MAGIC;
+      |                                ^~~~~~~~~~

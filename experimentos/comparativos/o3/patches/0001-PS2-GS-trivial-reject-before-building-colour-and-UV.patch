@@ -1,0 +1,216 @@
+From 33bc4f1f0ed0e22f92c17af9e19388dc530a6ea1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 21:34:19 -0300
+Subject: [PATCH 1/3] PS2 GS: trivial reject before building colour and UV
+
+DrawVertices built every vertex in full (position, texture coordinates,
+colour) before clipping, even for vertices that only belong to triangles
+rejected because all three are outside the same plane. MakeVertex is now
+split into SetPosition (clip position, one matrix product) and
+SetAttributes (UV and colour).
+
+DrawVertices runs four passes:
+1. position and outcode for every vertex;
+2. mark the vertices used by triangles that are not trivially rejected
+   (same test as ClipEmit);
+3. SetAttributes only for the marked vertices;
+4. ClipEmit with the outcodes from pass 1, so each outcode is computed
+   once per vertex. ClipAndEmit is kept as a wrapper.
+
+The emitted triangles are the same: positions come from the same code,
+attributes are computed the same way and only for vertices that are used.
+
+Not measured. The gain depends on how many vertices of a draw are outside
+the guard band; the extra pass costs a little when almost everything is
+visible.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/graphics/PS2GS.cpp | 87 +++++++++++++++++++++++++++++++-----------
+ src/graphics/PS2GS.hpp |  6 ++-
+ 2 files changed, 69 insertions(+), 24 deletions(-)
+
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 6fba536..c7f213c 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -729,10 +729,10 @@ void PS2GS::ReadPixels(i32 x, i32 y, i32 width, i32 height, void *pixels)
+ // Drawing
+ // ------------------------------------------------------------------------------------------------
+ 
+-PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSpace) const
++// Clip-space position of one vertex. Screen-space vertices (xyzrhw) map from game pixels to the viewport; 3D vertices
++// go through the model-view-projection matrix (D3D convention: row vector * matrix).
++void PS2GS::SetPosition(ClipVert &o, const InVert &in, bool screenSpace) const
+ {
+-    ClipVert o;
+-
+     if (screenSpace)
+     {
+         // The vertex position is already in game pixels: map it to clip space of the current viewport
+@@ -740,8 +740,6 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
+         o.y = 1.0f - (in.y - (f32)viewport.y) / (f32)viewport.height * 2.0f;
+         o.z = in.z;
+         o.w = 1.0f;
+-        o.u = in.u;
+-        o.v = in.v;
+     }
+     else
+     {
+@@ -754,18 +752,22 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
+         o.y = c[1];
+         o.z = c[2];
+         o.w = c[3];
++    }
++}
+ 
+-        if (textureMatrixIsIdentity)
+-        {
+-            o.u = in.u;
+-            o.v = in.v;
+-        }
+-        else
+-        {
+-            const ZunMatrix &t = textureMatrix;
+-            o.u = in.u * t.m[0][0] + in.v * t.m[1][0] + t.m[2][0];
+-            o.v = in.u * t.m[0][1] + in.v * t.m[1][1] + t.m[2][1];
+-        }
++// Texture coordinates and colour of one vertex. Called only for vertices that reach a triangle that is not rejected.
++void PS2GS::SetAttributes(ClipVert &o, const InVert &in, bool textured, bool screenSpace) const
++{
++    if (screenSpace || textureMatrixIsIdentity)
++    {
++        o.u = in.u;
++        o.v = in.v;
++    }
++    else
++    {
++        const ZunMatrix &t = textureMatrix;
++        o.u = in.u * t.m[0][0] + in.v * t.m[1][0] + t.m[2][0];
++        o.v = in.u * t.m[0][1] + in.v * t.m[1][1] + t.m[2][1];
+     }
+ 
+     if (textured && boundTexture)
+@@ -812,7 +814,6 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
+         o.b = arg[2];
+         o.a = arg[3];
+     }
+-    return o;
+ }
+ 
+ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
+@@ -826,7 +827,7 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
+     for (int i = 0; i < 3; i++)
+     {
+         const ClipVert &v = *tri[i];
+-        // Screen-space vertices have w == 1 (MakeVertex, and clipping keeps it at 1), so the divide is skipped.
++        // Screen-space vertices have w == 1 (SetPosition, and clipping keeps it at 1), so the divide is skipped.
+         const f32 invW = drawScreen ? 1.0f : 1.0f / v.w;
+         const f32 ndcX = v.x * invW;
+         const f32 ndcY = v.y * invW;
+@@ -884,7 +885,12 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
+ 
+ void PS2GS::ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
+ {
+-    const u32 oa = OutCode(a.x, a.y, a.w), ob = OutCode(b.x, b.y, b.w), oc = OutCode(c.x, c.y, c.w);
++    ClipEmit(a, b, c, OutCode(a.x, a.y, a.w), OutCode(b.x, b.y, b.w), OutCode(c.x, c.y, c.w), textured);
++}
++
++// ClipAndEmit with the outcodes already known (DrawVertices computes each vertex's code once).
++void PS2GS::ClipEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, u32 oa, u32 ob, u32 oc, bool textured)
++{
+ 
+     if ((oa & ob & oc) != 0)
+         return; // entirely outside one plane
+@@ -1005,24 +1011,59 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
+     batchUV = uvForm;
+     drawScreen = screenSpace;
+ 
++    // Pass 1: clip-space position and outcode of every vertex. One matrix product each; no colour or UV work yet.
+     clipVerts.resize(count);
++    vertCode.resize(count);
++    for (i32 i = 0; i < count; i++)
++    {
++        SetPosition(clipVerts[i], verts[i], screenSpace);
++        vertCode[i] = OutCode(clipVerts[i].x, clipVerts[i].y, clipVerts[i].w);
++    }
++
++    // Pass 2: a vertex needs its colour and UV only if a triangle that uses it is not trivially rejected (all three
++    // outside the same plane). The test is the one ClipEmit uses, so every emitted triangle has its attributes.
++    vertNeeded.assign(count, 0);
++    auto mark = [&](i32 a, i32 b, i32 c) {
++        if ((vertCode[a] & vertCode[b] & vertCode[c]) != 0)
++            return;
++        vertNeeded[a] = vertNeeded[b] = vertNeeded[c] = 1;
++    };
++    if (type == PRIM_TRIANGLE_STRIP)
++    {
++        for (i32 i = 0; i + 2 < count; i++)
++            mark(i, i + 1, i + 2);
++    }
++    else if (type == PRIM_TRIANGLE_FAN)
++    {
++        for (i32 i = 1; i + 1 < count; i++)
++            mark(0, i, i + 1);
++    }
++    else
++    {
++        for (i32 i = 0; i + 2 < count; i += 3)
++            mark(i, i + 1, i + 2);
++    }
++
++    // Pass 3: colour and UV, only for the vertices that will be used.
+     for (i32 i = 0; i < count; i++)
+-        clipVerts[i] = MakeVertex(verts[i], textured, screenSpace);
++        if (vertNeeded[i])
++            SetAttributes(clipVerts[i], verts[i], textured, screenSpace);
+ 
++    // Pass 4: clip and emit, with the outcodes from pass 1.
+     if (type == PRIM_TRIANGLE_STRIP)
+     {
+         for (i32 i = 0; i + 2 < count; i++)
+-            ClipAndEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], textured);
++            ClipEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], vertCode[i], vertCode[i + 1], vertCode[i + 2], textured);
+     }
+     else if (type == PRIM_TRIANGLE_FAN)
+     {
+         for (i32 i = 1; i + 1 < count; i++)
+-            ClipAndEmit(clipVerts[0], clipVerts[i], clipVerts[i + 1], textured);
++            ClipEmit(clipVerts[0], clipVerts[i], clipVerts[i + 1], vertCode[0], vertCode[i], vertCode[i + 1], textured);
+     }
+     else
+     {
+         for (i32 i = 0; i + 2 < count; i += 3)
+-            ClipAndEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], textured);
++            ClipEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], vertCode[i], vertCode[i + 1], vertCode[i + 2], textured);
+     }
+ }
+ 
+diff --git a/src/graphics/PS2GS.hpp b/src/graphics/PS2GS.hpp
+index ae7b2e6..e73542c 100644
+--- a/src/graphics/PS2GS.hpp
++++ b/src/graphics/PS2GS.hpp
+@@ -110,6 +110,8 @@ class PS2GS : public ZunGraphics
+ 
+     // Scratch buffers reused every draw call
+     std::vector<ClipVert> clipVerts;
++    std::vector<u32> vertCode;   // per vertex outcode, filled once per draw (DrawVertices)
++    std::vector<u8> vertNeeded;  // per vertex: 1 if a triangle that is not trivially rejected uses it
+     std::vector<GSPRIMSTQPOINT> texBatch;
+     std::vector<GSPRIMUVPOINT> uvBatch;   // screen-space sprites: no Q, no perspective divide (see DrawVertices)
+     std::vector<GSPRIMPOINT> flatBatch;
+@@ -133,7 +135,9 @@ class PS2GS : public ZunGraphics
+     void FlushPending(); // submit the deferred texture/flat batches before any state or memory change
+     void EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
+     void ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
+-    ClipVert MakeVertex(const InVert &in, bool textured, bool screenSpace) const;
++    void SetPosition(ClipVert &o, const InVert &in, bool screenSpace) const;
++    void SetAttributes(ClipVert &o, const InVert &in, bool textured, bool screenSpace) const;
++    void ClipEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, u32 oa, u32 ob, u32 oc, bool textured);
+     void DrawVertices(PrimitiveType type, const InVert *verts, i32 count, bool hasTex, bool screenSpace);
+     void ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fmt, PixelDataType type, const void *data);
+     void ReleaseTextureMemory(Tex *tex);
+-- 
+2.43.0
+

@@ -1,0 +1,46 @@
+From 13bbfc213352b39e842f2836c1467f050c23ea2c Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 19:56:36 -0300
+Subject: [PATCH 10/37] PS2: limit simultaneous enemies to 160 (frees ~6.5 MB
+ of static RAM); report out-of-memory loads
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/EnemyManager.hpp | 6 ++++++
+ src/FileSystem.cpp   | 1 +
+ 2 files changed, 7 insertions(+)
+
+diff --git a/src/EnemyManager.hpp b/src/EnemyManager.hpp
+index 3327079..72d94ce 100644
+--- a/src/EnemyManager.hpp
++++ b/src/EnemyManager.hpp
+@@ -261,7 +261,13 @@ struct Enemy
+     Enemy *next;
+ };
+ 
++#ifdef __PS2__
++// The PS2 only has 32 MB of RAM and EnemyManager is a static array of full Enemy structs (~20 KB each):
++// 480 of them take ~10 MB. 160 simultaneous enemies is plenty for normal play.
++#define MAX_ENEMIES 160
++#else
+ #define MAX_ENEMIES 480
++#endif
+ 
+ struct EnemyManager
+ {
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index 2f3c884..416b166 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -49,6 +49,7 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+             buf = (u8 *)malloc(fsize);
+             if (!buf)
+             {
++                g_GameErrorContext.Fatal("error : out of memory loading %s (%u bytes)\n", filename, fsize);
+                 return NULL;
+             }
+ 
+-- 
+2.43.0
+

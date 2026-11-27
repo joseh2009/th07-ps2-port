@@ -1,0 +1,168 @@
+From f77ff16a0388c9f7a41c6bd154bc046d24842707 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 09:09:44 -0300
+Subject: [PATCH] PS2 GS: screen-space sprites skip the w divide and use the UV
+ batch form
+
+DrawVertices draws xyzrhw vertices (w == 1). For those the divide by w is
+a no-op, so EmitTriangle now uses 1 directly. Their textured triangles go
+to gsKit_prim_list_triangle_goraud_texture_uv_3d (GSPRIMUVPOINT, texel *
+16 in the UV register) instead of the perspective STQ form, so the GS does
+not need a per-pixel Q divide for them. 3D draws keep STQ.
+
+The UV form is used only when the texture is narrower and taller than
+1024 texels (the UV register has 10 integer bits) and every vertex UV is
+in [0,1] (the register cannot hold negative or wrapped coordinates).
+Anything else stays on STQ, so REPEAT or clamped-out-of-range sprites are
+unchanged. The screen-space and STQ form give the same texel positions
+for w == 1, so the image should match.
+
+Risk (not verified on hardware; gsKit source not available here):
+- The unit (texel * 16 in a u16) is taken from the header types and the GS
+  UV register format, not from gsKit's own code. If the units differ,
+  screen-space sprites would be sampled from the wrong place. Check sprite
+  textures on the console first.
+- The GS work saved is expected but not measured. The packet size is the
+  same (48 bytes per vertex).
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/graphics/PS2GS.cpp | 53 ++++++++++++++++++++++++++++++++++++------
+ src/graphics/PS2GS.hpp |  3 +++
+ 2 files changed, 49 insertions(+), 7 deletions(-)
+
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 245d6b1..10b27df 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -190,6 +190,7 @@ ZunGraphics *PS2GS::Init()
+ 
+     self->clipVerts.reserve(1024);
+     self->texBatch.reserve(kMaxBatchVerts);
++    self->uvBatch.reserve(kMaxBatchVerts);
+     self->flatBatch.reserve(kMaxBatchVerts);
+ 
+     printf("PS2 GS backend: %dx%d %s, %s framebuffer + 16 bit Z\n", (int)gs->Width, (int)gs->Height,
+@@ -761,11 +762,16 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
+ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
+ {
+     const ClipVert *tri[3] = {&a, &b, &c};
++    // Texel size for the UV form: padded texture size * 16 (the UV register holds 4 fraction bits)
++    const bool uvForm = textured && batchUV;
++    const f32 uvScaleU = uvForm ? (f32)boundTexture->gs.Width * 16.0f : 0.0f;
++    const f32 uvScaleV = uvForm ? (f32)boundTexture->gs.Height * 16.0f : 0.0f;
+ 
+     for (int i = 0; i < 3; i++)
+     {
+         const ClipVert &v = *tri[i];
+-        const f32 invW = 1.0f / v.w;
++        // Screen-space vertices have w == 1 (MakeVertex, and clipping keeps it at 1), so the divide is skipped.
++        const f32 invW = drawScreen ? 1.0f : 1.0f / v.w;
+         const f32 ndcX = v.x * invW;
+         const f32 ndcY = v.y * invW;
+         const f32 ndcZ = v.z * invW;
+@@ -784,7 +790,19 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
+ 
+         const u8 r = ToGS(v.r), g = ToGS(v.g), bl = ToGS(v.b), al = ToGS(v.a);
+ 
+-        if (textured)
++        if (textured && batchUV)
++        {
++            // UV register: texel coordinate * 16 in an unsigned 14 bit field. The caller only uses this form when
++            // the texture is narrower than 1024 and all UVs are in [0,1], so the value fits and no wrap happens.
++            GSPRIMUVPOINT p;
++            p.rgbaq = color_to_RGBAQ(r, g, bl, al, 0.0f);
++            p.uv.coord.u = (u16)(std::clamp(v.u * uvScaleU, 0.0f, 16383.0f) + 0.5f);
++            p.uv.coord.v = (u16)(std::clamp(v.v * uvScaleV, 0.0f, 16383.0f) + 0.5f);
++            p.uv.tag = GS_UV;
++            p.xyz2 = vertex_to_XYZ2(gs, sx, sy, iz);
++            uvBatch.push_back(p);
++        }
++        else if (textured)
+         {
+             GSPRIMSTQPOINT p;
+             p.rgbaq = color_to_RGBAQ(r, g, bl, al, invW);
+@@ -803,7 +821,8 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
+         }
+     }
+ 
+-    if ((textured ? texBatch.size() : flatBatch.size()) >= (size_t)kMaxBatchVerts)
++    const size_t pending = !textured ? flatBatch.size() : (batchUV ? uvBatch.size() : texBatch.size());
++    if (pending >= (size_t)kMaxBatchVerts)
+         FlushBatch(textured);
+ }
+ 
+@@ -865,6 +884,18 @@ void PS2GS::ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c,
+ 
+ void PS2GS::FlushBatch(bool textured)
+ {
++    if (textured && batchUV)
++    {
++        if (uvBatch.empty())
++            return;
++        ApplyRenderState();
++        boundTexture->gs.Filter = GS_FILTER_LINEAR;
++        gsKit_TexManager_bind(gs, &boundTexture->gs);
++        gsKit_prim_list_triangle_goraud_texture_uv_3d(gs, &boundTexture->gs, (int)uvBatch.size(), uvBatch.data());
++        uvBatch.clear();
++        return;
++    }
++
+     const size_t count = textured ? texBatch.size() : flatBatch.size();
+     if (count == 0)
+         return;
+@@ -900,13 +931,21 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
+         mvpDirty = false;
+     }
+ 
++    // Screen-space sprites use the UV batch form (no Q, no perspective divide on the GS). The UV register cannot
++    // hold negative or wrapped coordinates and only 10 integer bits of texel, so anything else stays on STQ.
++    bool uvForm = textured && screenSpace && boundTexture->gs.Width < 1024 && boundTexture->gs.Height < 1024;
++    for (i32 i = 0; uvForm && i < count; i++)
++        uvForm = verts[i].u >= 0.0f && verts[i].u <= 1.0f && verts[i].v >= 0.0f && verts[i].v <= 1.0f;
++
+     // Consecutive draws with the same kind and texture share one batch (one ApplyRenderState and one bind for
+     // all of them). Order is kept because triangles are appended in submission order.
+-    if ((!texBatch.empty() || !flatBatch.empty()) &&
+-        (textured != batchTextured || (textured && boundTexture != batchTex)))
+-        FlushPending();
++    if ((!texBatch.empty() || !uvBatch.empty() || !flatBatch.empty()) &&
++        (textured != batchTextured || (textured && (boundTexture != batchTex || uvForm != batchUV))))
++        FlushPending(); // uses the old batchUV, so it must run before batchUV changes
+     batchTextured = textured;
+     batchTex = textured ? boundTexture : nullptr;
++    batchUV = uvForm;
++    drawScreen = screenSpace;
+ 
+     clipVerts.resize(count);
+     for (i32 i = 0; i < count; i++)
+@@ -931,7 +970,7 @@ void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, boo
+ 
+ void PS2GS::FlushPending()
+ {
+-    if (!texBatch.empty())
++    if (!texBatch.empty() || !uvBatch.empty()) // only one textured form is ever pending; FlushBatch picks it
+         FlushBatch(true);
+     if (!flatBatch.empty())
+         FlushBatch(false);
+diff --git a/src/graphics/PS2GS.hpp b/src/graphics/PS2GS.hpp
+index 98c1947..cd379a0 100644
+--- a/src/graphics/PS2GS.hpp
++++ b/src/graphics/PS2GS.hpp
+@@ -111,9 +111,12 @@ class PS2GS : public ZunGraphics
+     // Scratch buffers reused every draw call
+     std::vector<ClipVert> clipVerts;
+     std::vector<GSPRIMSTQPOINT> texBatch;
++    std::vector<GSPRIMUVPOINT> uvBatch;   // screen-space sprites: no Q, no perspective divide (see DrawVertices)
+     std::vector<GSPRIMPOINT> flatBatch;
+     bool batchTextured = false; // kind of the batch currently being filled (textured or flat)
++    bool batchUV = false;       // the textured batch is in uvBatch (UV form) instead of texBatch (STQ form)
+     Tex *batchTex = nullptr;    // texture the textured batch was built for
++    bool drawScreen = false;    // the draw being emitted is screen space: w is 1, so the divide is skipped
+     std::vector<InVert> upVerts; // DrawPrimitiveUP input, reused (a per-call heap vector fragmented the 32 MB heap)
+ 
+     void ApplyRenderState();
+-- 
+2.43.0
+

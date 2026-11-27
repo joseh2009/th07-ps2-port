@@ -1,0 +1,122 @@
+From f95fc51a6697cd789ed5f34142da8449b4432f4c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 23:08:19 -0300
+Subject: [PATCH] PS2: fix the timing panel: nested callback tables, shorter
+ lines, pad time shown
+
+The callback table is restored when a chain returns (chains can run inside chains). Panel lines are
+kept under 60 characters because AsciiManager drops longer strings. The per-manager lines are removed
+because they disagreed with the callback table; the table is the reference now.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Chain.cpp      |  4 ++--
+ src/Ps2Timing.hpp  | 11 +++++++++--
+ src/Supervisor.cpp | 30 ++++++++++++++----------------
+ 3 files changed, 25 insertions(+), 20 deletions(-)
+
+diff --git a/src/Chain.cpp b/src/Chain.cpp
+index e65518f..b56d868 100644
+--- a/src/Chain.cpp
++++ b/src/Chain.cpp
+@@ -130,7 +130,7 @@ ZunResult Chain::AddToDrawChain(ChainElem *elem, i32 priority)
+ i32 Chain::RunCalcChain()
+ {
+     PS2_TIME(PS2_T_CALC_CHAIN);
+-    PS2_SET_CB_TABLE(g_Ps2CalcStats);
++    PS2_CB_TABLE_SCOPE(g_Ps2CalcStats);
+     ChainElem *next;
+     ChainElem *current;
+     i32 updateCount;
+@@ -174,7 +174,7 @@ restart_from_first_job:
+ i32 Chain::RunDrawChain()
+ {
+     PS2_TIME(PS2_T_DRAW_CHAIN);
+-    PS2_SET_CB_TABLE(g_Ps2DrawStats);
++    PS2_CB_TABLE_SCOPE(g_Ps2DrawStats);
+     ChainElem *next;
+     ChainElem *current;
+     i32 updateCount;
+diff --git a/src/Ps2Timing.hpp b/src/Ps2Timing.hpp
+index fdd5f54..9f81101 100644
+--- a/src/Ps2Timing.hpp
++++ b/src/Ps2Timing.hpp
+@@ -73,10 +73,17 @@ inline u32 Ps2TimedChainCall(Ps2ChainFn cb, void *arg, Ps2CbStat *table)
+ }
+ // The chain runners set which table their callbacks are recorded in, then call every callback through CHAIN_CALL.
+ extern Ps2CbStat *g_Ps2ActiveCbTable;
+-#define PS2_SET_CB_TABLE(t) (g_Ps2ActiveCbTable = (t))
++// Restores the previous table when the runner returns. Chains can run inside other chains, so this must nest.
++struct Ps2CbTableScope
++{
++    Ps2CbStat *saved;
++    explicit Ps2CbTableScope(Ps2CbStat *t) : saved(g_Ps2ActiveCbTable) { g_Ps2ActiveCbTable = t; }
++    ~Ps2CbTableScope() { g_Ps2ActiveCbTable = saved; }
++};
++#define PS2_CB_TABLE_SCOPE(t) Ps2CbTableScope ps2CbTableScope_(t)
+ #define CHAIN_CALL(cb, arg) Ps2TimedChainCall((Ps2ChainFn)(cb), (arg), g_Ps2ActiveCbTable)
+ #else
+ #define PS2_TIME(slot)
+-#define PS2_SET_CB_TABLE(t)
++#define PS2_CB_TABLE_SCOPE(t)
+ #define CHAIN_CALL(cb, arg) (cb)(arg)
+ #endif
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index f725989..041bf57 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -896,36 +896,34 @@ LAB_00439350:
+             sprintf(s_Diag[1], "RAM heap used %dK  free %dK", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
+             sprintf(s_Diag[2], "TEX %dK in %u textures   SFX %dK", (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount,
+                     (int)(g_Ps2AudioBytes / 1024));
+-            sprintf(s_Diag[3], "PAD %04X  mode %02X  reads %u", g_Ps2PadHeld & 0xffff, g_Ps2PadMode, g_Ps2PadReads);
+-            sprintf(s_Diag[4], "RENDER %.2f  audio %.2f  sndq %.2f  anm %.2f  present(GS) %.2f", t[PS2_T_RENDER],
+-                    t[PS2_T_AUDIO], t[PS2_T_SNDQUEUE], t[PS2_T_ANM_FLUSH], t[PS2_T_PRESENT]);
+-            sprintf(s_Diag[5], "CALC %.2f (pad %.2f)  DRAW %.2f  untimed %.2f ms", t[PS2_T_CALC_CHAIN], t[PS2_T_PAD],
+-                    t[PS2_T_DRAW_CHAIN], untimed);
+-            sprintf(s_Diag[6], "UPDATE bul %.2f  ene %.2f  eff %.2f ms", t[PS2_T_BULLET_UPD], t[PS2_T_ENEMY_UPD],
+-                    t[PS2_T_EFFECT_UPD]);
+-            sprintf(s_Diag[7], "DRAW   bul %.2f  ene %.2f  eff %.2f ms", t[PS2_T_BULLET_DRAW], t[PS2_T_ENEMY_DRAW],
+-                    t[PS2_T_EFFECT_DRAW]);
+-            sprintf(s_Diag[8], "CALC callbacks (address, ms/frame):");
++            sprintf(s_Diag[3], "PAD %04X mode %02X reads %u read %.2f ms", g_Ps2PadHeld & 0xffff, g_Ps2PadMode,
++                    g_Ps2PadReads, t[PS2_T_PAD]);
++            // Keep every line under 60 characters: AsciiManager drops longer strings silently.
++            sprintf(s_Diag[4], "RENDER %.2f aud %.2f snd %.2f anm %.2f GS %.2f", t[PS2_T_RENDER], t[PS2_T_AUDIO],
++                    t[PS2_T_SNDQUEUE], t[PS2_T_ANM_FLUSH], t[PS2_T_PRESENT]);
++            sprintf(s_Diag[5], "CALC %.2f  DRAW %.2f  untimed %.2f", t[PS2_T_CALC_CHAIN], t[PS2_T_DRAW_CHAIN],
++                    untimed);
++            sprintf(s_Diag[6], "CALC callbacks (address, ms/frame):");
+             for (int k = 0; k < 6; k++)
+             {
+                 if (g_Ps2DiagCalcTop[k].fn)
+-                    sprintf(s_Diag[9 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagCalcTop[k].fn,
++                    sprintf(s_Diag[7 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagCalcTop[k].fn,
+                             g_Ps2DiagCalcTop[k].ms);
+                 else
+-                    sprintf(s_Diag[9 + k], "  -");
++                    sprintf(s_Diag[7 + k], "  -");
+             }
+-            sprintf(s_Diag[15], "DRAW callbacks (address, ms/frame):");
++            sprintf(s_Diag[13], "DRAW callbacks (address, ms/frame):");
+             for (int k = 0; k < 6; k++)
+             {
+                 if (g_Ps2DiagDrawTop[k].fn)
+-                    sprintf(s_Diag[16 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagDrawTop[k].fn,
++                    sprintf(s_Diag[14 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagDrawTop[k].fn,
+                             g_Ps2DiagDrawTop[k].ms);
+                 else
+-                    sprintf(s_Diag[16 + k], "  -");
++                    sprintf(s_Diag[14 + k], "  -");
+             }
+             ZunVec3 diagPos;
+             diagPos.z = 0.0f;
+-            for (int i = 0; i < 22; i++)
++            for (int i = 0; i < 20; i++)
+             {
+                 diagPos.x = 8.0f;
+                 diagPos.y = 24.0f + 14.0f * i;
+-- 
+2.43.0
+

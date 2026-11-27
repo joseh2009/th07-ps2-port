@@ -1,0 +1,13 @@
+src/EnemyManager.cpp: In member function 'void EnemyManager::RunEclTimeline()':
+src/EnemyManager.cpp:187:79: warning: overflow in conversion from 'ItemType' to 'i16' {aka 'short int'} changes value from 'ITEM_NO_ITEM' to '-1' [-Woverflow]
+  187 |                     this->SpawnEnemy(this->timelineInstr->arg0, &tmpVec3, -1, ITEM_NO_ITEM, -1);
+      |                                                                               ^~~~~~~~~~~~
+src/EnemyManager.cpp:204:94: warning: overflow in conversion from 'ItemType' to 'i16' {aka 'short int'} changes value from 'ITEM_NO_ITEM' to '-1' [-Woverflow]
+  204 |                     spawnedEnemy = this->SpawnEnemy(this->timelineInstr->arg0, &tmpVec3, -1, ITEM_NO_ITEM, -1);
+      |                                                                                              ^~~~~~~~~~~~
+src/EnemyManager.cpp:245:76: warning: overflow in conversion from 'ItemType' to 'i16' {aka 'short int'} changes value from 'ITEM_NO_ITEM' to '-1' [-Woverflow]
+  245 |                     this->SpawnEnemy(this->timelineInstr->arg0, &pos2, -1, ITEM_NO_ITEM, -1);
+      |                                                                            ^~~~~~~~~~~~
+src/EnemyManager.cpp:286:91: warning: overflow in conversion from 'ItemType' to 'i16' {aka 'short int'} changes value from 'ITEM_NO_ITEM' to '-1' [-Woverflow]
+  286 |                     spawnedEnemy = this->SpawnEnemy(this->timelineInstr->arg0, &pos4, -1, ITEM_NO_ITEM, -1);
+      |                                                                                           ^~~~~~~~~~~~

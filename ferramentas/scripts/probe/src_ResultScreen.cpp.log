@@ -1,0 +1,36 @@
+src/ResultScreen.cpp:26:35: warning: multi-character character constant [-Wmultichar]
+   26 | static const u32 g_DefaultMagic = 'DMYS';
+      |                                   ^~~~~~
+src/ResultScreen.cpp:110:48: warning: multi-character character constant [-Wmultichar]
+  110 |             if (decryptedFilePointer->magic == TH6K_MAGIC)
+      |                                                ^~~~~~~~~~
+src/ResultScreen.cpp:157:38: warning: multi-character character constant [-Wmultichar]
+  157 |         if (highScore->base.magic == HSCR_MAGIC && highScore->base.version == TH6K_VERSION &&
+      |                                      ^~~~~~~~~~
+src/ResultScreen.cpp:248:39: warning: multi-character character constant [-Wmultichar]
+  248 |         if (parsedCatk->base.magic == CATK_MAGIC && parsedCatk->base.version == TH6K_VERSION)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:279:49: warning: multi-character character constant [-Wmultichar]
+  279 |         outClrd[characterShotType].base.magic = CLRD_MAGIC;
+      |                                                 ^~~~~~~~~~
+src/ResultScreen.cpp:296:39: warning: multi-character character constant [-Wmultichar]
+  296 |         if (parsedClrd->base.magic == CLRD_MAGIC && parsedClrd->base.version == TH6K_VERSION)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:334:36: warning: multi-character character constant [-Wmultichar]
+  334 |                 pscr->base.magic = PSCR_MAGIC;
+      |                                    ^~~~~~~~~~
+src/ResultScreen.cpp:350:39: warning: multi-character character constant [-Wmultichar]
+  350 |         if (parsedPscr->base.magic == PSCR_MAGIC && parsedPscr->base.version == TH6K_VERSION)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:404:38: warning: multi-character character constant [-Wmultichar]
+  404 |     resultScreen->fileHeader.magic = TH6K_MAGIC;
+      |                                      ^~~~~~~~~~
+src/ResultScreen.cpp:424:63: warning: multi-character character constant [-Wmultichar]
+  424 |                     if (currentCharacter->data->base.magic == HSCR_MAGIC)
+      |                                                               ^~~~~~~~~~
+src/ResultScreen.cpp:455:28: warning: multi-character character constant [-Wmultichar]
+  455 |         clrd->base.magic = CLRD_MAGIC;
+      |                            ^~~~~~~~~~
+src/ResultScreen.cpp:466:33: warning: multi-character character constant [-Wmultichar]
+  466 |         if (catk->base.magic == CATK_MAGIC)
+      |                                 ^~~~~~~~~~

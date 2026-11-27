@@ -1,0 +1,12 @@
+Repositorio: some100/th07, branch ps2-port (sem GitHub).
+
+1) ps2-port.bundle: o branch inteiro com historico. Para usar:
+     git clone ps2-port.bundle th07 -b ps2-port
+   (ou git fetch ps2-port.bundle ps2-port:ps2-port dentro do seu clone)
+
+2) patches/: um patch por commit novo, sobre f95fc51 (base da v26), na ordem:
+     git am patches/*.patch
+   Ordem: A (VERBOSE), B (GS pipeline, opt-in), C (UV), D (floor), E (state cache),
+   F (texturas), G (balas), e por ultimo a correcao do audsrv.irx (alinhamento 64).
+
+Os dados do jogo (th07.dat, msgothic.ttc, etc.) NAO estao incluidos: use os seus.

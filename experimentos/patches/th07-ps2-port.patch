@@ -1,0 +1,4711 @@
+From 16367b33d40b51bf4b883dcc4a18dff8b26159a5 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 10:06:57 -0300
+Subject: [PATCH 01/10] Add experimental PlayStation 2 port (gsKit backend,
+ SDL2 audio shim)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ .gitignore               |   3 +
+ Makefile.ps2             |  60 +++
+ README-PS2.md            |  43 ++
+ src/GameErrorContext.cpp |   8 +
+ src/GameWindow.cpp       |  20 +
+ src/SoundPlayer.cpp      |  28 ++
+ src/SoundPlayer.hpp      |   8 +
+ src/Supervisor.cpp       |   3 +
+ src/ZunTimer.hpp         |   4 +-
+ src/graphics/PS2GS.cpp   | 914 +++++++++++++++++++++++++++++++++++++++
+ src/graphics/PS2GS.hpp   | 124 ++++++
+ src/inttypes.hpp         |  12 +-
+ src/main.cpp             |   4 +
+ src/ps2audio.cpp         | 326 ++++++++++++++
+ src/ps2audio.hpp         | 152 +++++++
+ 15 files changed, 1704 insertions(+), 5 deletions(-)
+ create mode 100644 Makefile.ps2
+ create mode 100644 README-PS2.md
+ create mode 100644 src/graphics/PS2GS.cpp
+ create mode 100644 src/graphics/PS2GS.hpp
+ create mode 100644 src/ps2audio.cpp
+ create mode 100644 src/ps2audio.hpp
+
+diff --git a/.gitignore b/.gitignore
+index 0f2309b..65feeaa 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -14,3 +14,6 @@ scripts/__pycache__/
+ compile_commands.json
+ src/th07/i18n.hpp
+ src/custom/i18n.hpp
++
++obj/
++*.elf
+diff --git a/Makefile.ps2 b/Makefile.ps2
+new file mode 100644
+index 0000000..2295beb
+--- /dev/null
++++ b/Makefile.ps2
+@@ -0,0 +1,60 @@
++# PlayStation 2 build of th07 (ps2dev / ps2sdk)
++#
++#   export PS2DEV=/usr/local/ps2dev
++#   export PS2SDK=$PS2DEV/ps2sdk
++#   export GSKIT=$PS2DEV/gsKit
++#   export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2DEV/iop/bin:$PS2DEV/dvp/bin:$PS2SDK/bin
++#   make -f Makefile.ps2          # -> th07.elf
++#   make -f Makefile.ps2 clean
++#
++# Needs the ps2sdk ports SDL2, SDL2_image, SDL2_ttf, freetype, libpng, libjpeg and zlib
++# (all part of the prebuilt ps2dev toolchain).
++#
++# Options:
++#   make -f Makefile.ps2 CT32=1   32 bit frame buffer instead of 16 bit (needs ~1.2 MB more VRAM)
++
++EE_BIN = th07.elf
++OBJDIR = obj/ps2
++
++SRCS = \
++	src/AnmManager.cpp src/AnmVm.cpp src/AsciiManager.cpp src/BombData.cpp src/BulletManager.cpp \
++	src/Chain.cpp src/Controller.cpp src/EclManager.cpp src/EffectManager.cpp src/Ending.cpp \
++	src/EnemyEclInstr.cpp src/EnemyManager.cpp src/FileSystem.cpp src/GameErrorContext.cpp \
++	src/GameManager.cpp src/GameWindow.cpp src/Gui.cpp src/ItemManager.cpp src/MainMenu.cpp \
++	src/MidiOutput.cpp src/MusicRoom.cpp src/Player.cpp src/ReplayManager.cpp src/ResultScreen.cpp \
++	src/Rng.cpp src/ScreenEffect.cpp src/SoundPlayer.cpp src/Stage.cpp src/Supervisor.cpp \
++	src/TextHelper.cpp src/main.cpp src/utils.cpp \
++	src/ps2audio.cpp src/graphics/PS2GS.cpp \
++	src/pbg4/Lzss.cpp src/pbg4/Pbg4Archive.cpp src/pbg4/Pbg4File.cpp
++
++EE_OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
++
++EE_INCS += -Isrc -I$(PS2SDK)/ports/include -I$(PS2SDK)/ports/include/SDL2 -I$(GSKIT)/include
++
++EE_CXXFLAGS += -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi \
++	-Wno-unused-parameter -Wno-missing-field-initializers
++EE_OPTFLAGS = -O2
++
++ifeq ($(CT32),1)
++EE_CXXFLAGS += -DTH07_PS2_CT32
++endif
++
++EE_LDFLAGS += -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
++
++# order matters: SDL2main first, SDL2 after the libraries that depend on it
++EE_LIBS += -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static \
++	-lm -lpatches -lgskit -ldmakit -lps2_drivers -lpthreadglue -lpthread -ldebug
++
++all: $(EE_BIN)
++
++clean:
++	rm -rf $(OBJDIR) $(EE_BIN)
++
++include $(PS2SDK)/Defs.make
++include $(PS2SDK)/samples/Makefile.pref
++include $(PS2SDK)/samples/Makefile.eeglobal_cpp
++
++# objects live in $(OBJDIR), mirroring the source tree
++$(OBJDIR)/%.o: %.cpp
++	@mkdir -p $(@D)
++	$(EE_CXX) $(EE_CXXFLAGS) $(EE_INCS) -c $< -o $@
+diff --git a/README-PS2.md b/README-PS2.md
+new file mode 100644
+index 0000000..c840b5e
+--- /dev/null
++++ b/README-PS2.md
+@@ -0,0 +1,43 @@
++# Touhou 7 (Perfect Cherry Blossom) — PlayStation 2 port (experimental)
++
++A PlayStation 2 build of the portable `th07` decompilation, using ps2dev / ps2sdk / gsKit.
++**Untested on real hardware; written without access to an emulator.** Expect bugs.
++
++## Credits / licence
++
++This is a derivative work. All game logic comes from the people who did the real work:
++
++* [some100/th07](https://github.com/some100/th07) (`portable` branch) – the SDL2 portable decompilation this port is built on (CC0).
++* [N0zoM1z0/th07](https://github.com/N0zoM1z0/th07) – the th07 decompilation project.
++* [GensokyoClub/th06](https://github.com/GensokyoClub/th06) and [GensokyoClub/th08](https://github.com/GensokyoClub/th08) – the th06/th08 decompilations that th07's structure and naming derive from.
++* Touhou Project / 東方妖々夢 are by ZUN (Team Shanghai Alice). This repository contains **no game data**.
++* PS2 toolchain: [ps2dev](https://github.com/ps2dev), ps2sdk, gsKit, ps2sdk-ports (SDL2, SDL2_ttf, SDL2_image).
++
++Files added for the PS2: `src/graphics/PS2GS.*` (GS backend), `src/ps2audio.*` (SDL2 based replacement for the
++miniaudio subset the game uses), `Makefile.ps2`, this file. Small `#ifdef __PS2__` changes elsewhere.
++
++## Building
++
++    export PS2DEV=/usr/local/ps2dev PS2SDK=$PS2DEV/ps2sdk GSKIT=$PS2DEV/gsKit
++    export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2DEV/iop/bin:$PS2DEV/dvp/bin:$PS2SDK/bin
++    make -f Makefile.ps2            # th07.elf        (CT32=1 for a 32 bit frame buffer)
++
++## Running
++
++Put `th07.elf` next to **your own legitimate copy** of the game data and start it (host:, USB, mass: ...):
++
++* `th07.dat`, `thbgm.dat` (and the `.cfg`/`.dat` files the game creates)
++* `msgothic.ttc` – required for text (MS Gothic, or any Japanese TTF renamed to this name)
++
++Progress is printed to the EE console (`th07 PS2: ...`, `LOG:`, `FATAL:`). The screen flashes dark blue for 1.5 s on
++start: if you see that and then black, the GS backend works and the problem is data files / paths (see the log).
++Controls: standard pad (cross = shoot, circle = bomb, ...).
++
++## Known limitations
++
++* Fog is not implemented (distant stage geometry is not faded).
++* `ReadPixels` (replay thumbnails / screenshots) returns black.
++* Colour op ADD and REPLACE are approximated; separate alpha/colour ops only partially.
++* MIDI output and 16 bit colour options are not available.
++* Audio is mixed in the SDL audio thread; BGM is streamed from `thbgm.dat` (enable "preload BGM" if it stutters).
++* Memory (32 MB) and VRAM (4 MB, textures are swapped by gsKit's texture manager) are tight.
+diff --git a/src/GameErrorContext.cpp b/src/GameErrorContext.cpp
+index f011b13..2e1d5a9 100644
+--- a/src/GameErrorContext.cpp
++++ b/src/GameErrorContext.cpp
+@@ -15,6 +15,10 @@ const char *GameErrorContext::Log(const char *fmt, ...)
+     va_start(args, fmt);
+     vsprintf(tmp, fmt, args);
+     tmpSize = strlen(tmp);
++#ifdef __PS2__
++    printf("LOG: %s", tmp);
++    fflush(stdout);
++#endif
+     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
+     {
+         strcpy(this->m_BufferEnd, tmp);
+@@ -35,6 +39,10 @@ const char *GameErrorContext::Fatal(const char *fmt, ...)
+     va_start(args, fmt);
+     vsprintf(tmp, fmt, args);
+     tmpSize = strlen(tmp);
++#ifdef __PS2__
++    printf("FATAL: %s", tmp);
++    fflush(stdout);
++#endif
+     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
+     {
+         strcpy(this->m_BufferEnd, tmp);
+diff --git a/src/GameWindow.cpp b/src/GameWindow.cpp
+index 12523f1..73592a0 100644
+--- a/src/GameWindow.cpp
++++ b/src/GameWindow.cpp
+@@ -15,7 +15,11 @@
+ #include "SoundPlayer.hpp"
+ #include "Stage.hpp"
+ #include "Supervisor.hpp"
++#ifdef __PS2__
++#include "graphics/PS2GS.hpp"
++#else
+ #include "graphics/Gles.hpp"
++#endif
+ #include "graphics/ZunGraphics.hpp"
+ 
+ GameWindow g_GameWindow;
+@@ -24,7 +28,11 @@ f64 g_LastFrameTime;
+ u64 g_LastPerfCounter;
+ 
+ static GfxInit g_RenderingBackends[] = {
++#ifdef __PS2__
++    PS2GS::Init,
++#else
+     GlesGraphics::Init,
++#endif
+ };
+ 
+ void GameWindow::Present()
+@@ -171,12 +179,24 @@ ZunResult GameWindow::InitInterface()
+ 
+ ZunResult GameWindow::CreateGameWindow()
+ {
++#ifdef __PS2__
++    // Only input: SDL's own PS2 video driver would fight the gsKit backend for the GS
++    if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0)
++#else
+     if (SDL_Init(SDL_INIT_VIDEO) < 0)
++#endif
+     {
+         g_GameErrorContext.Fatal("Direct3D オブジェクトは何故か作成出来なかった\n");
+         return ZUN_ERROR;
+     }
+ 
++#ifdef __PS2__
++    // There is no window system on the PS2: the GS backend owns the screen. Input still goes through SDL.
++    g_GameWindow.isAppActive = 1;
++    g_GameWindow.isAppInactive = 0;
++    g_LastPerfCounter = SDL_GetPerformanceCounter();
++    return ZUN_SUCCESS;
++#endif
+     u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
+     if (!g_Supervisor.cfg.windowed)
+     {
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index 90bd206..6d10697 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -8,8 +8,10 @@
+ #include "dxutil.hpp"
+ #include "utils.hpp"
+ 
++#ifndef __PS2__
+ #define MINIAUDIO_IMPLEMENTATION
+ #include "miniaudio.h"
++#endif
+ 
+ SoundBufferIdxVolume SOUND_BUFFER_IDX_VOL[38] = {
+     {0, -2000, 0},   {0, -2500, 0},   {1, -1200, 5},   {1, -1500, 5},   {2, -1000, 100},
+@@ -342,6 +344,26 @@ SoundPlayer::SoundPlayer()
+     }
+ }
+ 
++#ifdef __PS2__
++ZunResult SoundPlayer::InitializeSound()
++{
++    memset(this, 0, sizeof(SoundPlayer));
++    for (i32 i = 0; i < ARRAY_SIZE_SIGNED(this->unusedSoundVolRelated); i++)
++    {
++        this->unusedSoundVolRelated[i] = -1;
++    }
++
++    this->engine = new ma_engine;
++    if (ps2audio_engine_init(this->engine) != MA_SUCCESS)
++    {
++        g_GameErrorContext.Log("DirectSound オブジェクトの初期化が失敗したよ\n");
++        SAFE_DELETE(this->engine);
++        return ZUN_ERROR;
++    }
++    g_GameErrorContext.Log("DirectSound は正常に初期化されました\n");
++    return ZUN_SUCCESS;
++}
++#else
+ ZunResult SoundPlayer::InitializeSound()
+ {
+     ma_engine_config engineConfig;
+@@ -400,6 +422,7 @@ ZunResult SoundPlayer::InitializeSound()
+     g_GameErrorContext.Log("DirectSound は正常に初期化されました\n");
+     return ZUN_SUCCESS;
+ }
++#endif
+ 
+ ZunResult SoundPlayer::Release()
+ {
+@@ -431,10 +454,15 @@ ZunResult SoundPlayer::Release()
+ 
+     StopBGM();
+ 
++#ifdef __PS2__
++    ps2audio_engine_uninit(this->engine);
++    SAFE_DELETE(this->engine);
++#else
+     ma_device_uninit(this->device);
+     SAFE_DELETE(this->device);
+     ma_engine_uninit(this->engine);
+     SAFE_DELETE(this->engine);
++#endif
+     for (i = 0; i < ARRAY_SIZE_SIGNED(this->bgmPreloadData); i++)
+     {
+         SAFE_FREE(this->bgmPreloadData[i]);
+diff --git a/src/SoundPlayer.hpp b/src/SoundPlayer.hpp
+index cd05ade..9bac2ec 100644
+--- a/src/SoundPlayer.hpp
++++ b/src/SoundPlayer.hpp
+@@ -5,7 +5,11 @@
+ #include "GameErrorContext.hpp"
+ #include "ZunResult.hpp"
+ #include "inttypes.hpp"
++#ifdef __PS2__
++#include "ps2audio.hpp"
++#else
+ #include "miniaudio.h"
++#endif
+ 
+ enum AudioOpcode
+ {
+@@ -132,7 +136,11 @@ struct SoundPlayer
+     }
+ 
+     ma_engine *engine;
++#ifdef __PS2__
++    void *device;
++#else
+     ma_device *device;
++#endif
+     ma_audio_buffer *duplicateSfxData[128];
+     ma_audio_buffer *sfxData[128];
+     void *sfxPCMData[128];
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 343f50e..33fb7e8 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -48,6 +48,9 @@ void Supervisor::DebugPrint(const char *fmt, ...)
+     va_start(args, fmt);
+     vprintf(fmt, args);
+     va_end(args);
++#ifdef __PS2__
++    fflush(stdout);
++#endif
+ }
+ 
+ void Supervisor::CheckTiming()
+diff --git a/src/ZunTimer.hpp b/src/ZunTimer.hpp
+index 76a6d85..79440d3 100644
+--- a/src/ZunTimer.hpp
++++ b/src/ZunTimer.hpp
+@@ -84,12 +84,12 @@ struct ZunTimer
+         return this->current >= value;
+     }
+ 
+-    void operator++(i32)
++    void operator++(int)
+     {
+         this->Tick();
+     }
+ 
+-    void operator--(i32)
++    void operator--(int)
+     {
+         this->Decrement(1);
+     }
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+new file mode 100644
+index 0000000..46a5b61
+--- /dev/null
++++ b/src/graphics/PS2GS.cpp
+@@ -0,0 +1,914 @@
++#include "PS2GS.hpp"
++
++#include "AnmManager.hpp"
++#include "GameWindow.hpp"
++#include "Supervisor.hpp"
++
++#include <algorithm>
++#include <cmath>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++
++#include <dmaKit.h>
++#include <gsInline.h>
++#include <gsToolkit.h>
++#include <kernel.h>
++#include <malloc.h>
++
++// Framebuffer depth. 16 bit (with dithering) leaves ~1.2 MB more VRAM for textures than 32 bit.
++// Build with -DTH07_PS2_CT32 to get a 32 bit framebuffer instead.
++#ifdef TH07_PS2_CT32
++#define TH07_FB_PSM GS_PSM_CT32
++#else
++#define TH07_FB_PSM GS_PSM_CT16
++#endif
++
++// Everything is uploaded as RGBA32 (alpha scaled to the GS range 0..128)
++#define TH07_TEX_PSM GS_PSM_CT32
++
++namespace
++{
++constexpr int kMaxBatchVerts = 3 * 256;
++constexpr f32 kNearW = 0.001f;   // w below this is treated as behind the camera
++constexpr f32 kGuardBand = 4.0f; // clip |x|,|y| to 4*w so coordinates stay inside the GS primitive range
++constexpr int kMinTexSize = 8;   // the GS upload path needs at least 8x8 texels
++
++
++// 0..255 (D3D) -> 0..128 (GS, where 128 == 1.0)
++inline u8 ToGS(f32 v255)
++{
++    int v = (int)(v255 * 0.5f + 0.5f);
++    return (u8)(v < 0 ? 0 : (v > 128 ? 128 : v));
++}
++
++inline u32 PackGS(u32 r, u32 g, u32 b, u32 a8)
++{
++    u32 a = (a8 + 1) >> 1; // 0..255 -> 0..128
++    return r | (g << 8) | (b << 16) | (a << 24);
++}
++
++// Expand a `bits` wide channel to 8 bits, replicating the high bits so the maximum maps to 255
++inline u32 Expand(u32 v, u32 bits)
++{
++    switch (bits)
++    {
++    case 1:
++        return v ? 255 : 0;
++    case 4:
++        return (v << 4) | v;
++    case 5:
++        return (v << 3) | (v >> 2);
++    default: // 6
++        return (v << 2) | (v >> 4);
++    }
++}
++
++inline bool IsIdentity(const ZunMatrix &m)
++{
++    for (int i = 0; i < 4; i++)
++        for (int j = 0; j < 4; j++)
++            if (m.m[i][j] != (i == j ? 1.0f : 0.0f))
++                return false;
++    return true;
++}
++
++// Signed distance to each of the 5 clip planes (>= 0 means inside)
++inline f32 PlaneDist(int plane, f32 x, f32 y, f32 w)
++{
++    switch (plane)
++    {
++    case 0:
++        return w - kNearW;
++    case 1:
++        return kGuardBand * w - x;
++    case 2:
++        return kGuardBand * w + x;
++    case 3:
++        return kGuardBand * w - y;
++    default:
++        return kGuardBand * w + y;
++    }
++}
++
++inline u32 OutCode(f32 x, f32 y, f32 w)
++{
++    u32 code = 0;
++    for (int p = 0; p < 5; p++)
++        if (PlaneDist(p, x, y, w) < 0.0f)
++            code |= 1u << p;
++    return code;
++}
++} // namespace
++
++// ------------------------------------------------------------------------------------------------
++// Init / Exit
++// ------------------------------------------------------------------------------------------------
++
++ZunGraphics *PS2GS::Init()
++{
++    PS2GS *self = new PS2GS;
++
++    self->model.Identity();
++    self->view.Identity();
++    self->projection.Identity();
++    self->textureMatrix.Identity();
++    self->mvp.Identity();
++    self->textures.emplace_back(); // reserve handle 0
++
++    GSGLOBAL *gs = gsKit_init_global_custom(1536 * 1024, 128 * 1024);
++    if (gs == nullptr)
++    {
++        delete self;
++        return nullptr;
++    }
++    self->gs = gs;
++
++    gs->Mode = gsKit_check_rom();
++    gs->Interlace = GS_INTERLACED;
++    gs->Field = GS_FIELD;
++    gs->Width = 640;
++    gs->Height = (gs->Mode == GS_MODE_PAL) ? 512 : 448;
++    gs->PSM = TH07_FB_PSM;
++    gs->PSMZ = GS_PSMZ_16S;
++    gs->ZBuffering = GS_SETTING_ON;
++    gs->DoubleBuffering = GS_SETTING_ON;
++    gs->PrimAlphaEnable = GS_SETTING_ON;
++    gs->Dithering = GS_SETTING_ON;
++
++    dmaKit_init(D_CTRL_RELE_OFF, D_CTRL_MFD_OFF, D_CTRL_STS_UNSPEC, D_CTRL_STD_OFF, D_CTRL_RCYC_8, 1 << DMA_CHANNEL_GIF);
++    dmaKit_chan_init(DMA_CHANNEL_GIF);
++
++    gsKit_set_clamp(gs, GS_CMODE_REPEAT);
++    gsKit_vram_clear(gs);
++    gsKit_init_screen(gs);
++    gsKit_TexManager_init(gs);
++    gsKit_mode_switch(gs, GS_ONESHOT);
++
++    self->scaleX = (f32)gs->Width / GAME_WINDOW_WIDTH;
++    self->scaleY = (f32)gs->Height / GAME_WINDOW_HEIGHT;
++
++    // Boot diagnostic: show dark blue for ~1.5 s. If the screen turns blue and then black, the GS backend works and
++    // the problem is further up (e.g. missing data files, see the EE console log).
++    // Build with -DTH07_PS2_NO_BOOT_FLASH to disable.
++#ifndef TH07_PS2_NO_BOOT_FLASH
++    const u64 bootColor = GS_SETREG_RGBAQ(0, 0, 0x50, 0x80, 0);
++#else
++    const u64 bootColor = GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0);
++#endif
++    for (int i = 0; i < 2; i++)
++    {
++        gsKit_clear(gs, bootColor);
++        gsKit_queue_exec(gs);
++        gsKit_finish();
++        gsKit_sync_flip(gs);
++    }
++#ifndef TH07_PS2_NO_BOOT_FLASH
++    for (int i = 0; i < 90; i++)
++        gsKit_vsync_wait();
++#endif
++
++    self->clipVerts.reserve(1024);
++    self->texBatch.reserve(kMaxBatchVerts);
++    self->flatBatch.reserve(kMaxBatchVerts);
++
++    printf("PS2 GS backend: %dx%d %s, %s framebuffer + 16 bit Z\n", (int)gs->Width, (int)gs->Height,
++           gs->Mode == GS_MODE_PAL ? "PAL" : "NTSC", TH07_FB_PSM == GS_PSM_CT32 ? "32 bit" : "16 bit");
++    return self;
++}
++
++void PS2GS::Exit()
++{
++    for (Tex &t : textures)
++        ReleaseTextureMemory(&t);
++    textures.clear();
++    if (gs)
++    {
++        gsKit_vram_clear(gs);
++        gsKit_deinit_global(gs);
++        gs = nullptr;
++    }
++}
++
++// ------------------------------------------------------------------------------------------------
++// Simple state setters
++// ------------------------------------------------------------------------------------------------
++
++void PS2GS::SetFogRange(f32 nearPlane, f32 farPlane)
++{
++    fogNear = nearPlane;
++    fogFar = farPlane;
++}
++
++void PS2GS::SetFogColor(ZunColor color)
++{
++    fogColor = color; // fog is not implemented on the GS backend yet (see README-PS2.md)
++}
++
++void PS2GS::SetColorOp(TextureOpComponent component, ColorOp op)
++{
++    if (component == COMPONENT_RGB)
++        colorOpRgb = op;
++    else
++        colorOpAlpha = op;
++}
++
++void PS2GS::SetTextureFactor(ZunColor factor)
++{
++    textureFactor = factor;
++}
++
++void PS2GS::SetTextureArg(TextureArg arg)
++{
++    texArg = arg;
++}
++
++void PS2GS::SetTransformMatrix(TransformMatrix type, const ZunMatrix &matrix)
++{
++    switch (type)
++    {
++    case MATRIX_MODEL:
++        model = matrix;
++        mvpDirty = true;
++        break;
++    case MATRIX_VIEW:
++        view = matrix;
++        mvpDirty = true;
++        break;
++    case MATRIX_PROJECTION:
++        projection = matrix;
++        mvpDirty = true;
++        break;
++    case MATRIX_TEXTURE:
++        textureMatrix = matrix;
++        textureMatrixIsIdentity = IsIdentity(matrix);
++        break;
++    }
++}
++
++void PS2GS::SetTextureFilter()
++{
++    // bilinear filtering with repeat wrapping is always used
++}
++
++void PS2GS::GetViewport(ZunViewport &out)
++{
++    out = viewport;
++}
++
++void PS2GS::SetViewport(const ZunViewport &vp)
++{
++    viewport = vp;
++}
++
++void PS2GS::Enable(Capabilities cap)
++{
++    switch (cap)
++    {
++    case CAPS_BLEND:
++        blendEnabled = true;
++        break;
++    case CAPS_DEPTH_TEST:
++        depthTest = true;
++        break;
++    case CAPS_ALPHA_TEST:
++        alphaTest = true;
++        break;
++    case CAPS_FOG:
++        break;
++    }
++}
++
++void PS2GS::Disable(Capabilities cap)
++{
++    switch (cap)
++    {
++    case CAPS_BLEND:
++        blendEnabled = false;
++        break;
++    case CAPS_DEPTH_TEST:
++        depthTest = false;
++        break;
++    case CAPS_ALPHA_TEST:
++        alphaTest = false;
++        break;
++    case CAPS_FOG:
++        break;
++    }
++}
++
++void PS2GS::SetBlendMode(BlendMode srcMode, BlendMode dstMode)
++{
++    blendSrc = srcMode;
++    blendDst = dstMode;
++}
++
++void PS2GS::SetDepthMask(bool enable)
++{
++    depthMask = enable;
++}
++
++void PS2GS::SetDepthFunc(DepthFunc func)
++{
++    depthFunc = func;
++}
++
++void PS2GS::SetClearDepth(f32 depth)
++{
++    clearDepth = depth;
++}
++
++void PS2GS::SetClearColor(ZunColor color)
++{
++    clearRGB[0] = color.bytes.r;
++    clearRGB[1] = color.bytes.g;
++    clearRGB[2] = color.bytes.b;
++}
++
++void PS2GS::SetAlphaTestRef(u8 ref)
++{
++    alphaRef = ref;
++}
++
++// ------------------------------------------------------------------------------------------------
++// GS register helpers
++// ------------------------------------------------------------------------------------------------
++
++void PS2GS::PushRegister(u64 data, u64 address)
++{
++    u64 *p = (u64 *)gsKit_heap_alloc(gs, 1, 16, GIF_AD);
++    *p++ = GIF_TAG_AD(1);
++    *p++ = GIF_AD;
++    *p++ = data;
++    *p++ = address;
++}
++
++void PS2GS::ApplyRenderState()
++{
++    // Never let the draw queue overflow: if it is nearly full, kick what we have so far to the GS.
++    {
++        GSQUEUE *q = gs->CurQueue;
++        if ((u8 *)q->pool_max[q->dbuf] - (u8 *)q->pool_cur < 64 * 1024)
++        {
++            gsKit_queue_exec(gs);
++        }
++    }
++
++    // Blending. GS: Cd' = (A - B) * C + D with A/B/D in {Cs, Cd, 0} and C in {As, Ad, FIX}
++    bool blend = blendEnabled;
++    if (blendSrc == BLEND_ONE && blendDst == BLEND_NONE)
++    {
++        blend = false; // replace
++    }
++    else if (blendSrc == BLEND_ONE && blendDst == BLEND_ONE)
++    {
++        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 2, 1, 0x80), 0); // Cs + Cd
++    }
++    else if (blendSrc == BLEND_ALPHA && blendDst == BLEND_ONE)
++    {
++        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 0, 1, 0), 0); // Cs * As + Cd
++    }
++    else if (blendSrc == BLEND_ALPHA && blendDst == BLEND_NONE)
++    {
++        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 2, 0, 2, 0), 0); // Cs * As
++    }
++    else
++    {
++        gsKit_set_primalpha(gs, GS_SETREG_ALPHA(0, 1, 0, 1, 0), 0); // Cs * As + Cd * (1 - As)
++    }
++    gs->PrimAlphaEnable = blend ? GS_SETTING_ON : GS_SETTING_OFF;
++
++    // Alpha test (alpha is in the 0..128 GS range) + depth test
++    gs->Test->ATE = alphaTest ? 1 : 0;
++    gs->Test->ATST = 5; // GEQUAL
++    gs->Test->AREF = (alphaRef + 1) >> 1;
++    gs->Test->AFAIL = 0; // KEEP
++    gs->Test->ZTE = 1;
++    gs->Test->ZTST = (depthTest && depthFunc == DEPTH_FUNC_LEQUAL) ? 2 /*GEQUAL*/ : 1 /*ALWAYS*/;
++    gsKit_set_test(gs, 0);
++
++    // The GS Z buffer is inverted (0 = far), written only when depth test is on and the depth mask is set
++    const bool zwrite = depthTest && depthMask;
++    PushRegister(GS_SETREG_ZBUF(gs->ZBuffer / 8192, gs->PSMZ, zwrite ? 0 : 1), GS_ZBUF_1 + gs->PrimContext);
++
++    // The viewport becomes a scissor rectangle
++    int x0 = (int)(viewport.x * scaleX);
++    int y0 = (int)(viewport.y * scaleY);
++    int x1 = (int)((viewport.x + viewport.width) * scaleX) - 1;
++    int y1 = (int)((viewport.y + viewport.height) * scaleY) - 1;
++    x0 = std::clamp(x0, 0, (int)gs->Width - 1);
++    x1 = std::clamp(x1, x0, (int)gs->Width - 1);
++    y0 = std::clamp(y0, 0, (int)gs->Height - 1);
++    y1 = std::clamp(y1, y0, (int)gs->Height - 1);
++    gsKit_set_scissor(gs, GS_SETREG_SCISSOR(x0, x1, y0, y1));
++}
++
++void PS2GS::Clear(u32 clearBits)
++{
++    if (clearBits & CLEAR_COLOR_BUFFER)
++    {
++        // gsKit_clear() fills colour and writes Z = 0 (the far plane); make sure Z writes are enabled
++        gsKit_set_scissor(gs, GS_SCISSOR_RESET);
++        PushRegister(GS_SETREG_ZBUF(gs->ZBuffer / 8192, gs->PSMZ, 0), GS_ZBUF_1 + gs->PrimContext);
++        gs->Test->ATE = 0;
++        gsKit_clear(gs, GS_SETREG_RGBAQ(clearRGB[0] >> 1, clearRGB[1] >> 1, clearRGB[2] >> 1, 0x80, 0));
++    }
++    else if (clearBits & CLEAR_DEPTH_BUFFER)
++    {
++        // Depth only: draw a full screen sprite at Z = 0 with every colour channel masked out
++        const u64 fbp = gs->ScreenBuffer[gs->ActiveBuffer & 1] / 8192;
++        gsKit_set_scissor(gs, GS_SCISSOR_RESET);
++        PushRegister(GS_SETREG_FRAME(fbp, gs->Width / 64, gs->PSM, 0xFFFFFFFF), GS_FRAME_1 + gs->PrimContext);
++        PushRegister(GS_SETREG_ZBUF(gs->ZBuffer / 8192, gs->PSMZ, 0), GS_ZBUF_1 + gs->PrimContext);
++        gs->Test->ATE = 0;
++        gs->Test->ZTST = 1; // ALWAYS
++        gsKit_set_test(gs, 0);
++        gsKit_prim_sprite(gs, 0, 0, gs->Width, gs->Height, 0, GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0));
++        PushRegister(GS_SETREG_FRAME(fbp, gs->Width / 64, gs->PSM, 0), GS_FRAME_1 + gs->PrimContext);
++    }
++}
++
++// ------------------------------------------------------------------------------------------------
++// Textures
++// ------------------------------------------------------------------------------------------------
++
++void PS2GS::ReleaseTextureMemory(Tex *tex)
++{
++    if (tex->alive && gs)
++        gsKit_TexManager_free(gs, &tex->gs);
++    if (tex->gs.Mem)
++    {
++        free(tex->gs.Mem);
++        tex->gs.Mem = nullptr;
++    }
++    tex->alive = false;
++}
++
++GfxTextureHandle PS2GS::CreateTexture()
++{
++    u32 id;
++    if (!freeTextures.empty())
++    {
++        id = freeTextures.back();
++        freeTextures.pop_back();
++        textures[id] = Tex();
++    }
++    else
++    {
++        id = (u32)textures.size();
++        textures.emplace_back();
++    }
++    std::memset(&textures[id].gs, 0, sizeof(GSTEXTURE));
++    return {id};
++}
++
++void PS2GS::BindTexture(GfxTextureHandle handle)
++{
++    if (handle.id >= textures.size())
++        return;
++    boundTexture = &textures[handle.id];
++}
++
++void PS2GS::DeleteTexture(GfxTextureHandle handle)
++{
++    if (handle.id == 0 || handle.id >= textures.size())
++        return;
++    Tex *t = &textures[handle.id];
++    if (boundTexture == t)
++        boundTexture = nullptr;
++    ReleaseTextureMemory(t);
++    freeTextures.push_back(handle.id);
++}
++
++void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fmt, PixelDataType type, const void *data)
++{
++    const i32 stride = (i32)tex->gs.Width;
++    const u8 *src = (const u8 *)data;
++
++    for (i32 row = 0; row < h; row++)
++    {
++        u32 *dst = tex->gs.Mem + (size_t)(y + row) * stride + x;
++        if (type == PIXEL_UNSIGNED_BYTE)
++        {
++            if (fmt == PIXEL_RGB)
++            {
++                const u8 *s = src + (size_t)row * w * 3;
++                for (i32 i = 0; i < w; i++, s += 3)
++                    dst[i] = PackGS(s[0], s[1], s[2], 255);
++            }
++            else
++            {
++                const u8 *s = src + (size_t)row * w * 4;
++                for (i32 i = 0; i < w; i++, s += 4)
++                    dst[i] = PackGS(s[0], s[1], s[2], s[3]);
++            }
++        }
++        else
++        {
++            const u16 *s = (const u16 *)src + (size_t)row * w;
++            for (i32 i = 0; i < w; i++)
++            {
++                const u32 p = s[i];
++                switch (type)
++                {
++                case PIXEL_UNSIGNED_SHORT_4_4_4_4:
++                    dst[i] = PackGS(Expand(p >> 12, 4), Expand((p >> 8) & 15, 4), Expand((p >> 4) & 15, 4),
++                                    Expand(p & 15, 4));
++                    break;
++                case PIXEL_UNSIGNED_SHORT_5_5_5_1:
++                    dst[i] = PackGS(Expand(p >> 11, 5), Expand((p >> 6) & 31, 5), Expand((p >> 1) & 31, 5),
++                                    Expand(p & 1, 1));
++                    break;
++                default: // 5_6_5
++                    dst[i] = PackGS(Expand(p >> 11, 5), Expand((p >> 5) & 63, 6), Expand(p & 31, 5), 255);
++                    break;
++                }
++            }
++        }
++    }
++}
++
++void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataType type, const void *data)
++{
++    Tex *tex = boundTexture;
++    if (tex == nullptr)
++        return;
++
++    ReleaseTextureMemory(tex);
++
++    const u32 w = std::max<u32>(width, kMinTexSize);
++    const u32 h = std::max<u32>(height, kMinTexSize);
++    const u32 bytes = gsKit_texture_size_ee(w, h, TH07_TEX_PSM);
++
++    std::memset(&tex->gs, 0, sizeof(GSTEXTURE));
++    tex->gs.Mem = (u32 *)memalign(128, bytes);
++    if (tex->gs.Mem == nullptr)
++    {
++        printf("PS2GS: out of memory for a %ux%u texture\n", width, height);
++        return;
++    }
++    std::memset(tex->gs.Mem, 0, bytes);
++    tex->gs.Width = w;
++    tex->gs.Height = h;
++    tex->gs.PSM = TH07_TEX_PSM;
++    tex->gs.Filter = GS_FILTER_LINEAR;
++    tex->alive = true;
++
++    if (data)
++        ConvertAndStore(tex, 0, 0, (i32)width, (i32)height, fmt, type, data);
++
++    SyncDCache(tex->gs.Mem, (u8 *)tex->gs.Mem + bytes);
++    gsKit_TexManager_invalidate(gs, &tex->gs);
++}
++
++void PS2GS::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height, const void *data)
++{
++    Tex *tex = boundTexture;
++    if (tex == nullptr || !tex->alive || data == nullptr)
++        return;
++
++    ConvertAndStore(tex, xoffset, yoffset, width, height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, data);
++
++    SyncDCache(tex->gs.Mem, (u8 *)tex->gs.Mem + gsKit_texture_size_ee(tex->gs.Width, tex->gs.Height, TH07_TEX_PSM));
++    gsKit_TexManager_invalidate(gs, &tex->gs);
++}
++
++void PS2GS::ReadPixels(i32 x, i32 y, i32 width, i32 height, void *pixels)
++{
++    // Reading the frame buffer back from the GS is not supported yet: return opaque black.
++    u8 *dst = (u8 *)pixels;
++    for (i32 i = 0; i < width * height; i++, dst += 4)
++    {
++        dst[0] = dst[1] = dst[2] = 0;
++        dst[3] = 255;
++    }
++}
++
++
++// ------------------------------------------------------------------------------------------------
++// Drawing
++// ------------------------------------------------------------------------------------------------
++
++PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSpace) const
++{
++    ClipVert o;
++
++    if (screenSpace)
++    {
++        // The vertex position is already in game pixels: map it to clip space of the current viewport
++        o.x = (in.x - (f32)viewport.x) / (f32)viewport.width * 2.0f - 1.0f;
++        o.y = 1.0f - (in.y - (f32)viewport.y) / (f32)viewport.height * 2.0f;
++        o.z = in.z;
++        o.w = 1.0f;
++        o.u = in.u;
++        o.v = in.v;
++    }
++    else
++    {
++        // D3D convention: row vector * matrix
++        const f32 p[4] = {in.x, in.y, in.z, 1.0f};
++        f32 c[4];
++        for (int j = 0; j < 4; j++)
++            c[j] = p[0] * mvp.m[0][j] + p[1] * mvp.m[1][j] + p[2] * mvp.m[2][j] + p[3] * mvp.m[3][j];
++        o.x = c[0];
++        o.y = c[1];
++        o.z = c[2];
++        o.w = c[3];
++
++        if (textureMatrixIsIdentity)
++        {
++            o.u = in.u;
++            o.v = in.v;
++        }
++        else
++        {
++            const ZunMatrix &t = textureMatrix;
++            o.u = in.u * t.m[0][0] + in.v * t.m[1][0] + t.m[2][0];
++            o.v = in.u * t.m[0][1] + in.v * t.m[1][1] + t.m[2][1];
++        }
++    }
++
++    // Texture stage "argument 2": diffuse colour, texture factor, or nothing
++    f32 arg[4];
++    switch (texArg)
++    {
++    case TEX_ARG_TEXTURE:
++        arg[0] = arg[1] = arg[2] = arg[3] = 255.0f;
++        break;
++    case TEX_ARG_TFACTOR:
++        arg[0] = textureFactor.bytes.r;
++        arg[1] = textureFactor.bytes.g;
++        arg[2] = textureFactor.bytes.b;
++        arg[3] = textureFactor.bytes.a;
++        break;
++    default:
++        arg[0] = in.r;
++        arg[1] = in.g;
++        arg[2] = in.b;
++        arg[3] = in.a;
++        break;
++    }
++
++    if (textured)
++    {
++        // The GS multiplies texel * vertex colour. REPLACE/ADD are approximated by "texel only".
++        const bool rgbTex = (colorOpRgb == COLOR_OP_REPLACE || colorOpRgb == COLOR_OP_ADD);
++        const bool aTex = (colorOpAlpha == COLOR_OP_REPLACE || colorOpAlpha == COLOR_OP_ADD);
++        o.r = rgbTex ? 255.0f : arg[0];
++        o.g = rgbTex ? 255.0f : arg[1];
++        o.b = rgbTex ? 255.0f : arg[2];
++        o.a = aTex ? 255.0f : arg[3];
++    }
++    else
++    {
++        o.r = arg[0];
++        o.g = arg[1];
++        o.b = arg[2];
++        o.a = arg[3];
++    }
++    return o;
++}
++
++void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
++{
++    const ClipVert *tri[3] = {&a, &b, &c};
++
++    for (int i = 0; i < 3; i++)
++    {
++        const ClipVert &v = *tri[i];
++        const f32 invW = 1.0f / v.w;
++        const f32 ndcX = v.x * invW;
++        const f32 ndcY = v.y * invW;
++        const f32 ndcZ = v.z * invW;
++
++        const f32 sx = (((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX - 0.5f;
++        const f32 sy = (((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY - 0.5f;
++
++        f32 depth = (ndcZ * 0.5f + 0.5f) * (viewport.maxZ - viewport.minZ) + viewport.minZ;
++        depth = std::clamp(depth, 0.0f, 1.0f);
++        const int iz = (int)((1.0f - depth) * 65535.0f); // inverted: the GS test is GEQUAL
++
++        const u8 r = ToGS(v.r), g = ToGS(v.g), bl = ToGS(v.b), al = ToGS(v.a);
++
++        if (textured)
++        {
++            GSPRIMSTQPOINT p;
++            p.rgbaq = color_to_RGBAQ(r, g, bl, al, invW);
++            p.stq.st.s = v.u * invW;
++            p.stq.st.t = v.v * invW;
++            p.stq.tag = GS_ST;
++            p.xyz2 = vertex_to_XYZ2(gs, sx, sy, iz);
++            texBatch.push_back(p);
++        }
++        else
++        {
++            GSPRIMPOINT p;
++            p.rgbaq = color_to_RGBAQ(r, g, bl, al, 0.0f);
++            p.xyz2 = vertex_to_XYZ2(gs, sx, sy, iz);
++            flatBatch.push_back(p);
++        }
++    }
++
++    if ((textured ? texBatch.size() : flatBatch.size()) >= (size_t)kMaxBatchVerts)
++        FlushBatch(textured);
++}
++
++void PS2GS::ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured)
++{
++    const u32 oa = OutCode(a.x, a.y, a.w), ob = OutCode(b.x, b.y, b.w), oc = OutCode(c.x, c.y, c.w);
++
++    if ((oa & ob & oc) != 0)
++        return; // entirely outside one plane
++    if ((oa | ob | oc) == 0)
++    {
++        EmitTriangle(a, b, c, textured);
++        return;
++    }
++
++    // Sutherland-Hodgman against the near plane and the 4 guard band planes
++    ClipVert bufA[12], bufB[12];
++    ClipVert *in = bufA, *out = bufB;
++    int inCount = 3;
++    in[0] = a;
++    in[1] = b;
++    in[2] = c;
++
++    for (int plane = 0; plane < 5 && inCount >= 3; plane++)
++    {
++        int outCount = 0;
++        for (int i = 0; i < inCount; i++)
++        {
++            const ClipVert &cur = in[i];
++            const ClipVert &nxt = in[(i + 1) % inCount];
++            const f32 dc = PlaneDist(plane, cur.x, cur.y, cur.w);
++            const f32 dn = PlaneDist(plane, nxt.x, nxt.y, nxt.w);
++
++            if (dc >= 0.0f)
++                out[outCount++] = cur;
++            if ((dc >= 0.0f) != (dn >= 0.0f))
++            {
++                const f32 t = dc / (dc - dn);
++                ClipVert &o = out[outCount++];
++                o.x = cur.x + (nxt.x - cur.x) * t;
++                o.y = cur.y + (nxt.y - cur.y) * t;
++                o.z = cur.z + (nxt.z - cur.z) * t;
++                o.w = cur.w + (nxt.w - cur.w) * t;
++                o.u = cur.u + (nxt.u - cur.u) * t;
++                o.v = cur.v + (nxt.v - cur.v) * t;
++                o.r = cur.r + (nxt.r - cur.r) * t;
++                o.g = cur.g + (nxt.g - cur.g) * t;
++                o.b = cur.b + (nxt.b - cur.b) * t;
++                o.a = cur.a + (nxt.a - cur.a) * t;
++            }
++        }
++        std::swap(in, out);
++        inCount = outCount;
++    }
++
++    for (int i = 1; i + 1 < inCount; i++)
++        EmitTriangle(in[0], in[i], in[i + 1], textured);
++}
++
++void PS2GS::FlushBatch(bool textured)
++{
++    const size_t count = textured ? texBatch.size() : flatBatch.size();
++    if (count == 0)
++        return;
++
++    ApplyRenderState();
++
++    if (textured)
++    {
++        boundTexture->gs.Filter = GS_FILTER_LINEAR;
++        gsKit_TexManager_bind(gs, &boundTexture->gs);
++        gsKit_prim_list_triangle_goraud_texture_stq_3d(gs, &boundTexture->gs, (int)count, texBatch.data());
++        texBatch.clear();
++    }
++    else
++    {
++        gsKit_prim_list_triangle_gouraud_3d(gs, (int)count, flatBatch.data());
++        flatBatch.clear();
++    }
++}
++
++void PS2GS::DrawVertices(PrimitiveType type, const InVert *verts, i32 count, bool hasTex, bool screenSpace)
++{
++    if (count < 3)
++        return;
++
++    const bool textured = hasTex && boundTexture && boundTexture->alive;
++    if (hasTex && !textured)
++        return; // nothing sensible to draw without a texture
++
++    if (mvpDirty)
++    {
++        mvp = model * view * projection; // row vector convention: v * M * V * P
++        mvpDirty = false;
++    }
++
++    clipVerts.resize(count);
++    for (i32 i = 0; i < count; i++)
++        clipVerts[i] = MakeVertex(verts[i], textured, screenSpace);
++
++    if (type == PRIM_TRIANGLE_STRIP)
++    {
++        for (i32 i = 0; i + 2 < count; i++)
++            ClipAndEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], textured);
++    }
++    else if (type == PRIM_TRIANGLE_FAN)
++    {
++        for (i32 i = 1; i + 1 < count; i++)
++            ClipAndEmit(clipVerts[0], clipVerts[i], clipVerts[i + 1], textured);
++    }
++    else
++    {
++        for (i32 i = 0; i + 2 < count; i += 3)
++            ClipAndEmit(clipVerts[i], clipVerts[i + 1], clipVerts[i + 2], textured);
++    }
++
++    FlushBatch(textured);
++}
++
++static i32 VertexCount(PrimitiveType type, i32 primitiveCount)
++{
++    return type == PRIM_TRIANGLES ? primitiveCount * 3 : primitiveCount + 2;
++}
++
++void PS2GS::DrawPrimitive(PrimitiveType type, i32 startVertex, i32 primitiveCount)
++{
++    // The only indexed draw the game uses is the 256x256 unit quad centred on the origin
++    static const InVert quad[4] = {{-128.0f, -128.0f, 0.0f, 0.0f, 0.0f, 255, 255, 255, 255},
++                                   {128.0f, -128.0f, 0.0f, 1.0f, 0.0f, 255, 255, 255, 255},
++                                   {-128.0f, 128.0f, 0.0f, 0.0f, 1.0f, 255, 255, 255, 255},
++                                   {128.0f, 128.0f, 0.0f, 1.0f, 1.0f, 255, 255, 255, 255}};
++    const i32 count = VertexCount(type, primitiveCount);
++    if (startVertex < 0 || startVertex + count > 4)
++        return;
++    DrawVertices(type, quad + startVertex, count, true, false);
++}
++
++void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *vertexData, i32 vertexStride)
++{
++    const i32 count = VertexCount(type, primitiveCount);
++    if (count < 3 || vertexData == nullptr)
++        return;
++
++    bool screenSpace = false;
++    bool hasTex = false;
++    switch (vertexStride)
++    {
++    case sizeof(VertexTex1DiffuseXyzrhw):
++        screenSpace = true;
++        hasTex = true;
++        break;
++    case sizeof(VertexTex1DiffuseXyz):
++        hasTex = true;
++        break;
++    case sizeof(VertexDiffuseXyzrhw):
++        screenSpace = true;
++        break;
++    default:
++        return;
++    }
++
++    std::vector<InVert> in(count);
++    const u8 *base = (const u8 *)vertexData;
++    for (i32 i = 0; i < count; i++)
++    {
++        InVert &o = in[i];
++        const u8 *p = base + (size_t)i * vertexStride;
++        if (vertexStride == (i32)sizeof(VertexTex1DiffuseXyzrhw))
++        {
++            const VertexTex1DiffuseXyzrhw *v = (const VertexTex1DiffuseXyzrhw *)p;
++            o = {v->pos.x, v->pos.y, v->pos.z, v->textureUV.x, v->textureUV.y,
++                 v->diffuse.bytes.r, v->diffuse.bytes.g, v->diffuse.bytes.b, v->diffuse.bytes.a};
++        }
++        else if (vertexStride == (i32)sizeof(VertexTex1DiffuseXyz))
++        {
++            const VertexTex1DiffuseXyz *v = (const VertexTex1DiffuseXyz *)p;
++            o = {v->pos.x, v->pos.y, v->pos.z, v->textureUV.x, v->textureUV.y,
++                 v->diffuse.bytes.r, v->diffuse.bytes.g, v->diffuse.bytes.b, v->diffuse.bytes.a};
++        }
++        else
++        {
++            const VertexDiffuseXyzrhw *v = (const VertexDiffuseXyzrhw *)p;
++            o = {v->pos.x, v->pos.y, v->pos.z, 0.0f, 0.0f,
++                 v->diffuse.bytes.r, v->diffuse.bytes.g, v->diffuse.bytes.b, v->diffuse.bytes.a};
++        }
++    }
++    DrawVertices(type, in.data(), count, hasTex, screenSpace);
++}
++
++void PS2GS::SwapBuffers()
++{
++    static int frame = 0;
++    if (frame < 5)
++        printf("PS2GS: SwapBuffers frame %d (queue used: %d bytes)\n", frame,
++               (int)((u8 *)gs->CurQueue->pool_cur - (u8 *)gs->CurQueue->pool[gs->CurQueue->dbuf]));
++    frame++;
++
++    gsKit_queue_exec(gs);
++    gsKit_finish();
++    gsKit_sync_flip(gs);
++    gsKit_TexManager_nextFrame(gs);
++}
+diff --git a/src/graphics/PS2GS.hpp b/src/graphics/PS2GS.hpp
+new file mode 100644
+index 0000000..fdeab34
+--- /dev/null
++++ b/src/graphics/PS2GS.hpp
+@@ -0,0 +1,124 @@
++#pragma once
++
++// Native PlayStation 2 Graphics Synthesizer backend (gsKit) for the ZunGraphics interface.
++//
++// Vertex transform / clipping runs on the EE (CPU); the GS rasterizes the resulting screen-space triangles
++// with perspective-correct texturing (STQ), alpha blending, alpha test and a 16-bit Z-buffer.
++
++#include "ZunGraphics.hpp"
++#include <vector>
++
++#include <gsKit.h>
++
++class PS2GS : public ZunGraphics
++{
++  public:
++    static ZunGraphics *Init();
++    ~PS2GS() override
++    {
++        Exit();
++    }
++
++    void Exit() override;
++    RendererType GetType() override
++    {
++        return RENDERER_OPENGLES; // closest existing value; nothing in the game depends on it
++    }
++
++    void SetFogRange(f32 nearPlane, f32 farPlane) override;
++    void SetFogColor(ZunColor color) override;
++    void SetColorOp(TextureOpComponent component, ColorOp op) override;
++    void SetTextureFactor(ZunColor factor) override;
++    void SetTextureArg(TextureArg arg) override;
++    void SetTransformMatrix(TransformMatrix type, const ZunMatrix &matrix) override;
++    void SetTextureFilter() override;
++    void GetViewport(ZunViewport &viewport) override;
++    void SetViewport(const ZunViewport &viewport) override;
++    void Enable(Capabilities cap) override;
++    void Disable(Capabilities cap) override;
++    void SetBlendMode(BlendMode srcMode, BlendMode dstMode) override;
++    void SetDepthMask(bool enable) override;
++    void SetDepthFunc(DepthFunc func) override;
++    void SetClearDepth(f32 depth) override;
++    void SetClearColor(ZunColor color) override;
++    void SetAlphaTestRef(u8 ref) override;
++    void Clear(u32 clearBits) override;
++    GfxTextureHandle CreateTexture() override;
++    void BindTexture(GfxTextureHandle handle) override;
++    void DeleteTexture(GfxTextureHandle handle) override;
++    void SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataType type, const void *data) override;
++    void SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height, const void *data) override;
++    void ReadPixels(i32 x, i32 y, i32 width, i32 height, void *pixels) override;
++    void DrawPrimitive(PrimitiveType type, i32 startVertex, i32 primitiveCount) override;
++    void DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *vertexData, i32 vertexStride) override;
++    void SwapBuffers() override;
++
++  private:
++    struct Tex
++    {
++        GSTEXTURE gs;
++        bool alive = false;
++    };
++
++    // Vertex after the transform, before the perspective divide.
++    struct ClipVert
++    {
++        f32 x, y, z, w;
++        f32 u, v;
++        f32 r, g, b, a; // 0..255, converted to the GS range (0..128) when emitted
++    };
++
++    // Input vertex in a common layout
++    struct InVert
++    {
++        f32 x, y, z;
++        f32 u, v;
++        u8 r, g, b, a;
++    };
++
++    GSGLOBAL *gs = nullptr;
++
++    std::vector<Tex> textures; // index 0 is a reserved dummy so that handle 0 means "no texture"
++    std::vector<u32> freeTextures;
++    Tex *boundTexture = nullptr;
++
++    // Fixed function state
++    ZunViewport viewport = {0, 0, 640, 480, 0.0f, 1.0f};
++    f32 clearDepth = 1.0f;
++    u8 clearRGB[3] = {0, 0, 0};
++    ZunColor fogColor = {0};
++    f32 fogNear = 0.0f, fogFar = 1.0f;
++    ZunColor textureFactor = {0xFFFFFFFF};
++    TextureArg texArg = TEX_ARG_DIFFUSE;
++    ColorOp colorOpRgb = COLOR_OP_MODULATE;
++    ColorOp colorOpAlpha = COLOR_OP_MODULATE;
++    BlendMode blendSrc = BLEND_ALPHA, blendDst = BLEND_ALPHA;
++    DepthFunc depthFunc = DEPTH_FUNC_LEQUAL;
++    bool depthMask = true;
++    bool depthTest = false;
++    bool blendEnabled = false;
++    bool alphaTest = false;
++    u8 alphaRef = 0;
++
++    ZunMatrix model, view, projection, textureMatrix;
++    ZunMatrix mvp;
++    bool mvpDirty = true;
++    bool textureMatrixIsIdentity = true;
++
++    f32 scaleX = 1.0f, scaleY = 1.0f; // game space (640x480) -> GS framebuffer
++
++    // Scratch buffers reused every draw call
++    std::vector<ClipVert> clipVerts;
++    std::vector<GSPRIMSTQPOINT> texBatch;
++    std::vector<GSPRIMPOINT> flatBatch;
++
++    void ApplyRenderState();
++    void PushRegister(u64 data, u64 address);
++    void FlushBatch(bool textured);
++    void EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
++    void ClipAndEmit(const ClipVert &a, const ClipVert &b, const ClipVert &c, bool textured);
++    ClipVert MakeVertex(const InVert &in, bool textured, bool screenSpace) const;
++    void DrawVertices(PrimitiveType type, const InVert *verts, i32 count, bool hasTex, bool screenSpace);
++    void ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fmt, PixelDataType type, const void *data);
++    void ReleaseTextureMemory(Tex *tex);
++};
+diff --git a/src/inttypes.hpp b/src/inttypes.hpp
+index c2da83e..1883e3b 100644
+--- a/src/inttypes.hpp
++++ b/src/inttypes.hpp
+@@ -3,12 +3,18 @@
+ #include <cstdint>
+ 
+ typedef int8_t i8;
+-typedef uint8_t u8;
+ typedef int16_t i16;
+-typedef uint16_t u16;
+ typedef int32_t i32;
+-typedef uint32_t u32;
+ typedef int64_t i64;
++#ifdef __PS2__
++// On the EE, newlib's uint32_t is `unsigned long`, which conflicts with the ps2sdk's own u32 (`unsigned int`).
++// Reuse the ps2sdk definitions so that both sets of headers can be included together.
++#include <tamtypes.h>
++#else
++typedef uint8_t u8;
++typedef uint16_t u16;
++typedef uint32_t u32;
+ typedef uint64_t u64;
++#endif
+ typedef float f32;
+ typedef double f64;
+diff --git a/src/main.cpp b/src/main.cpp
+index 1174782..80226a2 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -35,6 +35,8 @@ int main(int argc, char *argv[])
+ 
+     res = RENDER_RESULT_KEEP_RUNNING;
+ 
++    printf("th07 PS2: main() reached\n");
++    fflush(stdout);
+     if (g_Supervisor.LoadConfig("th07.cfg") != ZUN_SUCCESS)
+     {
+         goto stop;
+@@ -59,6 +61,8 @@ start:
+         goto stop;
+     }
+ 
++    printf("th07 PS2: window/backend/rendering ready\n");
++    fflush(stdout);
+     g_SoundPlayer.InitializeSound();
+     Controller::ResetKeyboard();
+     g_AnmManager = new AnmManager();
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+new file mode 100644
+index 0000000..dd7e0b5
+--- /dev/null
++++ b/src/ps2audio.cpp
+@@ -0,0 +1,326 @@
++#include "ps2audio.hpp"
++
++#include <SDL2/SDL.h>
++#include <algorithm>
++#include <cmath>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <vector>
++
++namespace
++{
++constexpr int kRate = 44100;
++constexpr int kChunk = 512; // frames mixed per step
++
++SDL_AudioDeviceID g_dev = 0;
++std::vector<ma_sound *> g_sounds;
++volatile ma_uint64 g_framesMixed = 0;
++
++struct Lock
++{
++    Lock()
++    {
++        if (g_dev)
++            SDL_LockAudioDevice(g_dev);
++    }
++    ~Lock()
++    {
++        if (g_dev)
++            SDL_UnlockAudioDevice(g_dev);
++    }
++};
++
++float Gain(ma_sound *s, ma_uint64 nowMs)
++{
++    float g = s->volume;
++    if (s->fading)
++    {
++        float t = s->fadeLenMs ? (float)(nowMs - s->fadeStartMs) / (float)s->fadeLenMs : 1.0f;
++        if (nowMs < s->fadeStartMs)
++            t = 0.0f;
++        if (t >= 1.0f)
++        {
++            t = 1.0f;
++        }
++        g *= s->fadeFrom + (s->fadeTo - s->fadeFrom) * t;
++    }
++    return g;
++}
++
++// Reads up to `frames` frames from the sound as stereo f32 @ kRate. Returns frames produced.
++ma_uint64 ReadSound(ma_sound *s, float *out, ma_uint64 frames)
++{
++    const ma_data_source_vtable *vt = ((ma_data_source_base *)s->ds)->vtable;
++    static uint8_t raw[kChunk * 8];
++    ma_uint64 got = 0;
++    vt->onRead(s->ds, raw, frames, &got);
++    for (ma_uint64 i = 0; i < got; i++)
++    {
++        float l, r;
++        if (s->format == ma_format_s16)
++        {
++            const int16_t *p = (const int16_t *)raw + i * s->channels;
++            l = p[0] / 32768.0f;
++            r = s->channels > 1 ? p[1] / 32768.0f : l;
++        }
++        else
++        {
++            const float *p = (const float *)raw + i * s->channels;
++            l = p[0];
++            r = s->channels > 1 ? p[1] : l;
++        }
++        out[i * 2] = l;
++        out[i * 2 + 1] = r;
++    }
++    return got;
++}
++
++void AudioCallback(void *, Uint8 *stream, int len)
++{
++    int16_t *dst = (int16_t *)stream;
++    int frames = len / 4;
++    static float mix[kChunk * 2];
++    static float tmp[kChunk * 2];
++
++    while (frames > 0)
++    {
++        int n = std::min(frames, kChunk);
++        std::memset(mix, 0, sizeof(float) * n * 2);
++        const ma_uint64 nowMs = g_framesMixed * 1000 / kRate;
++
++        for (ma_sound *s : g_sounds)
++        {
++            if (!s->playing)
++                continue;
++            ma_uint64 got = ReadSound(s, tmp, n);
++            if (got == 0)
++            {
++                s->playing = false;
++                s->atEnd = true;
++                continue;
++            }
++            const float g = Gain(s, nowMs);
++            for (ma_uint64 i = 0; i < got * 2; i++)
++                mix[i] += tmp[i] * g;
++            if (got < (ma_uint64)n)
++                s->playing = false;
++        }
++
++        for (int i = 0; i < n * 2; i++)
++        {
++            float v = std::clamp(mix[i], -1.0f, 1.0f);
++            dst[i] = (int16_t)(v * 32767.0f);
++        }
++        dst += n * 2;
++        frames -= n;
++        g_framesMixed += n;
++    }
++}
++
++// ---- audio buffer data source ----
++ma_result BufRead(ma_data_source *ds, void *out, ma_uint64 frames, ma_uint64 *read)
++{
++    ma_audio_buffer *b = (ma_audio_buffer *)ds;
++    ma_uint64 n = std::min<ma_uint64>(frames, b->frames - b->cursor);
++    const uint32_t fs = ma_get_bytes_per_frame(b->format, b->channels);
++    std::memcpy(out, (const uint8_t *)b->pData + b->cursor * fs, n * fs);
++    b->cursor += n;
++    *read = n;
++    return n ? MA_SUCCESS : MA_AT_END;
++}
++ma_result BufSeek(ma_data_source *ds, ma_uint64 f)
++{
++    ma_audio_buffer *b = (ma_audio_buffer *)ds;
++    b->cursor = std::min(f, b->frames);
++    return MA_SUCCESS;
++}
++ma_result BufFormat(ma_data_source *ds, ma_format *f, ma_uint32 *c, ma_uint32 *sr, ma_channel *, size_t)
++{
++    ma_audio_buffer *b = (ma_audio_buffer *)ds;
++    if (f)
++        *f = b->format;
++    if (c)
++        *c = b->channels;
++    if (sr)
++        *sr = kRate;
++    return MA_SUCCESS;
++}
++ma_result BufCursor(ma_data_source *ds, ma_uint64 *c)
++{
++    *c = ((ma_audio_buffer *)ds)->cursor;
++    return MA_SUCCESS;
++}
++ma_result BufLength(ma_data_source *ds, ma_uint64 *l)
++{
++    *l = ((ma_audio_buffer *)ds)->frames;
++    return MA_SUCCESS;
++}
++const ma_data_source_vtable g_bufVtable = {BufRead, BufSeek, BufFormat, BufCursor, BufLength, nullptr, 0};
++} // namespace
++
++float ma_volume_db_to_linear(float db)
++{
++    return std::pow(10.0f, db / 20.0f);
++}
++
++void ma_free(void *p, const void *)
++{
++    std::free(p);
++}
++
++ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
++                                                   const void *pData, const void *)
++{
++    return {format, channels, sizeInFrames, pData};
++}
++
++ma_result ma_audio_buffer_init(const ma_audio_buffer_config *cfg, ma_audio_buffer *buf)
++{
++    buf->base.vtable = &g_bufVtable;
++    buf->format = cfg->format;
++    buf->channels = cfg->channels;
++    buf->frames = cfg->sizeInFrames;
++    buf->pData = cfg->pData;
++    buf->cursor = 0;
++    return MA_SUCCESS;
++}
++
++ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *cfg, ma_uint64 *pFrameCount,
++                           void **ppFrames)
++{
++    SDL_RWops *rw = SDL_RWFromConstMem(pData, (int)dataSize);
++    SDL_AudioSpec spec;
++    Uint8 *buf = nullptr;
++    Uint32 len = 0;
++    if (!rw || !SDL_LoadWAV_RW(rw, 1, &spec, &buf, &len))
++        return MA_ERROR;
++
++    SDL_AudioCVT cvt;
++    if (SDL_BuildAudioCVT(&cvt, spec.format, spec.channels, spec.freq, AUDIO_F32SYS, 2, kRate) < 0)
++    {
++        SDL_FreeWAV(buf);
++        return MA_ERROR;
++    }
++    cvt.len = (int)len;
++    cvt.buf = (Uint8 *)std::malloc((size_t)len * (size_t)cvt.len_mult);
++    if (!cvt.buf)
++    {
++        SDL_FreeWAV(buf);
++        return MA_ERROR;
++    }
++    std::memcpy(cvt.buf, buf, len);
++    SDL_FreeWAV(buf);
++    if (cvt.needed && SDL_ConvertAudio(&cvt) < 0)
++    {
++        std::free(cvt.buf);
++        return MA_ERROR;
++    }
++    *ppFrames = cvt.buf;
++    *pFrameCount = (ma_uint64)cvt.len_cvt / 8;
++    return MA_SUCCESS;
++}
++
++ma_result ps2audio_engine_init(ma_engine *e)
++{
++    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
++    {
++        std::printf("SDL audio init failed: %s\n", SDL_GetError());
++        return MA_ERROR;
++    }
++    SDL_AudioSpec want, have;
++    SDL_zero(want);
++    want.freq = kRate;
++    want.format = AUDIO_S16SYS;
++    want.channels = 2;
++    want.samples = 1024;
++    want.callback = AudioCallback;
++    g_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
++    if (!g_dev)
++    {
++        std::printf("SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
++        return MA_ERROR;
++    }
++    if (have.freq != kRate || have.format != AUDIO_S16SYS || have.channels != 2)
++        std::printf("audio: got %d Hz fmt %x ch %d (wanted 44100 S16 stereo)\n", have.freq, have.format,
++                    have.channels);
++    e->running = true;
++    SDL_PauseAudioDevice(g_dev, 0);
++    return MA_SUCCESS;
++}
++
++void ps2audio_engine_uninit(ma_engine *e)
++{
++    if (g_dev)
++    {
++        SDL_CloseAudioDevice(g_dev);
++        g_dev = 0;
++    }
++    g_sounds.clear();
++    e->running = false;
++}
++
++ma_uint64 ma_engine_get_time_in_milliseconds(ma_engine *)
++{
++    return g_framesMixed * 1000 / kRate;
++}
++
++ma_result ma_sound_init_from_data_source(ma_engine *, ma_data_source *ds, ma_uint32, void *, ma_sound *s)
++{
++    std::memset(s, 0, sizeof(*s));
++    const ma_data_source_vtable *vt = ((ma_data_source_base *)ds)->vtable;
++    if (vt->onGetDataFormat(ds, &s->format, &s->channels, &s->sampleRate, nullptr, 0) != MA_SUCCESS)
++        return MA_ERROR;
++    s->ds = ds;
++    s->volume = 1.0f;
++    Lock l;
++    g_sounds.push_back(s);
++    return MA_SUCCESS;
++}
++
++void ma_sound_uninit(ma_sound *s)
++{
++    Lock l;
++    g_sounds.erase(std::remove(g_sounds.begin(), g_sounds.end(), s), g_sounds.end());
++}
++
++ma_result ma_sound_start(ma_sound *s)
++{
++    Lock l;
++    s->playing = true;
++    s->atEnd = false;
++    return MA_SUCCESS;
++}
++
++ma_result ma_sound_stop(ma_sound *s)
++{
++    if (!s)
++        return MA_INVALID_ARGS;
++    Lock l;
++    s->playing = false;
++    return MA_SUCCESS;
++}
++
++ma_result ma_sound_seek_to_pcm_frame(ma_sound *s, ma_uint64 frame)
++{
++    Lock l;
++    const ma_data_source_vtable *vt = ((ma_data_source_base *)s->ds)->vtable;
++    return vt->onSeek ? vt->onSeek(s->ds, frame) : MA_ERROR;
++}
++
++void ma_sound_set_volume(ma_sound *s, float v)
++{
++    Lock l;
++    s->volume = v;
++}
++
++void ma_sound_set_fade_start_in_milliseconds(ma_sound *s, float volBeg, float volEnd, ma_uint64 lenMs,
++                                             ma_uint64 absoluteGlobalTimeMs)
++{
++    Lock l;
++    s->fading = true;
++    s->fadeFrom = volBeg < 0 ? 1.0f : volBeg; // -1 = current volume (the per-sound volume is applied separately)
++    s->fadeTo = volEnd;
++    s->fadeStartMs = absoluteGlobalTimeMs;
++    s->fadeLenMs = lenMs;
++}
+diff --git a/src/ps2audio.hpp b/src/ps2audio.hpp
+new file mode 100644
+index 0000000..b6ff9be
+--- /dev/null
++++ b/src/ps2audio.hpp
+@@ -0,0 +1,152 @@
++#pragma once
++
++// Tiny subset of the miniaudio API, implemented on top of SDL2 audio, used by SoundPlayer on the PlayStation 2
++// (miniaudio itself needs dlfcn/threads that ps2sdk does not provide). Only what SoundPlayer.cpp uses exists here.
++
++#include <cstddef>
++#include <cstdint>
++
++typedef int ma_result;
++typedef uint32_t ma_uint32;
++typedef uint64_t ma_uint64;
++typedef uint8_t ma_channel;
++
++#define MA_SUCCESS 0
++#define MA_ERROR (-1)
++#define MA_INVALID_ARGS (-2)
++#define MA_AT_END (-17)
++#define MA_TRUE 1
++
++enum ma_format
++{
++    ma_format_unknown = 0,
++    ma_format_s16 = 2,
++    ma_format_f32 = 5,
++};
++
++enum ma_standard_channel_map
++{
++    ma_standard_channel_map_default = 0
++};
++
++typedef void ma_data_source;
++
++struct ma_data_source_vtable
++{
++    ma_result (*onRead)(ma_data_source *, void *, ma_uint64, ma_uint64 *);
++    ma_result (*onSeek)(ma_data_source *, ma_uint64);
++    ma_result (*onGetDataFormat)(ma_data_source *, ma_format *, ma_uint32 *, ma_uint32 *, ma_channel *, size_t);
++    ma_result (*onGetCursor)(ma_data_source *, ma_uint64 *);
++    ma_result (*onGetLength)(ma_data_source *, ma_uint64 *);
++    ma_result (*onSetLooping)(ma_data_source *, ma_uint32);
++    ma_uint32 flags;
++};
++
++struct ma_data_source_base
++{
++    const ma_data_source_vtable *vtable;
++};
++
++struct ma_data_source_config
++{
++    const ma_data_source_vtable *vtable;
++};
++
++inline ma_data_source_config ma_data_source_config_init()
++{
++    ma_data_source_config c = {nullptr};
++    return c;
++}
++inline ma_result ma_data_source_init(const ma_data_source_config *cfg, ma_data_source_base *base)
++{
++    base->vtable = cfg->vtable;
++    return MA_SUCCESS;
++}
++inline void ma_data_source_uninit(ma_data_source_base *)
++{
++}
++inline ma_uint32 ma_get_bytes_per_frame(ma_format f, ma_uint32 channels)
++{
++    return (f == ma_format_s16 ? 2u : 4u) * channels;
++}
++inline void ma_channel_map_init_standard(ma_standard_channel_map, ma_channel *map, size_t cap, ma_uint32)
++{
++    for (size_t i = 0; i < cap; i++)
++        map[i] = 0;
++}
++float ma_volume_db_to_linear(float db);
++void ma_free(void *p, const void *allocationCallbacks);
++
++// ---- sample buffer (references the caller's memory, does not copy) ----
++struct ma_audio_buffer_config
++{
++    ma_format format;
++    ma_uint32 channels;
++    ma_uint64 sizeInFrames;
++    const void *pData;
++};
++struct ma_audio_buffer
++{
++    ma_data_source_base base;
++    ma_format format;
++    ma_uint32 channels;
++    ma_uint64 frames;
++    const void *pData;
++    ma_uint64 cursor;
++};
++ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
++                                                   const void *pData, const void *allocationCallbacks);
++ma_result ma_audio_buffer_init(const ma_audio_buffer_config *cfg, ma_audio_buffer *buf);
++inline void ma_audio_buffer_uninit(ma_audio_buffer *)
++{
++}
++
++// ---- WAV decoding to f32 stereo @ 44100 (malloc'd, release with ma_free) ----
++struct ma_decoder_config
++{
++    ma_format format;
++    ma_uint32 channels;
++    ma_uint32 sampleRate;
++};
++inline ma_decoder_config ma_decoder_config_init(ma_format f, ma_uint32 c, ma_uint32 sr)
++{
++    return {f, c, sr};
++}
++ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *cfg, ma_uint64 *pFrameCount,
++                           void **ppFrames);
++
++// ---- engine / sounds ----
++struct ma_sound;
++struct ma_engine
++{
++    bool running = false;
++};
++
++struct ma_sound
++{
++    ma_data_source *ds;
++    ma_format format;
++    ma_uint32 channels;
++    ma_uint32 sampleRate;
++    bool playing;
++    bool atEnd;
++    float volume;
++    // fade
++    bool fading;
++    float fadeFrom, fadeTo;
++    ma_uint64 fadeStartMs, fadeLenMs;
++    double srcPos; // for sample rate conversion of streams that are not 44100
++};
++
++ma_result ps2audio_engine_init(ma_engine *e); // opens the SDL audio device
++void ps2audio_engine_uninit(ma_engine *e);
++ma_uint64 ma_engine_get_time_in_milliseconds(ma_engine *e);
++ma_result ma_sound_init_from_data_source(ma_engine *e, ma_data_source *ds, ma_uint32 flags, void *group,
++                                         ma_sound *sound);
++void ma_sound_uninit(ma_sound *s);
++ma_result ma_sound_start(ma_sound *s);
++ma_result ma_sound_stop(ma_sound *s);
++ma_result ma_sound_seek_to_pcm_frame(ma_sound *s, ma_uint64 frame);
++void ma_sound_set_volume(ma_sound *s, float v);
++void ma_sound_set_fade_start_in_milliseconds(ma_sound *s, float volBeg, float volEnd, ma_uint64 lenMs,
++                                             ma_uint64 absoluteGlobalTimeMs);
+-- 
+2.43.0
+
+
+From df29309b041f2ef02c03f1c9c2fc4de1a24cea8b Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 14:59:41 -0300
+Subject: [PATCH 02/10] Add boot screen listing required game files
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2    |  2 +-
+ src/main.cpp    |  9 +++--
+ src/ps2boot.cpp | 94 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 102 insertions(+), 3 deletions(-)
+ create mode 100644 src/ps2boot.cpp
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index 2295beb..e0de32b 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -24,7 +24,7 @@ SRCS = \
+ 	src/MidiOutput.cpp src/MusicRoom.cpp src/Player.cpp src/ReplayManager.cpp src/ResultScreen.cpp \
+ 	src/Rng.cpp src/ScreenEffect.cpp src/SoundPlayer.cpp src/Stage.cpp src/Supervisor.cpp \
+ 	src/TextHelper.cpp src/main.cpp src/utils.cpp \
+-	src/ps2audio.cpp src/graphics/PS2GS.cpp \
++	src/ps2audio.cpp src/ps2boot.cpp src/graphics/PS2GS.cpp \
+ 	src/pbg4/Lzss.cpp src/pbg4/Pbg4Archive.cpp src/pbg4/Pbg4File.cpp
+ 
+ EE_OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
+diff --git a/src/main.cpp b/src/main.cpp
+index 80226a2..22bcd77 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -26,10 +26,15 @@ void AnmManager::TakeScreenshotIfRequested()
+     }
+ }
+ 
++#ifdef __PS2__
++void Ps2BootScreen(int argc, char **argv);
++#endif
++
+ int main(int argc, char *argv[])
+ {
+-    (void)argc;
+-    (void)argv;
++#ifdef __PS2__
++    Ps2BootScreen(argc, argv);
++#endif
+ 
+     i32 res;
+ 
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+new file mode 100644
+index 0000000..cece86f
+--- /dev/null
++++ b/src/ps2boot.cpp
+@@ -0,0 +1,94 @@
++#ifdef __PS2__
++#include <cstdio>
++#include <cstring>
++#include <debug.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
++// Boot screen: runs before anything else (even before the GS backend), using ps2sdk's built-in text console, so
++// that something is always visible on screen and the user can see which game files were found.
++
++static long FileSize(const char *path)
++{
++    struct stat st;
++    if (stat(path, &st) == 0)
++        return (long)st.st_size;
++    FILE *f = fopen(path, "rb"); // some file systems (host:) have no working stat()
++    if (!f)
++        return -1;
++    fseek(f, 0, SEEK_END);
++    long n = ftell(f);
++    fclose(f);
++    return n;
++}
++
++void Ps2BootScreen(int argc, char **argv)
++{
++    init_scr();
++    scr_printf("\n  Touhou 7 PS2 port (experimental)\n");
++    scr_printf("  ---------------------------------\n\n");
++    scr_printf("  main() reached - screen output works.\n");
++
++    const char *self = (argc > 0 && argv && argv[0]) ? argv[0] : "(none)";
++    scr_printf("  ELF path: %s\n", self);
++
++    // Make relative file names resolve next to the ELF (host:dir/th07.elf, mass:/dir/th07.elf, cdrom0:...)
++    char dir[256];
++    dir[0] = 0;
++    if (argc > 0 && argv && argv[0])
++    {
++        strncpy(dir, argv[0], sizeof(dir) - 1);
++        dir[sizeof(dir) - 1] = 0;
++        char *slash = strrchr(dir, '/');
++        char *colon = strrchr(dir, ':');
++        if (slash)
++            slash[1] = 0;
++        else if (colon)
++            colon[1] = 0;
++        else
++            dir[0] = 0;
++    }
++    if (dir[0])
++    {
++        int r = chdir(dir);
++        scr_printf("  chdir(%s) = %d\n", dir, r);
++    }
++    char cwd[256];
++    if (getcwd(cwd, sizeof(cwd)))
++        scr_printf("  working dir: %s\n", cwd);
++    scr_printf("\n");
++
++    static const struct
++    {
++        const char *name;
++        bool required;
++    } files[] = {{"th07.dat", true}, {"thbgm.dat", true}, {"msgothic.ttc", true}, {"th07.cfg", false}};
++
++    bool missing = false;
++    for (const auto &f : files)
++    {
++        long n = FileSize(f.name);
++        if (n >= 0)
++            scr_printf("  [ OK ]  %-14s %ld bytes\n", f.name, n);
++        else if (f.required)
++        {
++            scr_printf("  [MISS]  %-14s NOT FOUND (required)\n", f.name);
++            missing = true;
++        }
++        else
++            scr_printf("  [ -- ]  %-14s not found (created on first run)\n", f.name);
++    }
++    scr_printf("\n");
++
++    if (missing)
++    {
++        scr_printf("  Put the missing files in the same folder as the ELF\n");
++        scr_printf("  (names must match exactly, lower case). Halted.\n");
++        for (;;)
++            sleep(1);
++    }
++    scr_printf("  All required files found. Starting game...\n");
++    scr_printf("  (if the screen goes black after this, check the EE log)\n");
++    sleep(4);
++}
++#endif
+-- 
+2.43.0
+
+
+From f817edd8fbf6653c3fa99c7784c3d2b45579042e Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 15:02:09 -0300
+Subject: [PATCH 03/10] PS2: native libpad input, audsrv audio (embedded irx),
+ no SDL joystick init
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2        |    4 +-
+ README-PS2.md       |    1 +
+ src/Controller.cpp  |    4 +
+ src/GameWindow.cpp  |    2 +-
+ src/Ps2Pad.cpp      |   85 +++
+ src/Ps2Pad.hpp      |   12 +
+ src/SoundPlayer.cpp |    3 +
+ src/Supervisor.cpp  |    3 +
+ src/audsrv_irx.cpp  | 1239 +++++++++++++++++++++++++++++++++++++++++++
+ src/main.cpp        |    3 +
+ src/ps2audio.cpp    |   81 +--
+ src/ps2audio.hpp    |    1 +
+ 12 files changed, 1402 insertions(+), 36 deletions(-)
+ create mode 100644 src/Ps2Pad.cpp
+ create mode 100644 src/Ps2Pad.hpp
+ create mode 100644 src/audsrv_irx.cpp
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index e0de32b..3784102 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -24,7 +24,7 @@ SRCS = \
+ 	src/MidiOutput.cpp src/MusicRoom.cpp src/Player.cpp src/ReplayManager.cpp src/ResultScreen.cpp \
+ 	src/Rng.cpp src/ScreenEffect.cpp src/SoundPlayer.cpp src/Stage.cpp src/Supervisor.cpp \
+ 	src/TextHelper.cpp src/main.cpp src/utils.cpp \
+-	src/ps2audio.cpp src/ps2boot.cpp src/graphics/PS2GS.cpp \
++	src/ps2audio.cpp src/ps2boot.cpp src/Ps2Pad.cpp src/audsrv_irx.cpp src/graphics/PS2GS.cpp \
+ 	src/pbg4/Lzss.cpp src/pbg4/Pbg4Archive.cpp src/pbg4/Pbg4File.cpp
+ 
+ EE_OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
+@@ -43,7 +43,7 @@ EE_LDFLAGS += -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
+ 
+ # order matters: SDL2main first, SDL2 after the libraries that depend on it
+ EE_LIBS += -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static \
+-	-lm -lpatches -lgskit -ldmakit -lps2_drivers -lpthreadglue -lpthread -ldebug
++	-lm -lpatches -lgskit -ldmakit -lpadx -laudsrv -lps2_drivers -lpthreadglue -lpthread -ldebug
+ 
+ all: $(EE_BIN)
+ 
+diff --git a/README-PS2.md b/README-PS2.md
+index c840b5e..00e0602 100644
+--- a/README-PS2.md
++++ b/README-PS2.md
+@@ -11,6 +11,7 @@ This is a derivative work. All game logic comes from the people who did the real
+ * [N0zoM1z0/th07](https://github.com/N0zoM1z0/th07) – the th07 decompilation project.
+ * [GensokyoClub/th06](https://github.com/GensokyoClub/th06) and [GensokyoClub/th08](https://github.com/GensokyoClub/th08) – the th06/th08 decompilations that th07's structure and naming derive from.
+ * Touhou Project / 東方妖々夢 are by ZUN (Team Shanghai Alice). This repository contains **no game data**.
++* [sammwyy/th06-ps2](https://github.com/sammwyy/th06-ps2) and [makmal0962/th06-ps2](https://github.com/makmal0962/th06-ps2) – th06 PS2 ports; the native libpad input and the audsrv audio set-up follow their approach.
+ * PS2 toolchain: [ps2dev](https://github.com/ps2dev), ps2sdk, gsKit, ps2sdk-ports (SDL2, SDL2_ttf, SDL2_image).
+ 
+ Files added for the PS2: `src/graphics/PS2GS.*` (GS backend), `src/ps2audio.*` (SDL2 based replacement for the
+diff --git a/src/Controller.cpp b/src/Controller.cpp
+index 08c87ef..ad031c7 100644
+--- a/src/Controller.cpp
++++ b/src/Controller.cpp
+@@ -1,4 +1,5 @@
+ #include "Controller.hpp"
++#include "Ps2Pad.hpp"
+ 
+ #include <SDL2/SDL.h>
+ #include <SDL2/SDL_events.h>
+@@ -188,6 +189,9 @@ u16 Controller::GetInput()
+     buttons |= KEY_PRESSED(SDL_SCANCODE_R, TH_BUTTON_RESET);
+     buttons |= KEY_PRESSED(SDL_SCANCODE_RETURN, TH_BUTTON_ENTER);
+ 
++#ifdef __PS2__
++    buttons |= Ps2Pad::GetButtons();
++#endif
+     return GetControllerInput(buttons);
+ }
+ 
+diff --git a/src/GameWindow.cpp b/src/GameWindow.cpp
+index 73592a0..328be2a 100644
+--- a/src/GameWindow.cpp
++++ b/src/GameWindow.cpp
+@@ -181,7 +181,7 @@ ZunResult GameWindow::CreateGameWindow()
+ {
+ #ifdef __PS2__
+     // Only input: SDL's own PS2 video driver would fight the gsKit backend for the GS
+-    if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0)
++    if (SDL_Init(SDL_INIT_EVENTS) < 0)
+ #else
+     if (SDL_Init(SDL_INIT_VIDEO) < 0)
+ #endif
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+new file mode 100644
+index 0000000..40d8751
+--- /dev/null
++++ b/src/Ps2Pad.cpp
+@@ -0,0 +1,85 @@
++#ifdef __PS2__
++#include "Ps2Pad.hpp"
++#include "Controller.hpp"
++
++#include <cstdio>
++#include <libpad.h>
++#include <loadfile.h>
++#include <sifrpc.h>
++
++// The pad DMA buffer must be 64-byte aligned and 256 bytes long.
++static char s_PadBuf[256] __attribute__((aligned(64)));
++static bool s_Ready = false;
++
++#define STICK_DEADZONE 48
++
++bool Ps2Pad::Init()
++{
++    SifInitRpc(0);
++    // The newer X modules go with libpadx; the old rom0:PADMAN can hang padInit under emulation.
++    if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) < 0)
++    {
++        printf("Ps2Pad: failed to load XSIO2MAN\n");
++        return false;
++    }
++    if (SifLoadModule("rom0:XPADMAN", 0, NULL) < 0)
++    {
++        printf("Ps2Pad: failed to load XPADMAN\n");
++        return false;
++    }
++    padInit(0);
++    int r = padPortOpen(0, 0, s_PadBuf);
++    printf("Ps2Pad: padPortOpen -> %d\n", r);
++    if (r == 0)
++        return false;
++    s_Ready = true; // the pad settles over the next few frames; GetButtons just polls
++    return true;
++}
++
++u16 Ps2Pad::GetButtons()
++{
++    if (!s_Ready)
++        return 0;
++    int state = padGetState(0, 0);
++    if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1)
++        return 0;
++
++    struct padButtonStatus pad;
++    if (padRead(0, 0, &pad) == 0)
++        return 0;
++
++    u16 held = ~pad.btns; // active low
++    u16 out = 0;
++    if (held & PAD_UP)
++        out |= TH_BUTTON_UP;
++    if (held & PAD_DOWN)
++        out |= TH_BUTTON_DOWN;
++    if (held & PAD_LEFT)
++        out |= TH_BUTTON_LEFT;
++    if (held & PAD_RIGHT)
++        out |= TH_BUTTON_RIGHT;
++    if (held & PAD_CROSS)
++        out |= TH_BUTTON_SHOOT | TH_BUTTON_ENTER;
++    if (held & (PAD_CIRCLE | PAD_TRIANGLE))
++        out |= TH_BUTTON_BOMB;
++    if (held & (PAD_SQUARE | PAD_L1 | PAD_R1 | PAD_L2 | PAD_R2))
++        out |= TH_BUTTON_FOCUS;
++    if (held & PAD_START)
++        out |= TH_BUTTON_MENU;
++    if (held & PAD_SELECT)
++        out |= TH_BUTTON_SKIP;
++
++    if (pad.mode >> 4 == 0x7 || pad.mode >> 4 == 0x5) // analog stick mirrors the d-pad
++    {
++        if (pad.ljoy_h < 128 - STICK_DEADZONE)
++            out |= TH_BUTTON_LEFT;
++        if (pad.ljoy_h > 128 + STICK_DEADZONE)
++            out |= TH_BUTTON_RIGHT;
++        if (pad.ljoy_v < 128 - STICK_DEADZONE)
++            out |= TH_BUTTON_UP;
++        if (pad.ljoy_v > 128 + STICK_DEADZONE)
++            out |= TH_BUTTON_DOWN;
++    }
++    return out;
++}
++#endif
+diff --git a/src/Ps2Pad.hpp b/src/Ps2Pad.hpp
+new file mode 100644
+index 0000000..cedb162
+--- /dev/null
++++ b/src/Ps2Pad.hpp
+@@ -0,0 +1,12 @@
++#pragma once
++#include "inttypes.hpp"
++
++#ifdef __PS2__
++// Native joypad 1 input through libpad. SDL's PS2 joystick backend goes through the multitap RPC, which can hang
++// at start-up when the multitap module never answers, so the game reads the pad directly.
++namespace Ps2Pad
++{
++bool Init();
++u16 GetButtons(); // TH_BUTTON_* bit mask
++} // namespace Ps2Pad
++#endif
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index 6d10697..c99b78d 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -812,6 +812,9 @@ i32 SoundPlayer::ProcessQueues()
+     {
+         return 0;
+     }
++#ifdef __PS2__
++    ps2audio_pump();
++#endif
+ 
+     commandCursor = this->commandQueue;
+ loop:
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 33fb7e8..953ec4e 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -365,6 +365,9 @@ ZunResult Supervisor::SetupInput()
+         return ZUN_ERROR;
+     }
+ 
++#ifdef __PS2__
++    return ZUN_SUCCESS; // the pad is read through libpad (Ps2Pad), see main()
++#endif
+     if (SDL_Init(SDL_INIT_GAMECONTROLLER) == 0)
+     {
+         g_Supervisor.controller = SDL_GameControllerOpen(0);
+diff --git a/src/audsrv_irx.cpp b/src/audsrv_irx.cpp
+new file mode 100644
+index 0000000..acdc85c
+--- /dev/null
++++ b/src/audsrv_irx.cpp
+@@ -0,0 +1,1239 @@
++// audsrv.irx from ps2sdk (AFL-3.0 / ps2sdk licence), embedded so no extra file is needed next to the ELF.
++#ifdef __PS2__
++extern "C" {
++unsigned char audsrv_irx[] = {
++127,69,76,70,1,1,1,0,0,0,0,0,0,0,0,0,
++128,255,8,0,1,0,0,0,36,9,0,0,52,0,0,0,
++188,59,0,0,1,16,0,0,52,0,32,0,2,0,40,0,
++12,0,9,0,128,0,0,112,116,0,0,0,0,0,0,0,
++0,0,0,0,27,0,0,0,0,0,0,0,4,0,0,0,
++4,0,0,0,1,0,0,0,144,0,0,0,0,0,0,0,
++0,0,0,0,208,58,0,0,136,96,1,0,7,0,0,0,
++16,0,0,0,152,57,0,0,36,9,0,0,192,186,0,0,
++32,39,0,0,176,19,0,0,184,37,1,0,4,1,0,0,
++0,0,192,65,0,0,0,0,4,1,0,0,97,117,100,115,
++114,118,0,0,36,9,0,0,144,0,0,0,144,0,0,0,
++144,0,0,0,168,2,0,0,76,8,0,0,164,1,0,0,
++196,1,0,0,84,6,0,0,180,6,0,0,116,1,0,0,
++216,7,0,0,76,26,0,0,16,25,0,0,20,8,0,0,
++184,24,0,0,220,24,0,0,208,23,0,0,4,24,0,0,
++148,24,0,0,168,24,0,0,164,25,0,0,200,23,0,0,
++140,21,0,0,212,37,0,0,232,34,0,0,232,36,0,0,
++188,38,0,0,212,3,0,0,28,6,0,0,0,0,0,0,
++8,0,224,3,0,0,0,0,0,0,0,0,0,0,0,0,
++224,255,189,39,255,127,5,36,28,0,191,175,25,8,17,4,
++129,13,4,36,255,127,5,36,22,8,17,4,129,14,4,36,
++37,40,0,0,19,8,17,4,128,15,4,36,37,40,0,0,
++16,8,17,4,128,16,4,36,1,0,5,60,236,162,165,140,
++0,0,0,0,4,0,160,16,0,0,0,0,0,0,5,60,
++148,57,165,140,0,0,0,0,255,255,165,48,129,15,4,36,
++4,8,17,4,16,0,165,175,16,0,165,143,1,8,17,4,
++129,16,4,36,37,40,0,0,254,7,17,4,128,9,4,36,
++37,40,0,0,251,7,17,4,128,10,4,36,255,63,5,36,
++248,7,17,4,129,9,4,36,28,0,191,143,255,63,5,36,
++129,10,4,36,243,7,0,16,32,0,189,39,0,0,4,60,
++216,82,132,140,232,255,189,39,20,0,191,175,213,7,17,4,
++0,0,0,0,20,0,191,143,1,0,2,36,8,0,224,3,
++24,0,189,39,232,255,189,39,1,0,1,60,236,162,32,172,
++20,0,191,175,198,255,17,4,0,0,0,0,20,0,191,143,
++37,16,0,0,0,0,1,60,212,82,32,172,8,0,224,3,
++24,0,189,39,232,255,189,39,20,0,191,175,72,3,17,4,
++0,0,0,0,20,0,191,143,43,16,2,0,8,0,224,3,
++24,0,189,39,224,255,189,39,24,0,178,175,20,0,177,175,
++16,0,176,175,28,0,191,175,37,128,128,0,37,144,160,0,
++240,255,17,4,37,136,192,0,37,24,64,0,40,0,96,16,
++253,255,2,36,16,0,66,58,1,0,66,44,2,0,3,36,
++1,0,1,60,244,162,34,172,3,0,35,22,1,0,66,36,
++1,0,1,60,244,162,34,172,128,187,2,52,1,0,1,60,
++0,163,48,172,64,130,16,0,2,0,64,20,26,0,2,2,
++13,0,7,0,1,0,2,60,244,162,66,140,1,0,1,60,
++252,162,50,172,1,0,1,60,248,162,49,172,0,0,1,60,
++228,82,32,172,18,24,0,0,4,24,67,0,128,16,3,0,
++33,16,67,0,64,24,2,0,0,0,1,60,144,57,35,172,
++252,255,3,36,36,16,67,0,0,0,1,60,232,82,34,172,
++1,0,2,36,0,0,1,60,208,82,34,172,37,16,0,0,
++28,0,191,143,24,0,178,143,20,0,177,143,16,0,176,143,
++8,0,224,3,32,0,189,39,1,0,2,60,240,162,66,140,
++0,0,0,0,69,0,64,20,0,0,0,0,208,255,189,39,
++37,32,0,0,44,0,191,175,142,7,17,4,40,0,176,175,
++37,24,64,0,29,0,96,4,255,255,2,36,1,0,16,36,
++24,0,164,39,0,0,1,60,232,82,32,172,0,0,1,60,
++228,82,32,172,24,0,160,175,28,0,160,175,32,0,160,175,
++102,7,17,4,36,0,176,175,0,0,1,60,216,82,34,172,
++13,0,64,4,24,0,164,39,24,0,160,175,28,0,160,175,
++32,0,160,175,93,7,17,4,36,0,176,175,0,0,1,60,
++10,0,65,4,220,82,34,172,0,0,4,60,216,82,132,140,
++88,7,17,4,0,0,0,0,4,0,2,36,44,0,191,143,
++40,0,176,143,8,0,224,3,48,0,189,39,133,255,17,4,
++0,0,0,0,0,0,5,60,76,1,165,36,103,7,17,4,
++1,0,4,36,0,16,7,36,0,0,6,60,208,66,198,36,
++16,0,5,36,1,0,4,36,112,7,17,4,16,0,160,175,
++2,0,6,36,16,0,5,36,138,255,17,4,128,187,4,52,
++37,48,0,0,0,0,4,60,16,4,132,36,12,4,17,4,
++39,0,5,36,0,0,1,60,224,82,34,172,1,0,1,60,
++240,162,48,172,225,255,0,16,37,16,0,0,8,0,224,3,
++37,16,0,0,0,0,3,60,228,82,99,140,0,0,2,60,
++232,82,66,140,0,0,0,0,42,32,67,0,3,0,128,20,
++0,0,0,0,8,0,224,3,35,16,67,0,35,24,98,0,
++0,0,2,60,144,57,66,140,250,255,0,16,0,0,0,0,
++200,255,189,39,48,0,180,175,44,0,179,175,40,0,178,175,
++36,0,177,175,52,0,191,175,32,0,176,175,37,136,0,0,
++0,0,18,60,208,62,82,38,0,0,19,60,208,58,115,38,
++0,0,20,60,236,82,148,38,0,0,2,60,208,82,66,140,
++0,0,0,0,12,0,64,16,0,0,0,0,1,0,6,60,
++248,162,198,140,1,0,5,60,252,162,165,140,1,0,4,60,
++0,163,132,140,150,2,17,4,0,0,0,0,37,136,64,0,
++0,0,1,60,208,82,32,172,1,0,2,60,236,162,66,140,
++0,0,0,0,88,0,64,16,37,32,64,2,87,0,32,18,
++0,4,6,36,0,0,2,60,232,82,66,140,16,0,178,175,
++33,16,130,2,24,0,162,175,20,0,179,175,9,248,32,2,
++16,0,164,39,0,0,3,60,232,82,99,140,0,0,0,0,
++33,24,67,0,0,0,2,60,144,57,66,140,0,0,1,60,
++232,82,35,172,42,24,98,0,3,0,96,20,0,0,0,0,
++0,0,1,60,232,82,32,172,0,0,4,60,216,82,132,140,
++0,0,16,60,237,6,17,4,208,66,16,38,125,6,17,4,
++28,0,164,39,37,40,0,0,16,7,17,4,1,0,4,36,
++2,30,2,0,1,0,2,36,35,16,67,0,192,18,2,0,
++33,128,2,2,37,32,0,2,0,2,6,36,124,2,17,4,
++37,40,64,2,0,2,4,38,0,2,6,36,120,2,17,4,
++37,40,96,2,0,4,4,38,0,0,5,60,208,64,165,36,
++115,2,17,4,0,2,6,36,0,6,4,38,0,0,5,60,
++208,60,165,36,110,2,17,4,0,2,6,36,28,0,164,143,
++98,6,17,4,0,0,0,0,146,255,17,4,0,0,0,0,
++37,128,64,0,0,0,2,60,144,57,66,140,10,0,3,36,
++2,0,96,20,26,0,67,0,13,0,7,0,18,16,0,0,
++42,16,2,2,5,0,64,20,0,0,0,0,0,0,4,60,
++220,82,132,140,185,6,17,4,0,0,0,0,0,0,3,60,
++212,82,99,140,0,0,0,0,155,255,96,24,42,24,3,2,
++153,255,96,20,0,0,0,0,100,3,17,4,1,0,4,36,
++149,255,0,16,0,0,0,0,0,4,6,36,118,6,17,4,
++37,40,0,0,0,4,6,36,37,40,0,0,114,6,17,4,
++37,32,96,2,184,255,0,16,0,0,0,0,0,0,4,60,
++228,82,132,140,0,0,3,60,232,82,99,140,0,0,0,0,
++42,40,131,0,5,0,160,16,35,16,131,0,0,0,2,60,
++144,57,66,140,35,24,100,0,35,16,67,0,8,0,224,3,
++0,0,0,0,0,0,3,60,144,57,99,140,232,255,189,39,
++42,24,100,0,5,0,2,36,16,0,176,175,20,0,191,175,
++12,0,96,20,37,128,128,0,86,255,17,4,0,0,0,0,
++42,16,80,0,7,0,64,16,0,0,0,0,0,0,4,60,
++220,82,132,140,137,6,17,4,0,0,0,0,246,255,0,16,
++0,0,0,0,20,0,191,143,16,0,176,143,8,0,224,3,
++24,0,189,39,1,0,2,60,240,162,66,140,200,255,189,39,
++40,0,179,175,52,0,191,175,48,0,181,175,44,0,180,175,
++36,0,178,175,32,0,177,175,28,0,176,175,22,0,64,16,
++255,255,19,36,1,0,2,60,236,162,66,140,37,144,128,0,
++5,0,64,20,37,136,160,0,1,0,2,36,1,0,1,60,
++103,254,17,4,236,162,34,172,50,255,17,4,0,0,0,0,
++37,128,64,0,42,16,34,2,2,0,64,16,0,0,0,0,
++37,128,32,2,37,152,0,0,0,0,21,60,236,82,181,38,
++11,0,0,30,0,0,0,0,52,0,191,143,48,0,181,143,
++44,0,180,143,36,0,178,143,32,0,177,143,28,0,176,143,
++37,16,96,2,40,0,179,143,8,0,224,3,56,0,189,39,
++0,0,17,60,228,82,49,142,0,0,2,60,232,82,66,140,
++0,0,20,60,144,57,148,142,42,16,34,2,6,0,64,20,
++37,48,0,2,35,48,145,2,42,16,6,2,3,0,64,16,
++37,40,64,2,37,48,0,2,37,40,64,2,33,32,177,2,
++15,6,17,4,16,0,166,175,16,0,166,143,0,0,0,0,
++33,136,38,2,42,160,52,2,33,144,70,2,35,128,6,2,
++2,0,128,22,33,152,102,2,37,136,0,0,0,0,1,60,
++215,255,0,16,228,82,49,172,0,64,131,44,11,0,96,16,
++0,0,0,0,232,255,189,39,0,0,1,60,148,57,36,172,
++20,0,191,175,42,254,17,4,0,0,0,0,20,0,191,143,
++37,16,0,0,8,0,224,3,24,0,189,39,8,0,224,3,
++5,0,2,36,0,0,2,60,144,57,66,140,0,0,0,0,
++194,31,2,0,33,24,98,0,67,24,3,0,42,24,100,0,
++4,0,96,20,5,0,2,36,0,0,1,60,212,82,36,172,
++37,16,0,0,8,0,224,3,0,0,0,0,224,255,189,39,
++28,0,191,175,71,254,17,4,0,0,0,0,44,4,17,4,
++0,0,0,0,91,7,17,4,0,0,0,0,37,40,0,0,
++38,6,17,4,1,0,4,36,1,0,4,36,16,0,160,175,
++37,56,0,0,37,48,0,0,48,6,17,4,2,0,5,36,
++0,0,4,60,224,82,132,140,0,0,0,0,9,0,128,24,
++0,0,0,0,180,5,17,4,0,0,0,0,0,0,4,60,
++224,82,132,140,170,5,17,4,0,0,0,0,0,0,1,60,
++224,82,32,172,161,2,17,4,0,0,0,0,0,0,4,60,
++216,82,132,140,0,0,0,0,5,0,128,24,0,0,0,0,
++240,5,17,4,0,0,0,0,0,0,1,60,216,82,32,172,
++0,0,4,60,220,82,132,140,0,0,0,0,5,0,128,24,
++0,0,0,0,231,5,17,4,0,0,0,0,0,0,1,60,
++220,82,32,172,28,0,191,143,37,16,0,0,8,0,224,3,
++32,0,189,39,192,255,189,39,0,0,2,60,160,55,66,36,
++24,0,162,175,0,0,2,60,168,55,66,36,56,0,179,175,
++52,0,178,175,48,0,177,175,44,0,176,175,60,0,191,175,
++37,144,128,0,4,0,176,36,40,0,17,36,1,0,19,36,
++28,0,162,175,42,16,114,2,25,0,64,20,6,0,6,36,
++193,5,17,4,0,0,0,0,102,5,17,4,0,0,0,0,
++0,0,4,60,214,5,17,4,208,55,132,36,0,0,4,60,
++183,5,17,4,0,0,132,36,43,0,64,20,37,128,64,0,
++12,7,17,4,0,0,0,0,47,2,17,4,37,32,32,2,
++60,0,191,143,56,0,179,143,52,0,178,143,48,0,177,143,
++37,16,0,2,44,0,176,143,8,0,224,3,64,0,189,39,
++0,0,4,142,24,0,165,143,135,5,17,4,32,0,164,175,
++32,0,164,143,21,0,64,20,16,0,165,39,6,0,132,36,
++131,5,17,4,10,0,6,36,0,0,5,142,16,0,163,143,
++6,0,164,36,8,0,100,16,0,0,0,0,0,0,99,128,
++0,0,0,0,4,0,96,20,247,255,67,36,115,0,99,44,
++5,0,96,20,0,0,0,0,28,0,164,143,172,5,17,4,
++0,0,0,0,37,16,32,2,37,136,64,0,1,0,115,38,
++200,255,0,16,4,0,16,38,217,255,0,16,1,0,16,36,
++0,0,131,140,4,0,133,140,8,0,130,140,0,4,100,36,
++0,0,70,132,8,0,99,36,248,255,102,164,2,0,70,132,
++4,0,66,36,0,0,166,164,252,255,70,132,8,0,165,36,
++250,255,102,164,254,255,70,132,0,0,0,0,250,255,166,164,
++252,255,70,132,0,0,0,0,252,255,102,164,254,255,70,132,
++0,0,0,0,252,255,166,164,252,255,70,132,0,0,0,0,
++254,255,102,164,254,255,70,132,233,255,131,20,254,255,166,164,
++8,0,224,3,0,2,2,36,0,0,130,140,4,0,133,140,
++8,0,131,140,0,4,68,36,0,0,102,132,4,0,66,36,
++252,255,70,164,2,0,102,132,4,0,99,36,0,0,166,164,
++252,255,102,132,4,0,165,36,254,255,70,164,254,255,102,132,
++245,255,130,20,254,255,166,164,8,0,224,3,0,4,2,36,
++0,0,137,140,4,0,135,140,8,0,138,140,37,16,0,0,
++0,4,4,36,33,24,162,0,0,0,99,132,33,48,34,1,
++128,24,3,0,33,24,67,1,0,0,104,132,0,0,0,0,
++0,0,200,164,2,0,102,132,33,24,226,0,2,0,66,36,
++244,255,68,20,0,0,102,164,8,0,224,3,0,0,0,0,
++0,0,135,140,4,0,136,140,8,0,137,140,37,16,0,0,
++0,4,4,36,33,24,162,0,0,0,99,132,33,48,2,1,
++64,24,3,0,33,24,35,1,0,0,99,132,0,0,0,0,
++0,0,195,164,33,48,226,0,2,0,66,36,245,255,68,20,
++0,0,195,164,8,0,224,3,0,0,0,0,0,0,135,140,
++4,0,136,140,8,0,137,140,37,16,0,0,0,4,6,36,
++33,24,162,0,0,0,99,132,0,0,0,0,33,24,35,1,
++0,0,100,128,0,0,0,0,0,26,4,0,33,24,100,0,
++0,128,99,36,33,32,2,1,0,0,131,164,33,32,226,0,
++2,0,66,36,242,255,70,20,0,0,131,164,8,0,224,3,
++0,0,0,0,232,255,189,39,0,0,5,60,32,51,165,36,
++20,0,191,175,229,255,17,4,0,0,0,0,20,0,191,143,
++116,0,2,36,8,0,224,3,24,0,189,39,232,255,189,39,
++0,0,5,60,32,51,165,36,20,0,191,175,200,255,17,4,
++0,0,0,0,20,0,191,143,234,0,2,36,8,0,224,3,
++24,0,189,39,232,255,189,39,0,0,5,60,32,51,165,36,
++20,0,191,175,170,255,17,4,0,0,0,0,20,0,191,143,
++214,1,2,36,8,0,224,3,24,0,189,39,232,255,189,39,
++0,0,5,60,32,47,165,36,20,0,191,175,199,255,17,4,
++0,0,0,0,20,0,191,143,235,0,2,36,8,0,224,3,
++24,0,189,39,232,255,189,39,0,0,5,60,32,47,165,36,
++20,0,191,175,170,255,17,4,0,0,0,0,20,0,191,143,
++214,1,2,36,8,0,224,3,24,0,189,39,232,255,189,39,
++0,0,5,60,32,47,165,36,20,0,191,175,140,255,17,4,
++0,0,0,0,20,0,191,143,172,3,2,36,8,0,224,3,
++24,0,189,39,232,255,189,39,0,0,5,60,32,43,165,36,
++20,0,191,175,169,255,17,4,0,0,0,0,20,0,191,143,
++84,1,2,36,8,0,224,3,24,0,189,39,232,255,189,39,
++0,0,5,60,32,43,165,36,20,0,191,175,140,255,17,4,
++0,0,0,0,20,0,191,143,170,2,2,36,8,0,224,3,
++24,0,189,39,232,255,189,39,0,0,5,60,32,43,165,36,
++20,0,191,175,110,255,17,4,0,0,0,0,20,0,191,143,
++84,5,2,36,8,0,224,3,24,0,189,39,232,255,189,39,
++0,0,5,60,32,39,165,36,20,0,191,175,139,255,17,4,
++0,0,0,0,20,0,191,143,214,1,2,36,8,0,224,3,
++24,0,189,39,232,255,189,39,0,0,5,60,32,39,165,36,
++20,0,191,175,110,255,17,4,0,0,0,0,20,0,191,143,
++172,3,2,36,8,0,224,3,24,0,189,39,232,255,189,39,
++0,0,5,60,32,39,165,36,20,0,191,175,80,255,17,4,
++0,0,0,0,20,0,191,143,88,7,2,36,8,0,224,3,
++24,0,189,39,0,0,134,140,4,0,135,140,8,0,136,140,
++37,16,0,0,0,4,4,36,33,24,2,1,0,0,99,132,
++33,40,226,0,0,0,163,164,33,40,194,0,2,0,66,36,
++249,255,68,20,0,0,163,164,8,0,224,3,0,4,2,36,
++0,0,138,140,4,0,135,140,8,0,137,140,37,16,0,0,
++0,0,11,60,32,51,107,37,0,4,6,36,33,24,98,1,
++0,0,99,132,33,64,66,1,64,24,3,0,33,24,35,1,
++0,0,101,128,0,0,0,0,0,34,5,0,33,32,133,0,
++0,128,132,36,0,0,4,165,1,0,100,128,33,40,226,0,
++0,26,4,0,33,24,100,0,0,128,99,36,2,0,66,36,
++238,255,70,20,0,0,163,164,8,0,224,3,234,0,2,36,
++8,0,131,140,0,0,136,140,4,0,135,140,37,16,0,0,
++0,4,4,36,0,0,102,132,33,40,2,1,0,0,166,164,
++2,0,102,132,33,40,226,0,2,0,66,36,4,0,99,36,
++248,255,68,20,0,0,166,164,8,0,224,3,0,8,2,36,
++0,0,3,60,160,57,99,36,12,0,98,140,0,0,0,0,
++3,0,64,20,0,0,0,0,8,0,224,3,0,0,0,0,
++0,0,103,140,0,0,0,0,9,0,228,20,0,0,0,0,
++4,0,103,140,0,0,0,0,5,0,229,20,0,0,0,0,
++8,0,103,140,0,0,0,0,243,255,230,16,0,0,0,0,
++237,255,0,16,16,0,99,36,0,0,0,0,0,0,0,0,
++131,48,6,0,255,255,198,36,255,255,2,36,7,0,194,16,
++37,24,64,0,0,0,162,140,4,0,165,36,255,255,198,36,
++0,0,130,172,251,255,195,20,4,0,132,36,8,0,224,3,
++0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
++216,255,189,39,37,32,0,0,36,0,191,175,41,4,17,4,
++32,0,176,175,254,3,17,4,0,0,0,0,1,0,4,60,
++84,163,132,36,39,4,17,4,37,40,64,0,1,0,16,60,
++84,163,16,38,112,8,5,60,24,0,176,175,20,0,160,175,
++16,0,160,175,1,0,4,60,16,163,132,36,1,0,7,60,
++108,163,231,36,0,0,6,60,232,15,198,36,23,4,17,4,
++78,136,165,52,36,0,191,143,37,32,0,2,32,0,176,143,
++22,4,0,16,40,0,189,39,224,255,189,39,30,0,130,44,
++24,0,176,175,28,0,191,175,153,0,64,16,37,128,160,0,
++128,32,4,0,0,0,2,60,32,55,66,36,33,16,68,0,
++0,0,66,140,0,0,0,0,8,0,64,0,0,0,0,0,
++161,252,17,4,0,0,0,0,161,0,17,4,16,0,162,175,
++16,0,162,143,28,0,191,143,0,0,2,174,37,16,0,2,
++24,0,176,143,8,0,224,3,32,0,189,39,8,0,166,140,
++0,0,4,142,4,0,165,140,82,252,17,4,0,0,0,0,
++244,255,0,16,0,0,0,0,8,0,166,140,0,0,4,142,
++4,0,165,140,83,252,17,4,0,0,0,0,237,255,0,16,
++0,0,0,0,0,0,164,140,114,253,17,4,0,0,0,0,
++232,255,0,16,0,0,0,0,0,0,165,140,133,253,17,4,
++4,0,4,38,227,255,0,16,0,0,0,0,49,252,17,4,
++0,0,0,0,223,255,0,16,0,0,0,0,0,0,164,140,
++197,253,17,4,0,0,0,0,218,255,0,16,0,0,0,0,
++222,253,17,4,0,0,0,0,214,255,0,16,0,0,0,0,
++0,0,164,140,89,2,17,4,0,0,0,0,209,255,0,16,
++0,0,0,0,6,2,17,4,0,0,0,0,205,255,0,16,
++0,0,0,0,236,1,17,4,0,0,0,0,201,255,0,16,
++0,0,0,0,241,1,17,4,0,0,0,0,197,255,0,16,
++0,0,0,0,0,0,164,140,186,253,17,4,0,0,0,0,
++192,255,0,16,0,0,0,0,165,1,17,4,0,0,0,0,
++188,255,0,16,0,0,0,0,0,0,164,140,173,1,17,4,
++0,0,0,0,183,255,0,16,0,0,0,0,4,0,165,140,
++0,0,4,142,15,2,17,4,0,0,0,0,177,255,0,16,
++0,0,0,0,148,1,17,4,0,0,0,0,173,255,0,16,
++0,0,0,0,1,1,17,4,0,0,0,0,169,255,0,16,
++0,0,0,0,191,1,17,4,0,0,0,0,165,255,0,16,
++0,0,0,0,192,1,17,4,0,0,0,0,161,255,0,16,
++0,0,0,0,7,5,17,4,0,0,0,0,157,255,0,16,
++0,0,0,0,8,0,166,140,0,0,4,142,28,0,191,143,
++24,0,176,143,4,0,165,140,67,4,0,16,32,0,189,39,
++4,0,165,140,0,0,4,142,191,4,17,4,0,0,0,0,
++144,255,0,16,0,0,0,0,4,0,165,140,0,0,4,142,
++150,4,17,4,0,0,0,0,138,255,0,16,0,0,0,0,
++0,0,164,140,4,4,17,4,0,0,0,0,133,255,0,16,
++0,0,0,0,8,0,166,140,0,0,4,142,4,0,165,140,
++34,5,17,4,0,0,0,0,126,255,0,16,0,0,0,0,
++100,252,17,4,0,0,0,0,122,255,0,16,0,0,0,0,
++242,252,17,4,0,0,0,0,118,255,0,16,0,0,0,0,
++116,255,0,16,255,255,2,36,232,255,189,39,37,40,128,0,
++0,0,4,60,112,15,132,36,20,0,191,175,88,0,17,4,
++37,48,0,0,20,0,191,143,42,16,2,0,8,0,224,3,
++24,0,189,39,0,0,0,0,0,0,0,0,0,0,0,0,
++1,0,4,60,192,233,132,140,130,3,0,16,0,0,0,0,
++208,255,189,39,1,0,2,36,16,0,164,39,40,0,176,175,
++44,0,191,175,16,0,160,175,20,0,160,175,24,0,162,175,
++114,3,17,4,28,0,162,175,1,0,1,60,192,233,34,172,
++112,8,2,60,78,136,80,52,1,0,2,60,196,233,66,36,
++1,0,1,60,232,233,32,172,32,0,162,175,32,0,164,143,
++37,48,0,0,79,3,17,4,37,40,0,2,11,0,64,4,
++0,0,0,0,32,0,162,143,0,0,0,0,36,0,66,140,
++0,0,0,0,5,0,64,16,0,0,0,0,44,0,191,143,
++40,0,176,143,8,0,224,3,48,0,189,39,6,3,17,4,
++244,1,4,36,237,255,0,16,0,0,0,0,232,255,189,39,
++1,0,4,60,196,233,132,36,40,0,6,36,20,0,191,175,
++29,3,17,4,37,40,0,0,20,0,191,143,1,0,4,60,
++192,233,132,140,75,3,0,16,24,0,189,39,208,255,189,39,
++48,0,164,175,1,0,4,60,192,233,132,140,44,0,191,175,
++74,3,17,4,0,0,0,0,48,0,165,143,0,0,2,60,
++160,18,66,36,32,0,160,175,28,0,162,175,24,0,160,175,
++20,0,160,175,16,0,160,175,37,56,0,0,1,0,4,60,
++196,233,132,36,33,3,17,4,1,0,6,36,44,0,191,143,
++0,0,0,0,8,0,224,3,48,0,189,39,0,0,0,0,
++200,255,189,39,0,2,2,60,16,0,162,175,24,0,164,175,
++0,16,2,36,16,0,164,39,52,0,191,175,64,0,166,175,
++20,0,160,175,32,0,165,175,203,2,17,4,28,0,162,175,
++6,0,64,4,37,32,0,0,64,0,165,143,37,32,64,0,
++209,2,17,4,40,0,162,175,40,0,164,143,52,0,191,143,
++37,16,128,0,8,0,224,3,56,0,189,39,216,255,189,39,
++0,0,2,60,0,56,66,36,16,0,162,175,0,0,2,60,
++4,56,66,36,32,0,178,175,28,0,177,175,24,0,176,175,
++36,0,191,175,37,144,128,0,37,136,160,0,37,128,0,0,
++20,0,162,175,42,16,17,2,7,0,64,20,0,0,0,0,
++36,0,191,143,32,0,178,143,28,0,177,143,24,0,176,143,
++8,0,224,3,40,0,189,39,6,0,0,18,15,0,2,50,
++4,0,64,20,0,0,0,0,16,0,164,143,12,3,17,4,
++0,0,0,0,33,16,80,2,0,0,69,144,20,0,164,143,
++7,3,17,4,1,0,16,38,235,255,0,16,42,16,17,2,
++0,0,4,60,192,58,132,140,232,255,189,39,20,0,191,175,
++244,2,17,4,0,0,0,0,20,0,191,143,1,0,2,36,
++8,0,224,3,24,0,189,39,216,255,189,39,32,1,2,36,
++32,0,178,175,28,0,177,175,24,0,176,175,36,0,191,175,
++40,0,164,175,44,0,165,175,37,128,192,0,16,0,162,175,
++37,136,0,0,32,0,18,36,35,3,17,4,37,32,0,0,
++40,0,166,143,44,0,164,143,16,0,167,39,20,3,17,4,
++37,40,0,2,4,0,64,20,0,0,0,0,1,0,49,38,
++245,255,50,22,0,0,0,0,19,3,17,4,37,32,0,0,
++32,0,2,36,2,0,34,22,0,0,0,0,255,255,16,36,
++36,0,191,143,32,0,178,143,28,0,177,143,37,16,0,2,
++24,0,176,143,8,0,224,3,40,0,189,39,232,255,189,39,
++20,0,191,175,6,3,17,4,0,0,0,0,2,0,64,20,
++0,0,0,0,250,255,2,36,20,0,191,143,0,0,0,0,
++8,0,224,3,24,0,189,39,216,255,189,39,32,0,176,175,
++1,0,16,60,48,96,16,142,0,0,0,0,92,0,0,22,
++36,0,191,175,0,0,4,60,193,2,17,4,16,56,132,36,
++0,0,2,60,192,58,66,140,1,0,1,60,136,94,32,172,
++9,0,65,4,1,0,2,36,16,0,164,39,16,0,160,175,
++20,0,160,175,24,0,160,175,164,2,17,4,28,0,162,175,
++0,0,1,60,192,58,34,172,217,2,17,4,37,32,0,0,
++16,0,165,39,230,2,17,4,2,0,4,36,16,0,165,143,
++0,0,4,60,170,2,17,4,36,56,132,36,222,2,17,4,
++37,32,0,0,216,2,17,4,37,32,0,0,207,255,17,4,
++0,0,0,0,253,255,3,36,37,32,64,0,36,24,67,0,
++17,0,2,36,3,0,98,16,253,0,3,36,53,0,131,20,
++251,255,2,36,1,0,4,60,208,82,132,36,200,2,17,4,
++0,0,0,0,1,0,3,60,225,82,99,144,1,0,7,60,
++208,82,231,36,2,33,3,0,128,16,4,0,33,16,68,0,
++64,16,2,0,15,0,99,48,33,16,67,0,1,0,4,60,
++136,94,132,36,1,0,1,60,136,94,34,172,37,40,224,0,
++37,48,128,0,35,0,80,20,128,24,2,0,34,0,164,144,
++33,24,195,0,7,0,98,160,2,17,4,0,128,48,2,0,
++33,16,70,0,15,0,132,48,64,16,2,0,33,16,68,0,
++35,0,164,144,4,0,98,160,2,17,4,0,128,48,2,0,
++33,16,70,0,15,0,132,48,64,16,2,0,33,16,68,0,
++36,0,164,144,5,0,98,160,2,17,4,0,128,40,2,0,
++33,16,69,0,64,16,2,0,15,0,132,48,33,16,68,0,
++6,0,98,160,1,0,2,36,1,0,1,60,48,96,34,172,
++37,16,0,0,36,0,191,143,32,0,176,143,8,0,224,3,
++40,0,189,39,37,0,232,144,4,0,132,36,2,25,8,0,
++128,72,3,0,33,24,105,0,15,0,8,49,64,24,3,0,
++33,24,104,0,38,0,232,144,0,0,131,160,2,25,8,0,
++128,72,3,0,33,24,105,0,15,0,8,49,64,24,3,0,
++33,24,104,0,39,0,232,144,1,0,131,160,2,25,8,0,
++128,72,3,0,33,24,105,0,64,24,3,0,15,0,8,49,
++33,24,104,0,10,0,231,36,3,0,144,160,2,0,131,160,
++192,255,0,16,1,0,16,38,131,2,0,16,0,0,0,0,
++232,255,189,39,20,0,191,175,119,255,17,4,0,0,0,0,
++37,24,64,0,3,0,96,20,251,255,2,36,1,0,2,60,
++136,94,66,140,20,0,191,143,0,0,0,0,8,0,224,3,
++24,0,189,39,232,255,189,39,20,0,191,175,106,255,17,4,
++24,0,164,175,37,24,64,0,26,0,96,20,251,255,2,36,
++24,0,164,143,0,0,0,0,22,0,128,24,0,0,0,0,
++1,0,3,60,136,94,99,36,0,0,101,140,0,0,0,0,
++42,40,164,0,15,0,160,20,128,32,4,0,33,24,100,0,
++4,0,100,144,0,0,0,0,0,17,4,0,35,16,68,0,
++5,0,100,144,128,16,2,0,33,16,68,0,75,0,4,36,
++24,0,68,0,6,0,99,144,18,16,0,0,33,16,67,0,
++106,255,66,36,20,0,191,143,0,0,0,0,8,0,224,3,
++24,0,189,39,1,0,2,36,1,0,1,60,40,96,34,172,
++8,0,224,3,37,16,0,0,1,0,1,60,40,96,32,172,
++8,0,224,3,37,16,0,0,1,0,2,60,44,96,66,140,
++0,0,0,0,3,0,64,16,0,0,0,0,1,0,2,60,
++36,96,66,140,8,0,224,3,0,0,0,0,1,0,2,60,
++44,96,66,140,0,0,0,0,7,0,64,16,0,0,0,0,
++1,0,2,60,36,96,66,140,1,0,3,60,32,96,99,140,
++0,0,0,0,35,16,67,0,8,0,224,3,0,0,0,0,
++224,255,189,39,37,40,0,0,37,32,0,0,1,0,1,60,
++44,96,32,172,28,0,191,175,1,0,1,60,36,96,32,172,
++1,0,1,60,32,96,32,172,1,0,1,60,243,1,17,4,
++28,96,32,172,37,32,0,0,16,0,160,175,37,56,0,0,
++37,48,0,0,253,1,17,4,2,0,5,36,0,0,4,60,
++196,58,132,140,0,0,0,0,10,0,128,4,0,0,0,0,
++129,1,17,4,0,0,0,0,0,0,4,60,196,58,132,140,
++119,1,17,4,0,0,0,0,255,255,2,36,0,0,1,60,
++196,58,34,172,28,0,191,143,37,16,0,0,8,0,224,3,
++32,0,189,39,224,255,189,39,24,0,178,175,20,0,177,175,
++16,0,176,175,28,0,191,175,37,136,128,0,254,254,17,4,
++37,144,160,0,24,0,64,20,1,0,16,36,208,255,17,4,
++37,128,64,0,37,48,0,0,48,0,5,36,0,0,4,60,
++76,27,132,36,1,0,1,60,32,96,49,172,1,0,1,60,
++28,96,50,172,1,0,1,60,121,254,17,4,36,96,49,172,
++0,0,1,60,15,0,64,4,196,58,34,172,0,0,4,60,
++60,56,132,36,178,1,17,4,37,40,64,0,1,0,2,36,
++1,0,1,60,44,96,34,172,28,0,191,143,24,0,178,143,
++20,0,177,143,37,16,0,2,16,0,176,143,8,0,224,3,
++32,0,189,39,248,255,0,16,4,0,16,36,224,255,189,39,
++37,40,128,0,20,0,176,175,37,128,128,0,0,0,4,60,
++88,56,132,36,28,0,191,175,157,1,17,4,24,0,177,175,
++209,254,17,4,1,0,17,36,4,0,64,20,0,0,0,0,
++8,0,0,30,0,0,0,0,5,0,17,36,28,0,191,143,
++20,0,176,143,37,16,32,2,24,0,177,143,8,0,224,3,
++32,0,189,39,1,0,2,60,136,94,66,140,0,0,0,0,
++42,16,80,0,245,255,64,20,5,0,17,36,188,1,17,4,
++0,0,0,0,1,0,3,36,5,0,3,22,245,255,66,36,
++247,255,3,36,36,16,67,0,236,255,64,16,0,0,0,0,
++72,255,17,4,255,255,4,38,37,32,0,2,69,255,17,4,
++37,136,64,0,37,24,34,2,227,255,96,4,42,24,81,0,
++225,255,96,20,37,32,32,2,166,255,17,4,37,40,64,0,
++255,127,5,36,128,15,4,36,126,1,17,4,37,136,64,0,
++255,127,5,36,123,1,17,4,128,16,4,36,255,63,5,36,
++120,1,17,4,128,9,4,36,255,63,5,36,117,1,17,4,
++128,10,4,36,209,255,0,16,0,0,0,0,1,0,6,60,
++28,96,198,140,1,0,5,60,32,96,165,140,168,255,189,39,
++0,0,4,60,116,56,132,36,84,0,191,175,80,0,190,175,
++76,0,183,175,72,0,182,175,68,0,181,175,64,0,180,175,
++60,0,179,175,56,0,178,175,52,0,177,175,84,1,17,4,
++48,0,176,175,1,0,2,60,32,96,66,140,1,0,3,60,
++28,96,99,140,0,0,0,0,42,16,67,0,163,0,64,16,
++2,0,6,36,16,0,5,36,197,252,17,4,68,172,4,52,
++1,0,5,60,32,96,165,140,1,0,6,60,28,96,198,140,
++0,0,4,60,152,56,132,36,35,56,197,0,1,0,1,60,
++36,96,37,172,62,1,17,4,37,176,64,0,0,0,4,60,
++192,56,132,36,58,1,17,4,8,0,5,36,1,0,5,60,
++36,96,165,140,1,0,4,60,80,9,132,36,58,254,17,4,
++8,0,6,36,8,0,3,36,15,0,67,16,8,0,5,36,
++84,0,191,143,80,0,190,143,76,0,183,143,72,0,182,143,
++68,0,181,143,64,0,180,143,60,0,179,143,56,0,178,143,
++52,0,177,143,48,0,176,143,0,0,4,60,228,56,132,36,
++35,1,0,16,88,0,189,39,1,0,2,60,36,96,66,140,
++0,0,4,60,4,57,132,36,8,0,66,36,1,0,1,60,
++36,96,34,172,26,1,17,4,37,144,0,0,0,0,5,60,
++208,20,165,36,33,1,17,4,37,32,0,0,0,16,7,36,
++1,0,6,60,240,241,198,36,16,0,5,36,37,32,0,0,
++42,1,17,4,16,0,160,175,0,0,4,60,44,57,132,36,
++11,1,17,4,37,136,0,0,0,4,6,36,1,0,4,60,
++240,237,132,36,196,0,17,4,37,40,0,0,0,4,6,36,
++1,0,4,60,240,233,132,36,191,0,17,4,37,40,0,0,
++1,0,23,60,240,241,247,38,1,0,20,60,240,237,148,38,
++1,0,21,60,240,233,181,38,1,0,19,60,80,9,115,38,
++1,0,2,60,36,96,66,140,1,0,3,60,28,96,99,140,
++0,0,0,0,42,16,67,0,68,0,64,16,0,0,0,0,
++0,0,4,60,192,58,132,140,228,0,17,4,1,0,16,36,
++116,0,17,4,36,0,164,39,37,40,0,0,7,1,17,4,
++37,32,0,0,2,22,2,0,35,128,2,2,1,0,2,60,
++40,96,66,140,192,130,16,0,88,0,64,20,33,128,240,2,
++88,7,34,38,128,73,66,44,24,0,180,175,28,0,181,175,
++62,0,64,16,33,40,113,2,32,0,165,175,9,248,192,2,
++24,0,164,39,33,136,34,2,0,2,6,36,37,40,128,2,
++103,252,17,4,37,32,0,2,0,2,6,36,37,40,160,2,
++99,252,17,4,0,2,4,38,0,2,6,36,1,0,5,60,
++240,239,165,36,94,252,17,4,0,4,4,38,0,2,6,36,
++1,0,5,60,240,235,165,36,89,252,17,4,0,6,4,38,
++36,0,164,143,77,0,17,4,0,0,0,0,48,9,2,36,
++2,0,64,20,26,0,34,2,13,0,7,0,18,128,0,0,
++195,255,18,18,0,0,0,0,1,0,5,60,36,96,165,140,
++24,0,66,2,1,0,6,36,18,32,0,0,186,253,17,4,
++33,32,100,2,1,0,3,36,46,0,67,16,0,0,0,0,
++0,0,4,60,174,0,17,4,80,57,132,36,184,254,17,4,
++0,0,0,0,81,253,17,4,2,0,4,36,84,0,191,143,
++80,0,190,143,76,0,183,143,72,0,182,143,68,0,181,143,
++64,0,180,143,60,0,179,143,56,0,178,143,52,0,177,143,
++48,0,176,143,8,0,224,3,88,0,189,39,128,73,30,36,
++35,240,209,3,1,0,4,60,240,1,132,36,44,252,17,4,
++37,48,192,3,216,189,49,38,1,0,2,60,240,1,66,36,
++33,32,94,0,37,48,32,2,37,40,96,2,36,252,17,4,
++40,0,162,175,40,0,162,143,24,0,164,39,9,248,192,2,
++32,0,162,175,181,255,0,16,0,2,6,36,0,8,6,36,
++37,40,0,0,68,0,17,4,37,32,0,2,192,255,0,16,
++0,0,0,0,1,0,2,60,36,96,66,140,37,144,0,2,
++1,0,66,36,1,0,1,60,133,255,0,16,36,96,34,172,
++0,0,224,65,0,0,0,0,2,1,0,0,105,110,116,114,
++109,97,110,0,8,0,224,3,17,0,0,36,8,0,224,3,
++18,0,0,36,8,0,224,3,9,0,0,36,0,0,0,0,
++0,0,0,0,0,0,224,65,0,0,0,0,1,1,0,0,
++116,104,98,97,115,101,0,0,8,0,224,3,4,0,0,36,
++8,0,224,3,24,0,0,36,8,0,224,3,25,0,0,36,
++8,0,224,3,26,0,0,36,8,0,224,3,33,0,0,36,
++8,0,224,3,5,0,0,36,8,0,224,3,6,0,0,36,
++8,0,224,3,9,0,0,36,8,0,224,3,10,0,0,36,
++8,0,224,3,20,0,0,36,0,0,0,0,0,0,0,0,
++0,0,224,65,0,0,0,0,1,1,0,0,115,121,115,109,
++101,109,0,0,8,0,224,3,4,0,0,36,8,0,224,3,
++5,0,0,36,8,0,224,3,8,0,0,36,0,0,0,0,
++0,0,0,0,0,0,224,65,0,0,0,0,1,1,0,0,
++115,121,115,99,108,105,98,0,8,0,224,3,14,0,0,36,
++8,0,224,3,12,0,0,36,8,0,224,3,23,0,0,36,
++8,0,224,3,27,0,0,36,8,0,224,3,29,0,0,36,
++8,0,224,3,36,0,0,36,0,0,0,0,0,0,0,0,
++0,0,224,65,0,0,0,0,1,1,0,0,115,105,102,99,
++109,100,0,0,8,0,224,3,14,0,0,36,8,0,224,3,
++17,0,0,36,8,0,224,3,19,0,0,36,8,0,224,3,
++22,0,0,36,8,0,224,3,15,0,0,36,8,0,224,3,
++16,0,0,36,0,0,0,0,0,0,0,0,0,0,224,65,
++0,0,0,0,1,1,0,0,108,111,97,100,99,111,114,101,
++8,0,224,3,6,0,0,36,8,0,224,3,5,0,0,36,
++0,0,0,0,0,0,0,0,0,0,224,65,0,0,0,0,
++2,1,0,0,116,104,115,101,109,97,112,0,8,0,224,3,
++4,0,0,36,8,0,224,3,5,0,0,36,8,0,224,3,
++6,0,0,36,8,0,224,3,7,0,0,36,8,0,224,3,
++8,0,0,36,0,0,0,0,0,0,0,0,0,0,224,65,
++0,0,0,0,2,1,0,0,115,116,100,105,111,0,0,0,
++8,0,224,3,4,0,0,36,0,0,0,0,0,0,0,0,
++0,0,224,65,0,0,0,0,5,1,0,0,108,105,98,115,
++100,0,0,0,8,0,224,3,4,0,0,36,8,0,224,3,
++21,0,0,36,8,0,224,3,5,0,0,36,8,0,224,3,
++11,0,0,36,8,0,224,3,9,0,0,36,8,0,224,3,
++10,0,0,36,8,0,224,3,7,0,0,36,8,0,224,3,
++8,0,0,36,8,0,224,3,17,0,0,36,8,0,224,3,
++18,0,0,36,8,0,224,3,19,0,0,36,8,0,224,3,
++20,0,0,36,0,0,0,0,0,0,0,0,0,0,224,65,
++0,0,0,0,1,1,0,0,99,100,118,100,109,97,110,0,
++8,0,224,3,4,0,0,36,8,0,224,3,6,0,0,36,
++8,0,224,3,40,0,0,36,8,0,224,3,8,0,0,36,
++8,0,224,3,9,0,0,36,8,0,224,3,11,0,0,36,
++8,0,224,3,12,0,0,36,8,0,224,3,13,0,0,36,
++8,0,224,3,14,0,0,36,8,0,224,3,16,0,0,36,
++8,0,224,3,17,0,0,36,8,0,224,3,28,0,0,36,
++0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
++1,0,2,60,132,96,66,140,0,0,0,0,3,0,64,20,
++0,0,0,0,8,0,224,3,0,0,0,0,4,0,67,140,
++0,0,0,0,251,255,100,16,0,0,0,0,0,0,66,140,
++246,255,0,16,0,0,0,0,1,0,3,60,132,96,99,140,
++224,255,189,39,37,16,0,0,24,0,176,175,28,0,191,175,
++37,128,96,0,6,0,0,22,0,0,0,0,28,0,191,143,
++24,0,176,143,37,16,0,0,8,0,224,3,32,0,189,39,
++4,0,5,142,0,0,0,0,5,0,164,16,0,0,0,0,
++37,16,0,2,0,0,16,142,242,255,0,16,0,0,0,0,
++4,0,64,16,0,0,0,0,0,0,4,142,0,0,0,0,
++0,0,68,172,4,0,3,22,0,0,0,0,0,0,3,142,
++1,0,1,60,132,96,35,172,1,0,3,60,128,96,99,140,
++0,0,0,0,3,0,112,20,0,0,0,0,1,0,1,60,
++128,96,34,172,15,255,17,4,16,0,164,39,55,255,17,4,
++37,32,0,2,16,0,164,143,12,255,17,4,0,0,0,0,
++218,255,0,16,0,0,0,0,192,255,189,39,52,0,178,175,
++37,144,128,0,37,32,192,0,44,0,176,175,60,0,191,175,
++56,0,179,175,186,255,17,4,48,0,177,175,67,0,64,20,
++37,128,64,0,1,0,2,60,128,96,66,140,37,136,160,0,
++37,152,192,0,5,0,64,16,16,80,7,36,24,0,71,140,
++20,0,66,140,0,0,0,0,33,56,226,0,32,0,3,60,
++33,16,241,0,17,0,99,36,42,16,67,0,12,0,64,20,
++252,255,2,36,1,0,1,60,64,96,34,172,60,0,191,143,
++56,0,179,143,52,0,178,143,48,0,177,143,44,0,176,143,
++1,0,2,60,64,96,66,36,8,0,224,3,64,0,189,39,
++24,0,164,39,223,254,17,4,32,0,167,175,37,48,0,0,
++28,0,5,36,3,255,17,4,37,32,0,0,24,0,164,143,
++218,254,17,4,37,128,64,0,8,0,66,142,6,0,67,146,
++8,0,2,174,4,0,66,142,32,0,167,143,2,18,2,0,
++255,0,66,48,16,0,2,174,1,0,2,60,132,96,66,140,
++240,255,49,38,4,0,19,174,24,0,7,174,20,0,17,174,
++0,0,0,174,25,0,64,20,12,0,3,174,1,0,1,60,
++132,96,48,172,37,40,0,0,37,32,0,0,16,0,177,175,
++1,0,1,60,128,96,48,172,78,255,17,4,16,0,70,38,
++1,0,5,36,79,255,17,4,37,32,0,0,8,0,2,142,
++1,0,1,60,64,96,32,172,1,0,1,60,68,96,34,172,
++12,0,2,142,1,0,1,60,72,96,34,172,16,0,2,142,
++1,0,1,60,197,255,0,16,76,96,34,172,1,0,2,60,
++128,96,66,140,231,255,0,16,0,0,80,172,25,0,130,40,
++3,0,64,20,37,16,0,0,8,0,224,3,0,0,0,0,
++224,255,189,39,20,0,176,175,37,128,128,0,1,23,4,36,
++24,0,177,175,28,0,191,175,44,255,17,4,37,136,160,0,
++1,0,3,36,4,24,3,2,36,24,98,0,13,0,96,20,
++37,16,0,0,82,255,17,4,37,32,32,2,37,24,64,0,
++8,0,96,16,5,0,2,36,64,32,16,0,65,32,132,52,
++24,0,113,140,25,255,17,4,255,255,132,48,38,16,34,2,
++1,0,66,44,28,0,191,143,24,0,177,143,20,0,176,143,
++8,0,224,3,32,0,189,39,216,255,189,39,20,0,176,175,
++37,128,128,0,37,32,160,0,36,0,191,175,32,0,179,175,
++28,0,178,175,58,255,17,4,24,0,177,175,47,0,64,16,
++37,152,64,0,24,0,2,46,16,0,64,16,1,23,4,36,
++6,255,17,4,1,0,17,36,4,136,17,2,36,16,34,2,
++25,0,64,20,64,144,16,0,249,255,16,36,36,0,191,143,
++32,0,179,143,28,0,178,143,24,0,177,143,37,16,0,2,
++20,0,176,143,8,0,224,3,40,0,189,39,247,254,17,4,
++0,0,0,0,244,255,64,16,1,0,4,36,1,0,16,36,
++24,0,3,36,4,136,4,2,36,40,81,0,6,0,160,20,
++64,144,16,0,1,0,16,38,250,255,3,22,0,0,0,0,
++234,255,0,16,249,255,16,36,8,0,101,150,1,2,68,54,
++220,254,17,4,255,255,132,48,24,0,101,142,65,32,68,54,
++220,254,17,4,255,255,132,48,37,40,32,2,221,254,17,4,
++1,21,4,36,221,255,0,16,0,0,0,0,219,255,0,16,
++5,0,16,36,208,255,189,39,0,0,4,60,112,57,132,36,
++40,0,179,175,36,0,178,175,28,0,176,175,44,0,191,175,
++32,0,177,175,186,254,17,4,37,128,0,0,1,0,19,36,
++24,0,18,36,4,40,19,2,64,136,16,0,201,254,17,4,
++1,22,4,36,1,0,36,54,255,63,5,36,189,254,17,4,
++255,255,132,48,1,1,36,54,255,63,5,36,255,255,132,48,
++184,254,17,4,1,0,16,38,243,255,18,22,4,40,19,2,
++1,0,2,60,132,96,66,140,0,0,0,0,14,0,64,16,
++0,0,0,0,43,254,17,4,16,0,164,39,1,0,4,60,
++132,96,132,140,0,0,0,0,15,0,128,20,0,0,0,0,
++16,0,164,143,1,0,1,60,132,96,32,172,1,0,1,60,
++34,254,17,4,128,96,32,172,44,0,191,143,40,0,179,143,
++36,0,178,143,32,0,177,143,28,0,176,143,37,16,0,0,
++8,0,224,3,48,0,189,39,0,0,144,140,63,254,17,4,
++0,0,0,0,236,255,0,16,37,32,0,2,37,24,166,0,
++0,64,99,44,18,0,96,16,255,255,165,48,232,255,189,39,
++16,0,176,175,64,128,4,0,1,0,4,54,255,255,132,48,
++20,0,191,175,139,254,17,4,32,0,166,175,32,0,165,151,
++1,1,4,54,135,254,17,4,255,255,132,48,20,0,191,143,
++16,0,176,143,37,16,0,0,8,0,224,3,24,0,189,39,
++8,0,224,3,5,0,2,36,0,0,0,0,0,0,0,0,
++0,0,0,0,1,0,2,0,3,0,4,0,5,0,6,0,
++7,0,8,0,9,0,10,0,11,0,11,0,12,0,13,0,
++14,0,15,0,16,0,17,0,18,0,19,0,20,0,21,0,
++22,0,22,0,23,0,24,0,25,0,26,0,27,0,28,0,
++29,0,30,0,31,0,32,0,33,0,33,0,34,0,35,0,
++36,0,37,0,38,0,39,0,40,0,41,0,42,0,43,0,
++44,0,45,0,45,0,46,0,47,0,48,0,49,0,50,0,
++51,0,52,0,53,0,54,0,55,0,56,0,56,0,57,0,
++58,0,59,0,60,0,61,0,62,0,63,0,64,0,65,0,
++66,0,67,0,67,0,68,0,69,0,70,0,71,0,72,0,
++73,0,74,0,75,0,76,0,77,0,78,0,79,0,79,0,
++80,0,81,0,82,0,83,0,84,0,85,0,86,0,87,0,
++88,0,89,0,90,0,90,0,91,0,92,0,93,0,94,0,
++95,0,96,0,97,0,98,0,99,0,100,0,101,0,101,0,
++102,0,103,0,104,0,105,0,106,0,107,0,108,0,109,0,
++110,0,111,0,112,0,113,0,113,0,114,0,115,0,116,0,
++117,0,118,0,119,0,120,0,121,0,122,0,123,0,124,0,
++124,0,125,0,126,0,127,0,128,0,129,0,130,0,131,0,
++132,0,133,0,134,0,135,0,135,0,136,0,137,0,138,0,
++139,0,140,0,141,0,142,0,143,0,144,0,145,0,146,0,
++147,0,147,0,148,0,149,0,150,0,151,0,152,0,153,0,
++154,0,155,0,156,0,157,0,158,0,158,0,159,0,160,0,
++161,0,162,0,163,0,164,0,165,0,166,0,167,0,168,0,
++169,0,169,0,170,0,171,0,172,0,173,0,174,0,175,0,
++176,0,177,0,178,0,179,0,180,0,180,0,181,0,182,0,
++183,0,184,0,185,0,186,0,187,0,188,0,189,0,190,0,
++191,0,192,0,192,0,193,0,194,0,195,0,196,0,197,0,
++198,0,199,0,200,0,201,0,202,0,203,0,203,0,204,0,
++205,0,206,0,207,0,208,0,209,0,210,0,211,0,212,0,
++213,0,214,0,214,0,215,0,216,0,217,0,218,0,219,0,
++220,0,221,0,222,0,223,0,224,0,225,0,226,0,226,0,
++227,0,228,0,229,0,230,0,231,0,232,0,233,0,234,0,
++235,0,236,0,237,0,237,0,238,0,239,0,240,0,241,0,
++242,0,243,0,244,0,245,0,246,0,247,0,248,0,248,0,
++249,0,250,0,251,0,252,0,253,0,254,0,255,0,0,1,
++1,1,2,1,3,1,4,1,4,1,5,1,6,1,7,1,
++8,1,9,1,10,1,11,1,12,1,13,1,14,1,15,1,
++15,1,16,1,17,1,18,1,19,1,20,1,21,1,22,1,
++23,1,24,1,25,1,26,1,26,1,27,1,28,1,29,1,
++30,1,31,1,32,1,33,1,34,1,35,1,36,1,37,1,
++38,1,38,1,39,1,40,1,41,1,42,1,43,1,44,1,
++45,1,46,1,47,1,48,1,49,1,49,1,50,1,51,1,
++52,1,53,1,54,1,55,1,56,1,57,1,58,1,59,1,
++60,1,60,1,61,1,62,1,63,1,64,1,65,1,66,1,
++67,1,68,1,69,1,70,1,71,1,71,1,72,1,73,1,
++74,1,75,1,76,1,77,1,78,1,79,1,80,1,81,1,
++82,1,83,1,83,1,84,1,85,1,86,1,87,1,88,1,
++89,1,90,1,91,1,92,1,93,1,94,1,94,1,95,1,
++96,1,97,1,98,1,99,1,100,1,101,1,102,1,103,1,
++104,1,105,1,105,1,106,1,107,1,108,1,109,1,110,1,
++111,1,112,1,113,1,114,1,115,1,116,1,117,1,117,1,
++118,1,119,1,120,1,121,1,122,1,123,1,124,1,125,1,
++126,1,127,1,128,1,128,1,129,1,130,1,131,1,132,1,
++133,1,134,1,135,1,136,1,137,1,138,1,139,1,139,1,
++140,1,141,1,142,1,143,1,144,1,145,1,146,1,147,1,
++148,1,149,1,150,1,151,1,151,1,152,1,153,1,154,1,
++155,1,156,1,157,1,158,1,159,1,160,1,161,1,162,1,
++162,1,163,1,164,1,165,1,166,1,167,1,168,1,169,1,
++170,1,171,1,172,1,173,1,173,1,174,1,175,1,176,1,
++177,1,178,1,179,1,180,1,181,1,182,1,183,1,184,1,
++185,1,185,1,186,1,187,1,188,1,189,1,190,1,191,1,
++192,1,193,1,194,1,195,1,196,1,196,1,197,1,198,1,
++199,1,200,1,201,1,202,1,203,1,204,1,205,1,206,1,
++207,1,207,1,208,1,209,1,210,1,211,1,212,1,213,1,
++0,0,0,0,1,0,2,0,2,0,3,0,4,0,4,0,
++5,0,6,0,6,0,7,0,8,0,8,0,9,0,10,0,
++10,0,11,0,12,0,12,0,13,0,14,0,14,0,15,0,
++16,0,16,0,17,0,18,0,18,0,19,0,20,0,20,0,
++21,0,22,0,22,0,23,0,24,0,24,0,25,0,26,0,
++26,0,27,0,28,0,28,0,29,0,30,0,30,0,31,0,
++32,0,32,0,33,0,34,0,34,0,35,0,36,0,36,0,
++37,0,38,0,38,0,39,0,40,0,40,0,41,0,42,0,
++42,0,43,0,44,0,44,0,45,0,46,0,46,0,47,0,
++48,0,48,0,49,0,50,0,50,0,51,0,52,0,52,0,
++53,0,54,0,54,0,55,0,56,0,56,0,57,0,58,0,
++58,0,59,0,60,0,60,0,61,0,62,0,62,0,63,0,
++64,0,64,0,65,0,66,0,66,0,67,0,68,0,68,0,
++69,0,70,0,70,0,71,0,72,0,72,0,73,0,74,0,
++74,0,75,0,76,0,76,0,77,0,78,0,78,0,79,0,
++80,0,80,0,81,0,82,0,82,0,83,0,84,0,84,0,
++85,0,86,0,86,0,87,0,88,0,88,0,89,0,90,0,
++90,0,91,0,92,0,92,0,93,0,94,0,94,0,95,0,
++96,0,96,0,97,0,98,0,98,0,99,0,100,0,100,0,
++101,0,102,0,102,0,103,0,104,0,104,0,105,0,106,0,
++106,0,107,0,108,0,108,0,109,0,110,0,110,0,111,0,
++112,0,112,0,113,0,114,0,114,0,115,0,116,0,116,0,
++117,0,118,0,118,0,119,0,120,0,120,0,121,0,122,0,
++122,0,123,0,124,0,124,0,125,0,126,0,126,0,127,0,
++128,0,128,0,129,0,130,0,130,0,131,0,132,0,132,0,
++133,0,134,0,134,0,135,0,136,0,136,0,137,0,138,0,
++138,0,139,0,140,0,140,0,141,0,142,0,142,0,143,0,
++144,0,144,0,145,0,146,0,146,0,147,0,148,0,148,0,
++149,0,150,0,150,0,151,0,152,0,152,0,153,0,154,0,
++154,0,155,0,156,0,156,0,157,0,158,0,158,0,159,0,
++160,0,160,0,161,0,162,0,162,0,163,0,164,0,164,0,
++165,0,166,0,166,0,167,0,168,0,168,0,169,0,170,0,
++170,0,171,0,172,0,172,0,173,0,174,0,174,0,175,0,
++176,0,176,0,177,0,178,0,178,0,179,0,180,0,180,0,
++181,0,182,0,182,0,183,0,184,0,184,0,185,0,186,0,
++186,0,187,0,188,0,188,0,189,0,190,0,190,0,191,0,
++192,0,192,0,193,0,194,0,194,0,195,0,196,0,196,0,
++197,0,198,0,198,0,199,0,200,0,200,0,201,0,202,0,
++202,0,203,0,204,0,204,0,205,0,206,0,206,0,207,0,
++208,0,208,0,209,0,210,0,210,0,211,0,212,0,212,0,
++213,0,214,0,214,0,215,0,216,0,216,0,217,0,218,0,
++218,0,219,0,220,0,220,0,221,0,222,0,222,0,223,0,
++224,0,224,0,225,0,226,0,226,0,227,0,228,0,228,0,
++229,0,230,0,230,0,231,0,232,0,232,0,233,0,234,0,
++234,0,235,0,236,0,236,0,237,0,238,0,238,0,239,0,
++240,0,240,0,241,0,242,0,242,0,243,0,244,0,244,0,
++245,0,246,0,246,0,247,0,248,0,248,0,249,0,250,0,
++250,0,251,0,252,0,252,0,253,0,254,0,254,0,255,0,
++0,1,0,1,1,1,2,1,2,1,3,1,4,1,4,1,
++5,1,6,1,6,1,7,1,8,1,8,1,9,1,10,1,
++10,1,11,1,12,1,12,1,13,1,14,1,14,1,15,1,
++16,1,16,1,17,1,18,1,18,1,19,1,20,1,20,1,
++21,1,22,1,22,1,23,1,24,1,24,1,25,1,26,1,
++26,1,27,1,28,1,28,1,29,1,30,1,30,1,31,1,
++32,1,32,1,33,1,34,1,34,1,35,1,36,1,36,1,
++37,1,38,1,38,1,39,1,40,1,40,1,41,1,42,1,
++42,1,43,1,44,1,44,1,45,1,46,1,46,1,47,1,
++48,1,48,1,49,1,50,1,50,1,51,1,52,1,52,1,
++53,1,54,1,54,1,55,1,56,1,56,1,57,1,58,1,
++58,1,59,1,60,1,60,1,61,1,62,1,62,1,63,1,
++64,1,64,1,65,1,66,1,66,1,67,1,68,1,68,1,
++69,1,70,1,70,1,71,1,72,1,72,1,73,1,74,1,
++74,1,75,1,76,1,76,1,77,1,78,1,78,1,79,1,
++80,1,80,1,81,1,82,1,82,1,83,1,84,1,84,1,
++0,0,0,0,0,0,1,0,1,0,2,0,2,0,3,0,
++3,0,4,0,4,0,5,0,5,0,5,0,6,0,6,0,
++7,0,7,0,8,0,8,0,9,0,9,0,10,0,10,0,
++11,0,11,0,11,0,12,0,12,0,13,0,13,0,14,0,
++14,0,15,0,15,0,16,0,16,0,16,0,17,0,17,0,
++18,0,18,0,19,0,19,0,20,0,20,0,21,0,21,0,
++22,0,22,0,22,0,23,0,23,0,24,0,24,0,25,0,
++25,0,26,0,26,0,27,0,27,0,28,0,28,0,28,0,
++29,0,29,0,30,0,30,0,31,0,31,0,32,0,32,0,
++33,0,33,0,33,0,34,0,34,0,35,0,35,0,36,0,
++36,0,37,0,37,0,38,0,38,0,39,0,39,0,39,0,
++40,0,40,0,41,0,41,0,42,0,42,0,43,0,43,0,
++44,0,44,0,45,0,45,0,45,0,46,0,46,0,47,0,
++47,0,48,0,48,0,49,0,49,0,50,0,50,0,50,0,
++51,0,51,0,52,0,52,0,53,0,53,0,54,0,54,0,
++55,0,55,0,56,0,56,0,56,0,57,0,57,0,58,0,
++58,0,59,0,59,0,60,0,60,0,61,0,61,0,62,0,
++62,0,62,0,63,0,63,0,64,0,64,0,65,0,65,0,
++66,0,66,0,67,0,67,0,67,0,68,0,68,0,69,0,
++69,0,70,0,70,0,71,0,71,0,72,0,72,0,73,0,
++73,0,73,0,74,0,74,0,75,0,75,0,76,0,76,0,
++77,0,77,0,78,0,78,0,79,0,79,0,79,0,80,0,
++80,0,81,0,81,0,82,0,82,0,83,0,83,0,84,0,
++84,0,84,0,85,0,85,0,86,0,86,0,87,0,87,0,
++88,0,88,0,89,0,89,0,90,0,90,0,90,0,91,0,
++91,0,92,0,92,0,93,0,93,0,94,0,94,0,95,0,
++95,0,96,0,96,0,96,0,97,0,97,0,98,0,98,0,
++99,0,99,0,100,0,100,0,101,0,101,0,101,0,102,0,
++102,0,103,0,103,0,104,0,104,0,105,0,105,0,106,0,
++106,0,107,0,107,0,107,0,108,0,108,0,109,0,109,0,
++110,0,110,0,111,0,111,0,112,0,112,0,113,0,113,0,
++113,0,114,0,114,0,115,0,115,0,116,0,116,0,117,0,
++117,0,118,0,118,0,118,0,119,0,119,0,120,0,120,0,
++121,0,121,0,122,0,122,0,123,0,123,0,124,0,124,0,
++124,0,125,0,125,0,126,0,126,0,127,0,127,0,128,0,
++128,0,129,0,129,0,130,0,130,0,130,0,131,0,131,0,
++132,0,132,0,133,0,133,0,134,0,134,0,135,0,135,0,
++135,0,136,0,136,0,137,0,137,0,138,0,138,0,139,0,
++139,0,140,0,140,0,141,0,141,0,141,0,142,0,142,0,
++143,0,143,0,144,0,144,0,145,0,145,0,146,0,146,0,
++147,0,147,0,147,0,148,0,148,0,149,0,149,0,150,0,
++150,0,151,0,151,0,152,0,152,0,152,0,153,0,153,0,
++154,0,154,0,155,0,155,0,156,0,156,0,157,0,157,0,
++158,0,158,0,158,0,159,0,159,0,160,0,160,0,161,0,
++161,0,162,0,162,0,163,0,163,0,163,0,164,0,164,0,
++165,0,165,0,166,0,166,0,167,0,167,0,168,0,168,0,
++169,0,169,0,169,0,170,0,170,0,171,0,171,0,172,0,
++172,0,173,0,173,0,174,0,174,0,175,0,175,0,175,0,
++176,0,176,0,177,0,177,0,178,0,178,0,179,0,179,0,
++180,0,180,0,180,0,181,0,181,0,182,0,182,0,183,0,
++183,0,184,0,184,0,185,0,185,0,186,0,186,0,186,0,
++187,0,187,0,188,0,188,0,189,0,189,0,190,0,190,0,
++191,0,191,0,192,0,192,0,192,0,193,0,193,0,194,0,
++194,0,195,0,195,0,196,0,196,0,197,0,197,0,197,0,
++198,0,198,0,199,0,199,0,200,0,200,0,201,0,201,0,
++202,0,202,0,203,0,203,0,203,0,204,0,204,0,205,0,
++205,0,206,0,206,0,207,0,207,0,208,0,208,0,209,0,
++209,0,209,0,210,0,210,0,211,0,211,0,212,0,212,0,
++213,0,213,0,214,0,214,0,214,0,215,0,215,0,216,0,
++216,0,217,0,217,0,218,0,218,0,219,0,219,0,220,0,
++220,0,220,0,221,0,221,0,222,0,222,0,223,0,223,0,
++224,0,224,0,225,0,225,0,226,0,226,0,226,0,227,0,
++227,0,228,0,228,0,229,0,229,0,230,0,230,0,231,0,
++231,0,231,0,232,0,232,0,233,0,233,0,234,0,234,0,
++0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,
++1,0,2,0,2,0,2,0,2,0,2,0,3,0,3,0,
++3,0,3,0,4,0,4,0,4,0,4,0,5,0,5,0,
++5,0,5,0,5,0,6,0,6,0,6,0,6,0,7,0,
++7,0,7,0,7,0,8,0,8,0,8,0,8,0,8,0,
++9,0,9,0,9,0,9,0,10,0,10,0,10,0,10,0,
++11,0,11,0,11,0,11,0,11,0,12,0,12,0,12,0,
++12,0,13,0,13,0,13,0,13,0,14,0,14,0,14,0,
++14,0,14,0,15,0,15,0,15,0,15,0,16,0,16,0,
++16,0,16,0,16,0,17,0,17,0,17,0,17,0,18,0,
++18,0,18,0,18,0,19,0,19,0,19,0,19,0,19,0,
++20,0,20,0,20,0,20,0,21,0,21,0,21,0,21,0,
++22,0,22,0,22,0,22,0,22,0,23,0,23,0,23,0,
++23,0,24,0,24,0,24,0,24,0,25,0,25,0,25,0,
++25,0,25,0,26,0,26,0,26,0,26,0,27,0,27,0,
++27,0,27,0,28,0,28,0,28,0,28,0,28,0,29,0,
++29,0,29,0,29,0,30,0,30,0,30,0,30,0,31,0,
++31,0,31,0,31,0,31,0,32,0,32,0,32,0,32,0,
++33,0,33,0,33,0,33,0,33,0,34,0,34,0,34,0,
++34,0,35,0,35,0,35,0,35,0,36,0,36,0,36,0,
++36,0,36,0,37,0,37,0,37,0,37,0,38,0,38,0,
++38,0,38,0,39,0,39,0,39,0,39,0,39,0,40,0,
++40,0,40,0,40,0,41,0,41,0,41,0,41,0,42,0,
++42,0,42,0,42,0,42,0,43,0,43,0,43,0,43,0,
++44,0,44,0,44,0,44,0,45,0,45,0,45,0,45,0,
++45,0,46,0,46,0,46,0,46,0,47,0,47,0,47,0,
++47,0,48,0,48,0,48,0,48,0,48,0,49,0,49,0,
++49,0,49,0,50,0,50,0,50,0,50,0,50,0,51,0,
++51,0,51,0,51,0,52,0,52,0,52,0,52,0,53,0,
++53,0,53,0,53,0,53,0,54,0,54,0,54,0,54,0,
++55,0,55,0,55,0,55,0,56,0,56,0,56,0,56,0,
++56,0,57,0,57,0,57,0,57,0,58,0,58,0,58,0,
++58,0,59,0,59,0,59,0,59,0,59,0,60,0,60,0,
++60,0,60,0,61,0,61,0,61,0,61,0,62,0,62,0,
++62,0,62,0,62,0,63,0,63,0,63,0,63,0,64,0,
++64,0,64,0,64,0,65,0,65,0,65,0,65,0,65,0,
++66,0,66,0,66,0,66,0,67,0,67,0,67,0,67,0,
++67,0,68,0,68,0,68,0,68,0,69,0,69,0,69,0,
++69,0,70,0,70,0,70,0,70,0,70,0,71,0,71,0,
++71,0,71,0,72,0,72,0,72,0,72,0,73,0,73,0,
++73,0,73,0,73,0,74,0,74,0,74,0,74,0,75,0,
++75,0,75,0,75,0,76,0,76,0,76,0,76,0,76,0,
++77,0,77,0,77,0,77,0,78,0,78,0,78,0,78,0,
++79,0,79,0,79,0,79,0,79,0,80,0,80,0,80,0,
++80,0,81,0,81,0,81,0,81,0,81,0,82,0,82,0,
++82,0,82,0,83,0,83,0,83,0,83,0,84,0,84,0,
++84,0,84,0,84,0,85,0,85,0,85,0,85,0,86,0,
++86,0,86,0,86,0,87,0,87,0,87,0,87,0,87,0,
++88,0,88,0,88,0,88,0,89,0,89,0,89,0,89,0,
++90,0,90,0,90,0,90,0,90,0,91,0,91,0,91,0,
++91,0,92,0,92,0,92,0,92,0,93,0,93,0,93,0,
++93,0,93,0,94,0,94,0,94,0,94,0,95,0,95,0,
++95,0,95,0,96,0,96,0,96,0,96,0,96,0,97,0,
++97,0,97,0,97,0,98,0,98,0,98,0,98,0,98,0,
++99,0,99,0,99,0,99,0,100,0,100,0,100,0,100,0,
++101,0,101,0,101,0,101,0,101,0,102,0,102,0,102,0,
++102,0,103,0,103,0,103,0,103,0,104,0,104,0,104,0,
++104,0,104,0,105,0,105,0,105,0,105,0,106,0,106,0,
++106,0,106,0,107,0,107,0,107,0,107,0,107,0,108,0,
++108,0,108,0,108,0,109,0,109,0,109,0,109,0,110,0,
++110,0,110,0,110,0,110,0,111,0,111,0,111,0,111,0,
++112,0,112,0,112,0,112,0,113,0,113,0,113,0,113,0,
++113,0,114,0,114,0,114,0,114,0,115,0,115,0,115,0,
++115,0,115,0,116,0,116,0,116,0,116,0,117,0,117,0,
++32,16,0,0,208,16,0,0,76,16,0,0,104,16,0,0,
++152,16,0,0,132,16,0,0,172,16,0,0,188,16,0,0,
++36,17,0,0,224,16,0,0,244,16,0,0,4,17,0,0,
++20,17,0,0,56,17,0,0,72,17,0,0,96,18,0,0,
++96,18,0,0,148,17,0,0,164,17,0,0,92,17,0,0,
++116,17,0,0,132,17,0,0,180,17,0,0,196,17,0,0,
++224,17,0,0,36,18,0,0,64,18,0,0,80,18,0,0,
++16,18,0,0,248,17,0,0,0,0,0,0,0,0,0,0,
++116,104,112,114,105,61,0,0,97,117,100,115,114,118,58,32,
++105,103,110,111,114,105,110,103,32,105,110,118,97,108,105,100,
++32,97,114,103,117,109,101,110,116,32,39,37,115,39,10,0,
++103,114,101,101,116,105,110,103,115,32,102,114,111,109,32,118,
++101,114,115,105,111,110,32,48,46,57,51,32,33,10,0,0,
++97,117,100,115,114,118,0,0,0,0,0,0,0,0,0,0,
++10,0,0,0,37,48,50,120,32,0,0,0,0,0,0,0,
++105,110,105,116,105,97,108,105,122,105,110,103,32,99,100,100,
++97,10,0,0,84,114,97,121,82,101,113,32,114,101,116,117,
++114,110,101,100,32,37,100,10,0,0,0,0,99,100,100,97,
++32,116,104,114,101,97,100,32,48,120,37,120,32,115,116,97,
++114,116,101,100,10,0,0,0,114,101,113,117,101,115,116,32,
++116,111,32,112,108,97,121,32,116,114,97,99,107,32,37,100,
++10,0,0,0,99,100,100,97,95,112,114,111,99,101,100,117,
++114,101,32,115,116,97,114,116,101,100,32,119,105,116,104,32,
++37,100,44,32,37,100,10,0,112,108,97,121,105,110,103,32,
++115,101,99,116,111,114,115,32,37,100,32,45,32,37,100,32,
++40,37,100,32,115,101,99,116,111,114,115,41,10,0,0,0,
++102,105,108,108,105,110,103,32,98,117,102,102,101,114,32,119,
++105,116,104,32,110,115,101,99,116,111,114,115,32,37,100,46,
++46,10,0,0,102,97,105,108,101,100,32,116,111,32,114,101,
++97,100,32,37,100,32,115,101,99,116,111,114,115,46,46,10,
++0,0,0,0,115,101,99,116,111,114,115,32,114,101,97,100,
++46,46,32,110,111,119,32,115,101,116,116,105,110,103,32,99,
++97,108,108,98,97,99,107,115,10,0,0,0,99,97,108,108,
++98,97,99,107,115,32,107,105,99,107,101,100,44,32,115,116,
++97,114,116,105,110,103,32,108,111,111,112,10,0,0,0,0,
++102,97,105,108,101,100,32,116,111,32,114,101,97,100,32,49,
++32,115,101,99,116,111,114,10,0,0,0,0,0,0,0,0,
++97,117,100,115,114,118,95,97,100,112,99,109,95,105,110,105,
++116,40,41,10,0,0,0,0,0,0,0,0,0,0,0,0,
++0,80,0,0,255,63,0,0,240,55,0,0,4,1,0,0,
++17,43,0,0,8,0,0,0,1,0,0,0,4,12,0,0,
++17,43,0,0,8,0,0,0,2,0,0,0,32,14,0,0,
++17,43,0,0,16,0,0,0,1,0,0,0,44,12,0,0,
++17,43,0,0,16,0,0,0,2,0,0,0,84,12,0,0,
++224,46,0,0,16,0,0,0,2,0,0,0,80,10,0,0,
++34,86,0,0,8,0,0,0,1,0,0,0,124,12,0,0,
++34,86,0,0,16,0,0,0,1,0,0,0,164,12,0,0,
++34,86,0,0,16,0,0,0,2,0,0,0,204,12,0,0,
++192,93,0,0,16,0,0,0,2,0,0,0,200,10,0,0,
++0,125,0,0,8,0,0,0,1,0,0,0,244,12,0,0,
++0,125,0,0,16,0,0,0,1,0,0,0,28,13,0,0,
++0,125,0,0,16,0,0,0,2,0,0,0,68,13,0,0,
++68,172,0,0,8,0,0,0,1,0,0,0,108,13,0,0,
++68,172,0,0,16,0,0,0,1,0,0,0,148,13,0,0,
++68,172,0,0,16,0,0,0,2,0,0,0,188,13,0,0,
++128,187,0,0,16,0,0,0,1,0,0,0,228,13,0,0,
++128,187,0,0,16,0,0,0,2,0,0,0,144,14,0,0,
++0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
++255,255,255,255,255,255,255,255,0,0,0,0,0,0,0,0,
++0,46,105,111,112,109,111,100,0,46,116,101,120,116,0,46,
++114,101,108,46,116,101,120,116,0,46,114,111,100,97,116,97,
++0,46,114,101,108,46,114,111,100,97,116,97,0,46,100,97,
++116,97,0,46,114,101,108,46,100,97,116,97,0,46,98,115,
++115,0,46,115,104,115,116,114,116,97,98,0,46,115,121,109,
++116,97,98,0,46,115,116,114,116,97,98,0,0,0,0,0,
++0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
++0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
++0,0,0,0,1,0,0,0,128,0,0,112,0,0,0,0,
++0,0,0,0,116,0,0,0,27,0,0,0,0,0,0,0,
++0,0,0,0,4,0,0,0,0,0,0,0,9,0,0,0,
++1,0,0,0,6,0,0,0,0,0,0,0,144,0,0,0,
++24,39,0,0,0,0,0,0,0,0,0,0,16,0,0,0,
++0,0,0,0,15,0,0,0,9,0,0,0,64,0,0,0,
++0,0,0,0,156,61,0,0,192,13,0,0,10,0,0,0,
++2,0,0,0,4,0,0,0,8,0,0,0,25,0,0,0,
++1,0,0,0,2,0,0,0,32,39,0,0,176,39,0,0,
++101,18,0,0,0,0,0,0,0,0,0,0,16,0,0,0,
++0,0,0,0,33,0,0,0,9,0,0,0,64,0,0,0,
++0,0,0,0,92,75,0,0,240,0,0,0,10,0,0,0,
++4,0,0,0,4,0,0,0,8,0,0,0,45,0,0,0,
++1,0,0,0,3,0,0,0,144,57,0,0,32,58,0,0,
++64,1,0,0,0,0,0,0,0,0,0,0,16,0,0,0,
++0,0,0,0,51,0,0,0,9,0,0,0,64,0,0,0,
++0,0,0,0,76,76,0,0,144,0,0,0,10,0,0,0,
++6,0,0,0,4,0,0,0,8,0,0,0,61,0,0,0,
++8,0,0,0,3,0,0,0,208,58,0,0,96,59,0,0,
++184,37,1,0,0,0,0,0,0,0,0,0,16,0,0,0,
++0,0,0,0,66,0,0,0,3,0,0,0,0,0,0,0,
++0,0,0,0,96,59,0,0,92,0,0,0,0,0,0,0,
++0,0,0,0,1,0,0,0,0,0,0,0,76,0,0,0,
++2,0,0,0,0,0,0,0,0,0,0,0,220,76,0,0,
++16,0,0,0,11,0,0,0,1,0,0,0,4,0,0,0,
++16,0,0,0,84,0,0,0,3,0,0,0,0,0,0,0,
++0,0,0,0,236,76,0,0,1,0,0,0,0,0,0,0,
++0,0,0,0,1,0,0,0,0,0,0,0,20,0,0,0,
++2,0,0,0,24,0,0,0,2,0,0,0,28,0,0,0,
++2,0,0,0,32,0,0,0,2,0,0,0,36,0,0,0,
++2,0,0,0,40,0,0,0,2,0,0,0,44,0,0,0,
++2,0,0,0,48,0,0,0,2,0,0,0,52,0,0,0,
++2,0,0,0,56,0,0,0,2,0,0,0,60,0,0,0,
++2,0,0,0,64,0,0,0,2,0,0,0,68,0,0,0,
++2,0,0,0,72,0,0,0,2,0,0,0,76,0,0,0,
++2,0,0,0,80,0,0,0,2,0,0,0,84,0,0,0,
++2,0,0,0,88,0,0,0,2,0,0,0,92,0,0,0,
++2,0,0,0,96,0,0,0,2,0,0,0,100,0,0,0,
++2,0,0,0,104,0,0,0,2,0,0,0,108,0,0,0,
++2,0,0,0,112,0,0,0,2,0,0,0,116,0,0,0,
++2,0,0,0,120,0,0,0,2,0,0,0,124,0,0,0,
++2,0,0,0,128,0,0,0,2,0,0,0,132,0,0,0,
++2,0,0,0,136,0,0,0,2,0,0,0,216,0,0,0,
++5,0,0,0,220,0,0,0,6,0,0,0,236,0,0,0,
++5,0,0,0,240,0,0,0,6,0,0,0,76,1,0,0,
++5,0,0,0,80,1,0,0,6,0,0,0,120,1,0,0,
++5,0,0,0,124,1,0,0,6,0,0,0,148,1,0,0,
++5,0,0,0,152,1,0,0,6,0,0,0,0,2,0,0,
++5,0,0,0,4,2,0,0,6,0,0,0,16,2,0,0,
++5,0,0,0,20,2,0,0,6,0,0,0,28,2,0,0,
++5,0,0,0,32,2,0,0,6,0,0,0,52,2,0,0,
++5,0,0,0,56,2,0,0,6,0,0,0,60,2,0,0,
++5,0,0,0,64,2,0,0,6,0,0,0,68,2,0,0,
++5,0,0,0,72,2,0,0,6,0,0,0,76,2,0,0,
++5,0,0,0,80,2,0,0,6,0,0,0,104,2,0,0,
++5,0,0,0,108,2,0,0,6,0,0,0,120,2,0,0,
++5,0,0,0,124,2,0,0,6,0,0,0,132,2,0,0,
++5,0,0,0,136,2,0,0,6,0,0,0,168,2,0,0,
++5,0,0,0,172,2,0,0,6,0,0,0,228,2,0,0,
++5,0,0,0,232,2,0,0,6,0,0,0,236,2,0,0,
++5,0,0,0,240,2,0,0,6,0,0,0,8,3,0,0,
++5,0,0,0,12,3,0,0,6,0,0,0,44,3,0,0,
++5,0,0,0,52,3,0,0,6,0,0,0,56,3,0,0,
++5,0,0,0,60,3,0,0,6,0,0,0,100,3,0,0,
++5,0,0,0,104,3,0,0,6,0,0,0,120,3,0,0,
++5,0,0,0,124,3,0,0,6,0,0,0,164,3,0,0,
++5,0,0,0,168,3,0,0,6,0,0,0,180,3,0,0,
++5,0,0,0,184,3,0,0,6,0,0,0,188,3,0,0,
++5,0,0,0,192,3,0,0,6,0,0,0,212,3,0,0,
++5,0,0,0,216,3,0,0,6,0,0,0,220,3,0,0,
++5,0,0,0,224,3,0,0,6,0,0,0,0,4,0,0,
++5,0,0,0,4,4,0,0,6,0,0,0,48,4,0,0,
++5,0,0,0,52,4,0,0,6,0,0,0,56,4,0,0,
++5,0,0,0,60,4,0,0,6,0,0,0,64,4,0,0,
++5,0,0,0,68,4,0,0,6,0,0,0,72,4,0,0,
++5,0,0,0,76,4,0,0,6,0,0,0,92,4,0,0,
++5,0,0,0,96,4,0,0,6,0,0,0,100,4,0,0,
++5,0,0,0,104,4,0,0,6,0,0,0,108,4,0,0,
++5,0,0,0,112,4,0,0,6,0,0,0,128,4,0,0,
++5,0,0,0,132,4,0,0,6,0,0,0,136,4,0,0,
++5,0,0,0,140,4,0,0,6,0,0,0,164,4,0,0,
++5,0,0,0,168,4,0,0,6,0,0,0,196,4,0,0,
++5,0,0,0,200,4,0,0,6,0,0,0,212,4,0,0,
++5,0,0,0,216,4,0,0,6,0,0,0,220,4,0,0,
++5,0,0,0,224,4,0,0,6,0,0,0,240,4,0,0,
++5,0,0,0,244,4,0,0,6,0,0,0,248,4,0,0,
++5,0,0,0,252,4,0,0,6,0,0,0,0,5,0,0,
++5,0,0,0,8,5,0,0,6,0,0,0,88,5,0,0,
++5,0,0,0,92,5,0,0,6,0,0,0,108,5,0,0,
++5,0,0,0,112,5,0,0,6,0,0,0,148,5,0,0,
++5,0,0,0,152,5,0,0,6,0,0,0,188,5,0,0,
++5,0,0,0,192,5,0,0,6,0,0,0,204,5,0,0,
++5,0,0,0,208,5,0,0,6,0,0,0,28,6,0,0,
++5,0,0,0,32,6,0,0,6,0,0,0,36,6,0,0,
++5,0,0,0,40,6,0,0,6,0,0,0,60,6,0,0,
++5,0,0,0,64,6,0,0,6,0,0,0,84,6,0,0,
++5,0,0,0,88,6,0,0,6,0,0,0,140,6,0,0,
++5,0,0,0,144,6,0,0,6,0,0,0,180,6,0,0,
++5,0,0,0,184,6,0,0,6,0,0,0,228,6,0,0,
++5,0,0,0,232,6,0,0,6,0,0,0,252,6,0,0,
++5,0,0,0,4,7,0,0,6,0,0,0,40,7,0,0,
++5,0,0,0,44,7,0,0,6,0,0,0,96,7,0,0,
++5,0,0,0,100,7,0,0,6,0,0,0,104,7,0,0,
++5,0,0,0,108,7,0,0,6,0,0,0,112,7,0,0,
++5,0,0,0,116,7,0,0,6,0,0,0,204,7,0,0,
++5,0,0,0,212,7,0,0,6,0,0,0,232,7,0,0,
++5,0,0,0,236,7,0,0,6,0,0,0,20,8,0,0,
++5,0,0,0,24,8,0,0,6,0,0,0,56,8,0,0,
++5,0,0,0,60,8,0,0,6,0,0,0,144,8,0,0,
++5,0,0,0,148,8,0,0,6,0,0,0,172,8,0,0,
++5,0,0,0,176,8,0,0,6,0,0,0,188,8,0,0,
++5,0,0,0,192,8,0,0,6,0,0,0,204,8,0,0,
++5,0,0,0,208,8,0,0,6,0,0,0,232,8,0,0,
++5,0,0,0,236,8,0,0,6,0,0,0,240,8,0,0,
++5,0,0,0,244,8,0,0,6,0,0,0,12,9,0,0,
++5,0,0,0,16,9,0,0,6,0,0,0,40,9,0,0,
++5,0,0,0,44,9,0,0,6,0,0,0,52,9,0,0,
++5,0,0,0,56,9,0,0,6,0,0,0,128,9,0,0,
++5,0,0,0,136,9,0,0,6,0,0,0,140,9,0,0,
++5,0,0,0,148,9,0,0,6,0,0,0,8,12,0,0,
++5,0,0,0,12,12,0,0,6,0,0,0,48,12,0,0,
++5,0,0,0,52,12,0,0,6,0,0,0,88,12,0,0,
++5,0,0,0,92,12,0,0,6,0,0,0,128,12,0,0,
++5,0,0,0,132,12,0,0,6,0,0,0,168,12,0,0,
++5,0,0,0,172,12,0,0,6,0,0,0,208,12,0,0,
++5,0,0,0,212,12,0,0,6,0,0,0,248,12,0,0,
++5,0,0,0,252,12,0,0,6,0,0,0,32,13,0,0,
++5,0,0,0,36,13,0,0,6,0,0,0,72,13,0,0,
++5,0,0,0,76,13,0,0,6,0,0,0,112,13,0,0,
++5,0,0,0,116,13,0,0,6,0,0,0,152,13,0,0,
++5,0,0,0,156,13,0,0,6,0,0,0,192,13,0,0,
++5,0,0,0,196,13,0,0,6,0,0,0,48,14,0,0,
++5,0,0,0,52,14,0,0,6,0,0,0,208,14,0,0,
++5,0,0,0,212,14,0,0,6,0,0,0,140,15,0,0,
++5,0,0,0,144,15,0,0,6,0,0,0,156,15,0,0,
++5,0,0,0,160,15,0,0,6,0,0,0,180,15,0,0,
++5,0,0,0,184,15,0,0,6,0,0,0,188,15,0,0,
++5,0,0,0,192,15,0,0,6,0,0,0,196,15,0,0,
++5,0,0,0,200,15,0,0,6,0,0,0,4,16,0,0,
++5,0,0,0,8,16,0,0,6,0,0,0,112,18,0,0,
++5,0,0,0,116,18,0,0,6,0,0,0,160,18,0,0,
++5,0,0,0,164,18,0,0,6,0,0,0,216,18,0,0,
++5,0,0,0,220,18,0,0,6,0,0,0,232,18,0,0,
++5,0,0,0,236,18,0,0,6,0,0,0,240,18,0,0,
++5,0,0,0,244,18,0,0,6,0,0,0,80,19,0,0,
++5,0,0,0,84,19,0,0,6,0,0,0,108,19,0,0,
++5,0,0,0,112,19,0,0,6,0,0,0,132,19,0,0,
++5,0,0,0,136,19,0,0,6,0,0,0,156,19,0,0,
++5,0,0,0,160,19,0,0,6,0,0,0,188,19,0,0,
++5,0,0,0,192,19,0,0,6,0,0,0,64,20,0,0,
++5,0,0,0,68,20,0,0,6,0,0,0,76,20,0,0,
++5,0,0,0,80,20,0,0,6,0,0,0,208,20,0,0,
++5,0,0,0,212,20,0,0,6,0,0,0,192,21,0,0,
++5,0,0,0,196,21,0,0,6,0,0,0,212,21,0,0,
++5,0,0,0,220,21,0,0,6,0,0,0,224,21,0,0,
++5,0,0,0,228,21,0,0,6,0,0,0,232,21,0,0,
++5,0,0,0,236,21,0,0,6,0,0,0,16,22,0,0,
++5,0,0,0,20,22,0,0,6,0,0,0,48,22,0,0,
++5,0,0,0,56,22,0,0,6,0,0,0,116,22,0,0,
++5,0,0,0,120,22,0,0,6,0,0,0,132,22,0,0,
++5,0,0,0,136,22,0,0,6,0,0,0,140,22,0,0,
++5,0,0,0,144,22,0,0,6,0,0,0,172,22,0,0,
++5,0,0,0,176,22,0,0,6,0,0,0,180,22,0,0,
++5,0,0,0,184,22,0,0,6,0,0,0,56,23,0,0,
++5,0,0,0,60,23,0,0,6,0,0,0,236,23,0,0,
++5,0,0,0,240,23,0,0,6,0,0,0,48,24,0,0,
++5,0,0,0,52,24,0,0,6,0,0,0,152,24,0,0,
++5,0,0,0,156,24,0,0,6,0,0,0,168,24,0,0,
++5,0,0,0,172,24,0,0,6,0,0,0,184,24,0,0,
++5,0,0,0,188,24,0,0,6,0,0,0,204,24,0,0,
++5,0,0,0,208,24,0,0,6,0,0,0,220,24,0,0,
++5,0,0,0,224,24,0,0,6,0,0,0,240,24,0,0,
++5,0,0,0,244,24,0,0,6,0,0,0,248,24,0,0,
++5,0,0,0,252,24,0,0,6,0,0,0,28,25,0,0,
++5,0,0,0,32,25,0,0,6,0,0,0,40,25,0,0,
++5,0,0,0,44,25,0,0,6,0,0,0,48,25,0,0,
++5,0,0,0,52,25,0,0,6,0,0,0,56,25,0,0,
++5,0,0,0,64,25,0,0,6,0,0,0,92,25,0,0,
++5,0,0,0,96,25,0,0,6,0,0,0,120,25,0,0,
++5,0,0,0,124,25,0,0,6,0,0,0,140,25,0,0,
++5,0,0,0,144,25,0,0,6,0,0,0,220,25,0,0,
++5,0,0,0,224,25,0,0,6,0,0,0,228,25,0,0,
++5,0,0,0,232,25,0,0,6,0,0,0,236,25,0,0,
++5,0,0,0,240,25,0,0,6,0,0,0,244,25,0,0,
++5,0,0,0,252,25,0,0,6,0,0,0,0,26,0,0,
++5,0,0,0,8,26,0,0,6,0,0,0,12,26,0,0,
++5,0,0,0,16,26,0,0,6,0,0,0,32,26,0,0,
++5,0,0,0,36,26,0,0,6,0,0,0,92,26,0,0,
++5,0,0,0,96,26,0,0,6,0,0,0,164,26,0,0,
++5,0,0,0,168,26,0,0,6,0,0,0,76,27,0,0,
++5,0,0,0,80,27,0,0,6,0,0,0,84,27,0,0,
++5,0,0,0,88,27,0,0,6,0,0,0,96,27,0,0,
++5,0,0,0,100,27,0,0,6,0,0,0,148,27,0,0,
++5,0,0,0,152,27,0,0,6,0,0,0,156,27,0,0,
++5,0,0,0,160,27,0,0,6,0,0,0,192,27,0,0,
++5,0,0,0,196,27,0,0,6,0,0,0,200,27,0,0,
++5,0,0,0,204,27,0,0,6,0,0,0,208,27,0,0,
++5,0,0,0,212,27,0,0,6,0,0,0,220,27,0,0,
++5,0,0,0,224,27,0,0,6,0,0,0,236,27,0,0,
++5,0,0,0,240,27,0,0,6,0,0,0,252,27,0,0,
++5,0,0,0,0,28,0,0,6,0,0,0,4,28,0,0,
++5,0,0,0,8,28,0,0,6,0,0,0,72,28,0,0,
++5,0,0,0,76,28,0,0,6,0,0,0,88,28,0,0,
++5,0,0,0,92,28,0,0,6,0,0,0,96,28,0,0,
++5,0,0,0,100,28,0,0,6,0,0,0,108,28,0,0,
++5,0,0,0,112,28,0,0,6,0,0,0,124,28,0,0,
++5,0,0,0,128,28,0,0,6,0,0,0,144,28,0,0,
++5,0,0,0,148,28,0,0,6,0,0,0,168,28,0,0,
++5,0,0,0,172,28,0,0,6,0,0,0,188,28,0,0,
++5,0,0,0,192,28,0,0,6,0,0,0,208,28,0,0,
++5,0,0,0,212,28,0,0,6,0,0,0,224,28,0,0,
++5,0,0,0,228,28,0,0,6,0,0,0,232,28,0,0,
++5,0,0,0,236,28,0,0,6,0,0,0,240,28,0,0,
++5,0,0,0,244,28,0,0,6,0,0,0,248,28,0,0,
++5,0,0,0,252,28,0,0,6,0,0,0,0,29,0,0,
++5,0,0,0,4,29,0,0,6,0,0,0,8,29,0,0,
++5,0,0,0,12,29,0,0,6,0,0,0,32,29,0,0,
++5,0,0,0,36,29,0,0,6,0,0,0,76,29,0,0,
++5,0,0,0,80,29,0,0,6,0,0,0,172,29,0,0,
++5,0,0,0,176,29,0,0,6,0,0,0,192,29,0,0,
++5,0,0,0,196,29,0,0,6,0,0,0,248,29,0,0,
++5,0,0,0,252,29,0,0,6,0,0,0,32,30,0,0,
++5,0,0,0,40,30,0,0,6,0,0,0,116,30,0,0,
++5,0,0,0,120,30,0,0,6,0,0,0,136,30,0,0,
++5,0,0,0,140,30,0,0,6,0,0,0,212,30,0,0,
++5,0,0,0,216,30,0,0,6,0,0,0,228,30,0,0,
++5,0,0,0,236,30,0,0,6,0,0,0,240,33,0,0,
++5,0,0,0,244,33,0,0,6,0,0,0,40,34,0,0,
++5,0,0,0,44,34,0,0,6,0,0,0,160,34,0,0,
++5,0,0,0,164,34,0,0,6,0,0,0,168,34,0,0,
++5,0,0,0,172,34,0,0,6,0,0,0,188,34,0,0,
++5,0,0,0,192,34,0,0,6,0,0,0,20,35,0,0,
++5,0,0,0,24,35,0,0,6,0,0,0,84,35,0,0,
++5,0,0,0,88,35,0,0,6,0,0,0,112,35,0,0,
++5,0,0,0,116,35,0,0,6,0,0,0,200,35,0,0,
++5,0,0,0,204,35,0,0,6,0,0,0,236,35,0,0,
++5,0,0,0,240,35,0,0,6,0,0,0,0,36,0,0,
++5,0,0,0,4,36,0,0,6,0,0,0,32,36,0,0,
++5,0,0,0,36,36,0,0,6,0,0,0,40,36,0,0,
++5,0,0,0,44,36,0,0,6,0,0,0,52,36,0,0,
++5,0,0,0,56,36,0,0,6,0,0,0,64,36,0,0,
++5,0,0,0,72,36,0,0,6,0,0,0,76,36,0,0,
++5,0,0,0,80,36,0,0,6,0,0,0,216,37,0,0,
++5,0,0,0,220,37,0,0,6,0,0,0,64,38,0,0,
++5,0,0,0,68,38,0,0,6,0,0,0,92,38,0,0,
++5,0,0,0,96,38,0,0,6,0,0,0,116,38,0,0,
++5,0,0,0,120,38,0,0,6,0,0,0,124,38,0,0,
++5,0,0,0,132,38,0,0,6,0,0,0,32,55,0,0,
++2,0,0,0,36,55,0,0,2,0,0,0,40,55,0,0,
++2,0,0,0,44,55,0,0,2,0,0,0,48,55,0,0,
++2,0,0,0,52,55,0,0,2,0,0,0,56,55,0,0,
++2,0,0,0,60,55,0,0,2,0,0,0,64,55,0,0,
++2,0,0,0,68,55,0,0,2,0,0,0,72,55,0,0,
++2,0,0,0,76,55,0,0,2,0,0,0,80,55,0,0,
++2,0,0,0,84,55,0,0,2,0,0,0,88,55,0,0,
++2,0,0,0,92,55,0,0,2,0,0,0,96,55,0,0,
++2,0,0,0,100,55,0,0,2,0,0,0,104,55,0,0,
++2,0,0,0,108,55,0,0,2,0,0,0,112,55,0,0,
++2,0,0,0,116,55,0,0,2,0,0,0,120,55,0,0,
++2,0,0,0,124,55,0,0,2,0,0,0,128,55,0,0,
++2,0,0,0,132,55,0,0,2,0,0,0,136,55,0,0,
++2,0,0,0,140,55,0,0,2,0,0,0,144,55,0,0,
++2,0,0,0,148,55,0,0,2,0,0,0,152,57,0,0,
++2,0,0,0,172,57,0,0,2,0,0,0,188,57,0,0,
++2,0,0,0,204,57,0,0,2,0,0,0,220,57,0,0,
++2,0,0,0,236,57,0,0,2,0,0,0,252,57,0,0,
++2,0,0,0,12,58,0,0,2,0,0,0,28,58,0,0,
++2,0,0,0,44,58,0,0,2,0,0,0,60,58,0,0,
++2,0,0,0,76,58,0,0,2,0,0,0,92,58,0,0,
++2,0,0,0,108,58,0,0,2,0,0,0,124,58,0,0,
++2,0,0,0,140,58,0,0,2,0,0,0,156,58,0,0,
++2,0,0,0,172,58,0,0,2,0,0,0,0,0,0,0,
++0,0,0,0,0,0,0,0,0,0,0,0,0,
++};
++unsigned int size_audsrv_irx = 19693;
++}
++#endif
+diff --git a/src/main.cpp b/src/main.cpp
+index 22bcd77..8439ccd 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -27,13 +27,16 @@ void AnmManager::TakeScreenshotIfRequested()
+ }
+ 
+ #ifdef __PS2__
++#include "Ps2Pad.hpp"
+ void Ps2BootScreen(int argc, char **argv);
+ #endif
+ 
+ int main(int argc, char *argv[])
+ {
+ #ifdef __PS2__
++    setbuf(stdout, NULL);
+     Ps2BootScreen(argc, argv);
++    Ps2Pad::Init();
+ #endif
+ 
+     i32 res;
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index dd7e0b5..a351041 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -1,6 +1,9 @@
+ #include "ps2audio.hpp"
+ 
+ #include <SDL2/SDL.h>
++#include <audsrv.h>
++#include <loadfile.h>
++#include <sifrpc.h>
+ #include <algorithm>
+ #include <cmath>
+ #include <cstdio>
+@@ -13,23 +16,13 @@ namespace
+ constexpr int kRate = 44100;
+ constexpr int kChunk = 512; // frames mixed per step
+ 
+-SDL_AudioDeviceID g_dev = 0;
++bool g_dev = false;
+ std::vector<ma_sound *> g_sounds;
+ volatile ma_uint64 g_framesMixed = 0;
+ 
+ struct Lock
+ {
+-    Lock()
+-    {
+-        if (g_dev)
+-            SDL_LockAudioDevice(g_dev);
+-    }
+-    ~Lock()
+-    {
+-        if (g_dev)
+-            SDL_UnlockAudioDevice(g_dev);
+-    }
+-};
++}; // single threaded: audio is mixed from the main loop (ps2audio_pump)
+ 
+ float Gain(ma_sound *s, ma_uint64 nowMs)
+ {
+@@ -76,10 +69,8 @@ ma_uint64 ReadSound(ma_sound *s, float *out, ma_uint64 frames)
+     return got;
+ }
+ 
+-void AudioCallback(void *, Uint8 *stream, int len)
++void MixFrames(int16_t *dst, int frames)
+ {
+-    int16_t *dst = (int16_t *)stream;
+-    int frames = len / 4;
+     static float mix[kChunk * 2];
+     static float tmp[kChunk * 2];
+ 
+@@ -221,40 +212,64 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+     return MA_SUCCESS;
+ }
+ 
++extern "C" unsigned char audsrv_irx[];
++extern "C" unsigned int size_audsrv_irx;
++
+ ma_result ps2audio_engine_init(ma_engine *e)
+ {
+-    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
++    SifInitRpc(0);
++    int r = SifLoadModule("rom0:LIBSD", 0, NULL);
++    std::printf("audio: LIBSD -> %d\n", r);
++    int ret = 0;
++    r = SifExecModuleBuffer(audsrv_irx, size_audsrv_irx, 0, NULL, &ret);
++    std::printf("audio: audsrv.irx -> %d (ret %d)\n", r, ret);
++    if (r < 0)
++        return MA_ERROR;
++    if (audsrv_init() != AUDSRV_ERR_NOERROR)
+     {
+-        std::printf("SDL audio init failed: %s\n", SDL_GetError());
++        std::printf("audio: audsrv_init failed: %d\n", audsrv_get_error());
+         return MA_ERROR;
+     }
+-    SDL_AudioSpec want, have;
+-    SDL_zero(want);
+-    want.freq = kRate;
+-    want.format = AUDIO_S16SYS;
+-    want.channels = 2;
+-    want.samples = 1024;
+-    want.callback = AudioCallback;
+-    g_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
+-    if (!g_dev)
++    audsrv_fmt_t fmt;
++    fmt.freq = kRate;
++    fmt.bits = 16;
++    fmt.channels = 2;
++    if (audsrv_set_format(&fmt) != 0)
+     {
+-        std::printf("SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
++        std::printf("audio: audsrv_set_format failed\n");
++        audsrv_quit();
+         return MA_ERROR;
+     }
+-    if (have.freq != kRate || have.format != AUDIO_S16SYS || have.channels != 2)
+-        std::printf("audio: got %d Hz fmt %x ch %d (wanted 44100 S16 stereo)\n", have.freq, have.format,
+-                    have.channels);
++    audsrv_set_volume(MAX_VOLUME);
++    g_dev = true;
+     e->running = true;
+-    SDL_PauseAudioDevice(g_dev, 0);
++    std::printf("audio: audsrv ready\n");
+     return MA_SUCCESS;
+ }
+ 
++void ps2audio_pump()
++{
++    if (!g_dev)
++        return;
++    static int16_t out[kChunk * 2];
++    // Feed the SPU2 queue with as much audio as it has room for (bounded so a slow frame cannot stall for long)
++    for (int i = 0; i < 8; i++)
++    {
++        int avail = audsrv_available();
++        if (avail < (int)sizeof(out))
++            break;
++        MixFrames(out, kChunk);
++        audsrv_play_audio((const char *)out, sizeof(out));
++    }
++}
++
+ void ps2audio_engine_uninit(ma_engine *e)
+ {
+     if (g_dev)
+     {
+-        SDL_CloseAudioDevice(g_dev);
+-        g_dev = 0;
++        audsrv_stop_audio();
++        audsrv_quit();
++        g_dev = false;
+     }
+     g_sounds.clear();
+     e->running = false;
+diff --git a/src/ps2audio.hpp b/src/ps2audio.hpp
+index b6ff9be..3498a32 100644
+--- a/src/ps2audio.hpp
++++ b/src/ps2audio.hpp
+@@ -140,6 +140,7 @@ struct ma_sound
+ 
+ ma_result ps2audio_engine_init(ma_engine *e); // opens the SDL audio device
+ void ps2audio_engine_uninit(ma_engine *e);
++void ps2audio_pump(); // call once per frame: mixes and queues audio for the SPU2
+ ma_uint64 ma_engine_get_time_in_milliseconds(ma_engine *e);
+ ma_result ma_sound_init_from_data_source(ma_engine *e, ma_data_source *ds, ma_uint32 flags, void *group,
+                                          ma_sound *sound);
+-- 
+2.43.0
+
+
+From 0c9cdaf3a5d7c6faac5d6c81b077a297e73ce957 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:11:39 -0300
+Subject: [PATCH 04/10] PS2: detect game folder (host:/mass:/...) and redirect
+ relative fopen through it
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2    |  2 +-
+ src/ps2boot.cpp | 88 ++++++++++++++++++++++++++++++++-----------------
+ 2 files changed, 58 insertions(+), 32 deletions(-)
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index 3784102..6750d18 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -39,7 +39,7 @@ ifeq ($(CT32),1)
+ EE_CXXFLAGS += -DTH07_PS2_CT32
+ endif
+ 
+-EE_LDFLAGS += -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
++EE_LDFLAGS += -Wl,--wrap=fopen -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
+ 
+ # order matters: SDL2main first, SDL2 after the libraries that depend on it
+ EE_LIBS += -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static \
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index cece86f..7342e6a 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -2,24 +2,43 @@
+ #include <cstdio>
+ #include <cstring>
+ #include <debug.h>
+-#include <sys/stat.h>
+ #include <unistd.h>
+ 
+-// Boot screen: runs before anything else (even before the GS backend), using ps2sdk's built-in text console, so
+-// that something is always visible on screen and the user can see which game files were found.
++// Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
++// relative names, so every relative fopen() of the game is redirected through this prefix (see __wrap_fopen).
++char g_Ps2BasePrefix[160] = "";
+ 
+-static long FileSize(const char *path)
++extern "C" FILE *__real_fopen(const char *path, const char *mode);
++
++extern "C" FILE *__wrap_fopen(const char *path, const char *mode)
++{
++    if (!path)
++        return nullptr;
++    if (strchr(path, ':') || path[0] == '/' || path[0] == '\\' || g_Ps2BasePrefix[0] == 0)
++        return __real_fopen(path, mode);
++
++    const char *rel = path;
++    while (rel[0] == '.' && rel[1] == '/')
++        rel += 2;
++    char full[320];
++    snprintf(full, sizeof(full), "%s%s", g_Ps2BasePrefix, rel);
++    FILE *f = __real_fopen(full, mode);
++    if (!f)
++        f = __real_fopen(path, mode);
++    return f;
++}
++
++static bool CanOpen(const char *prefix, const char *name, long *size)
+ {
+-    struct stat st;
+-    if (stat(path, &st) == 0)
+-        return (long)st.st_size;
+-    FILE *f = fopen(path, "rb"); // some file systems (host:) have no working stat()
++    char full[320];
++    snprintf(full, sizeof(full), "%s%s", prefix, name);
++    FILE *f = __real_fopen(full, "rb");
+     if (!f)
+-        return -1;
++        return false;
+     fseek(f, 0, SEEK_END);
+-    long n = ftell(f);
++    *size = ftell(f);
+     fclose(f);
+-    return n;
++    return true;
+ }
+ 
+ void Ps2BootScreen(int argc, char **argv)
+@@ -30,34 +49,42 @@ void Ps2BootScreen(int argc, char **argv)
+     scr_printf("  main() reached - screen output works.\n");
+ 
+     const char *self = (argc > 0 && argv && argv[0]) ? argv[0] : "(none)";
+-    scr_printf("  ELF path: %s\n", self);
++    scr_printf("  ELF path: %s\n\n", self);
+ 
+-    // Make relative file names resolve next to the ELF (host:dir/th07.elf, mass:/dir/th07.elf, cdrom0:...)
+-    char dir[256];
+-    dir[0] = 0;
++    // Candidate folders, first the one the ELF was started from
++    char fromElf[160] = "";
+     if (argc > 0 && argv && argv[0])
+     {
+-        strncpy(dir, argv[0], sizeof(dir) - 1);
+-        dir[sizeof(dir) - 1] = 0;
+-        char *slash = strrchr(dir, '/');
+-        char *colon = strrchr(dir, ':');
+-        if (slash)
+-            slash[1] = 0;
++        strncpy(fromElf, argv[0], sizeof(fromElf) - 1);
++        char *slash = strrchr(fromElf, '/');
++        char *bslash = strrchr(fromElf, '\\');
++        char *colon = strrchr(fromElf, ':');
++        char *cut = slash > bslash ? slash : bslash;
++        if (cut)
++            cut[1] = 0;
+         else if (colon)
+             colon[1] = 0;
+         else
+-            dir[0] = 0;
++            fromElf[0] = 0;
+     }
+-    if (dir[0])
++    const char *candidates[] = {fromElf, "", "host:", "host:/", "mass:/", "mass0:/", "cdrom0:\\", "mc0:/"};
++
++    const char *chosen = nullptr;
++    scr_printf("  Looking for th07.dat:\n");
++    for (const char *c : candidates)
+     {
+-        int r = chdir(dir);
+-        scr_printf("  chdir(%s) = %d\n", dir, r);
++        long n;
++        bool ok = CanOpen(c, "th07.dat", &n);
++        scr_printf("    %-12s %s\n", c[0] ? c : "(cwd)", ok ? "FOUND" : "no");
++        if (ok && !chosen)
++            chosen = c;
+     }
+-    char cwd[256];
+-    if (getcwd(cwd, sizeof(cwd)))
+-        scr_printf("  working dir: %s\n", cwd);
+     scr_printf("\n");
+ 
++    if (chosen)
++        strncpy(g_Ps2BasePrefix, chosen, sizeof(g_Ps2BasePrefix) - 1);
++    scr_printf("  Using prefix: '%s'\n\n", g_Ps2BasePrefix);
++
+     static const struct
+     {
+         const char *name;
+@@ -67,8 +94,8 @@ void Ps2BootScreen(int argc, char **argv)
+     bool missing = false;
+     for (const auto &f : files)
+     {
+-        long n = FileSize(f.name);
+-        if (n >= 0)
++        long n;
++        if (CanOpen(g_Ps2BasePrefix, f.name, &n))
+             scr_printf("  [ OK ]  %-14s %ld bytes\n", f.name, n);
+         else if (f.required)
+         {
+@@ -88,7 +115,6 @@ void Ps2BootScreen(int argc, char **argv)
+             sleep(1);
+     }
+     scr_printf("  All required files found. Starting game...\n");
+-    scr_printf("  (if the screen goes black after this, check the EE log)\n");
+     sleep(4);
+ }
+ #endif
+-- 
+2.43.0
+
+
+From 6ad6a56bec04a181478258be9ac419b1d6059995 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:41:26 -0300
+Subject: [PATCH 05/10] PS2GS: pad textures to power of two and scale UVs
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/graphics/PS2GS.cpp | 16 ++++++++++++++--
+ src/graphics/PS2GS.hpp |  1 +
+ 2 files changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 46a5b61..59bb4f4 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -536,8 +536,14 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
+ 
+     ReleaseTextureMemory(tex);
+ 
+-    const u32 w = std::max<u32>(width, kMinTexSize);
+-    const u32 h = std::max<u32>(height, kMinTexSize);
++    // The GS wraps/addresses textures in powers of two: pad the allocation and scale the UVs to match
++    u32 w = kMinTexSize, h = kMinTexSize;
++    while (w < width)
++        w <<= 1;
++    while (h < height)
++        h <<= 1;
++    tex->scaleU = (f32)width / (f32)w;
++    tex->scaleV = (f32)height / (f32)h;
+     const u32 bytes = gsKit_texture_size_ee(w, h, TH07_TEX_PSM);
+ 
+     std::memset(&tex->gs, 0, sizeof(GSTEXTURE));
+@@ -628,6 +634,12 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
+         }
+     }
+ 
++    if (textured && boundTexture)
++    {
++        o.u *= boundTexture->scaleU;
++        o.v *= boundTexture->scaleV;
++    }
++
+     // Texture stage "argument 2": diffuse colour, texture factor, or nothing
+     f32 arg[4];
+     switch (texArg)
+diff --git a/src/graphics/PS2GS.hpp b/src/graphics/PS2GS.hpp
+index fdeab34..04f85a7 100644
+--- a/src/graphics/PS2GS.hpp
++++ b/src/graphics/PS2GS.hpp
+@@ -58,6 +58,7 @@ class PS2GS : public ZunGraphics
+     {
+         GSTEXTURE gs;
+         bool alive = false;
++        f32 scaleU = 1.0f, scaleV = 1.0f; // image size / (power of two) texture size
+     };
+ 
+     // Vertex after the transform, before the perspective divide.
+-- 
+2.43.0
+
+
+From 3aab54d99b8a8e68e1c5bb36e82ad42b98b86666 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:42:20 -0300
+Subject: [PATCH 06/10] PS2: show the reason for an early exit on screen
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/GameErrorContext.cpp |  7 +++++
+ src/Supervisor.cpp       | 14 ++++++++++
+ src/main.cpp             | 12 +++++++-
+ src/ps2boot.cpp          | 60 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 92 insertions(+), 1 deletion(-)
+
+diff --git a/src/GameErrorContext.cpp b/src/GameErrorContext.cpp
+index 2e1d5a9..895ab9a 100644
+--- a/src/GameErrorContext.cpp
++++ b/src/GameErrorContext.cpp
+@@ -4,6 +4,10 @@
+ #include <cstdio>
+ #include <cstring>
+ 
++#ifdef __PS2__
++void Ps2LogAppend(const char *text);
++#endif
++
+ GameErrorContext g_GameErrorContext;
+ 
+ const char *GameErrorContext::Log(const char *fmt, ...)
+@@ -16,6 +20,7 @@ const char *GameErrorContext::Log(const char *fmt, ...)
+     vsprintf(tmp, fmt, args);
+     tmpSize = strlen(tmp);
+ #ifdef __PS2__
++    Ps2LogAppend(tmp);
+     printf("LOG: %s", tmp);
+     fflush(stdout);
+ #endif
+@@ -40,6 +45,8 @@ const char *GameErrorContext::Fatal(const char *fmt, ...)
+     vsprintf(tmp, fmt, args);
+     tmpSize = strlen(tmp);
+ #ifdef __PS2__
++    Ps2LogAppend("FATAL: ");
++    Ps2LogAppend(tmp);
+     printf("FATAL: %s", tmp);
+     fflush(stdout);
+ #endif
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 953ec4e..905643f 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -42,10 +42,24 @@ char g_FpsCounterBuffer[256];
+ u32 g_NumFramesSinceLastTime;
+ u64 g_PerformanceCounter;
+ 
++#ifdef __PS2__
++void Ps2LogAppend(const char *text);
++#endif
++
+ void Supervisor::DebugPrint(const char *fmt, ...)
+ {
+     va_list args;
+     va_start(args, fmt);
++#ifdef __PS2__
++    {
++        char tmp[512];
++        va_list args2;
++        va_copy(args2, args);
++        vsnprintf(tmp, sizeof(tmp), fmt, args2);
++        va_end(args2);
++        Ps2LogAppend(tmp);
++    }
++#endif
+     vprintf(fmt, args);
+     va_end(args);
+ #ifdef __PS2__
+diff --git a/src/main.cpp b/src/main.cpp
+index 8439ccd..4c5e954 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -29,6 +29,7 @@ void AnmManager::TakeScreenshotIfRequested()
+ #ifdef __PS2__
+ #include "Ps2Pad.hpp"
+ void Ps2BootScreen(int argc, char **argv);
++void Ps2ShowExitScreen(int result);
+ #endif
+ 
+ int main(int argc, char *argv[])
+@@ -47,6 +48,7 @@ int main(int argc, char *argv[])
+     fflush(stdout);
+     if (g_Supervisor.LoadConfig("th07.cfg") != ZUN_SUCCESS)
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+@@ -56,16 +58,19 @@ int main(int argc, char *argv[])
+ start:
+     if (GameWindow::CreateGameWindow())
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+     if (GameWindow::InitInterface())
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+     if (GameWindow::InitRendering())
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+@@ -83,9 +88,11 @@ start:
+     {
+         if (res == ZUN_ERROR)
+         {
+-            goto cleanup;
++            Supervisor::DebugPrint("main: leaving through cleanup (line %d)\n", __LINE__);
++        goto cleanup;
+         }
+         res = RENDER_RESULT_EXIT_ERROR;
++        Supervisor::DebugPrint("main: leaving through cleanup (line %d)\n", __LINE__);
+         goto cleanup;
+     }
+     res = RENDER_RESULT_KEEP_RUNNING;
+@@ -178,5 +185,8 @@ stop:
+     }
+     FileSystem::WriteDataToFile("th07.cfg", &g_Supervisor.cfg, sizeof(GameConfiguration));
+     g_GameErrorContext.Flush();
++#ifdef __PS2__
++    Ps2ShowExitScreen(res);
++#endif
+     return 0;
+ }
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index 7342e6a..e453605 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -28,6 +28,66 @@ extern "C" FILE *__wrap_fopen(const char *path, const char *mode)
+     return f;
+ }
+ 
++// Last few KB of everything the game logged, so the reason for an early exit can be shown on screen
++static char s_LogTail[3072];
++static size_t s_LogLen = 0;
++
++void Ps2LogAppend(const char *text)
++{
++    size_t n = strlen(text);
++    if (n >= sizeof(s_LogTail))
++    {
++        text += n - (sizeof(s_LogTail) - 1);
++        n = sizeof(s_LogTail) - 1;
++    }
++    if (s_LogLen + n >= sizeof(s_LogTail))
++    {
++        size_t drop = s_LogLen + n - (sizeof(s_LogTail) - 1);
++        memmove(s_LogTail, s_LogTail + drop, s_LogLen - drop);
++        s_LogLen -= drop;
++    }
++    memcpy(s_LogTail + s_LogLen, text, n);
++    s_LogLen += n;
++    s_LogTail[s_LogLen] = 0;
++}
++
++void Ps2ShowExitScreen(int result)
++{
++    init_scr();
++    scr_printf("\n  Touhou 7 PS2 - the game exited (result %d)\n", result);
++    scr_printf("  Last messages (Japanese text is not shown):\n\n");
++    // Keep only plain ASCII lines, last 24 of them
++    static char lines[40][100];
++    int count = 0;
++    char cur[100];
++    size_t ci = 0;
++    for (size_t i = 0; i <= s_LogLen; i++)
++    {
++        char ch = s_LogTail[i];
++        if (ch == '\n' || ch == 0)
++        {
++            cur[ci] = 0;
++            if (ci > 0)
++            {
++                strncpy(lines[count % 40], cur, 99);
++                lines[count % 40][99] = 0;
++                count++;
++            }
++            ci = 0;
++        }
++        else if (ch >= 32 && ch < 127 && ci < 96)
++            cur[ci++] = ch;
++        else if (ch < 0 && ci < 96)
++            cur[ci++] = '?';
++    }
++    int start = count > 24 ? count - 24 : 0;
++    for (int i = start; i < count; i++)
++        scr_printf("  %s\n", lines[i % 40]);
++    scr_printf("\n  Halted. Close the emulator window.\n");
++    for (;;)
++        sleep(1);
++}
++
+ static bool CanOpen(const char *prefix, const char *name, long *size)
+ {
+     char full[320];
+-- 
+2.43.0
+
+
+From a167e0490e09e023f0e9d71ad1e218fd1084ecb8 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:46:07 -0300
+Subject: [PATCH 07/10] PS2: tolerant WAV decoder; a bad sound no longer aborts
+ start-up
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/SoundPlayer.cpp |   7 +++
+ src/ps2audio.cpp    | 126 ++++++++++++++++++++++++++++++++++++--------
+ 2 files changed, 110 insertions(+), 23 deletions(-)
+
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index c99b78d..b0547d9 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -540,6 +540,13 @@ ZunResult SoundPlayer::LoadSound(i32 idx, const char *path)
+     }
+ 
+     i32 fileSize = *(u32 *)(soundFileDat + 4) + 8;
++#ifdef __PS2__
++    // trust the real size of the file over the RIFF header (which may be wrong or too large)
++    if (g_LastFileSize >= 12 && (u32)fileSize > g_LastFileSize)
++    {
++        fileSize = g_LastFileSize;
++    }
++#endif
+ 
+     ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 44100);
+     if (ma_decode_memory(soundFileDat, fileSize, &decoderConfig, &frameCount, &frames) !=
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index a351041..e4753c8 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -177,38 +177,118 @@ ma_result ma_audio_buffer_init(const ma_audio_buffer_config *cfg, ma_audio_buffe
+     return MA_SUCCESS;
+ }
+ 
+-ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *cfg, ma_uint64 *pFrameCount,
++static uint32_t Rd32(const uint8_t *p)
++{
++    return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24);
++}
++static uint16_t Rd16(const uint8_t *p)
++{
++    return (uint16_t)(p[0] | (p[1] << 8));
++}
++
++// Own RIFF/WAVE parser: PCM 8/16/24/32 bit and float, any channel count and rate -> f32 stereo @ 44100.
++// A sound that cannot be decoded becomes a short silence instead of an error, so one odd file cannot stop the game.
++static void MakeSilence(ma_uint64 *pFrameCount, void **ppFrames)
++{
++    float *buf = (float *)std::calloc(64, sizeof(float) * 2);
++    *ppFrames = buf;
++    *pFrameCount = 64;
++}
++
++ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *, ma_uint64 *pFrameCount,
+                            void **ppFrames)
+ {
+-    SDL_RWops *rw = SDL_RWFromConstMem(pData, (int)dataSize);
+-    SDL_AudioSpec spec;
+-    Uint8 *buf = nullptr;
+-    Uint32 len = 0;
+-    if (!rw || !SDL_LoadWAV_RW(rw, 1, &spec, &buf, &len))
+-        return MA_ERROR;
++    const uint8_t *d = (const uint8_t *)pData;
++    uint16_t tag = 0, channels = 0, bits = 0;
++    uint32_t rate = 0;
++    const uint8_t *samples = nullptr;
++    size_t sampleBytes = 0;
+ 
+-    SDL_AudioCVT cvt;
+-    if (SDL_BuildAudioCVT(&cvt, spec.format, spec.channels, spec.freq, AUDIO_F32SYS, 2, kRate) < 0)
++    if (dataSize >= 12 && std::memcmp(d, "RIFF", 4) == 0 && std::memcmp(d + 8, "WAVE", 4) == 0)
+     {
+-        SDL_FreeWAV(buf);
+-        return MA_ERROR;
++        size_t pos = 12;
++        while (pos + 8 <= dataSize)
++        {
++            uint32_t csize = Rd32(d + pos + 4);
++            const uint8_t *c = d + pos + 8;
++            size_t avail = dataSize - (pos + 8);
++            if (std::memcmp(d + pos, "fmt ", 4) == 0 && csize >= 16 && avail >= 16)
++            {
++                tag = Rd16(c);
++                channels = Rd16(c + 2);
++                rate = Rd32(c + 4);
++                bits = Rd16(c + 14);
++                if (tag == 0xFFFE && csize >= 26 && avail >= 26)
++                    tag = Rd16(c + 24); // WAVE_FORMAT_EXTENSIBLE: sub format
++            }
++            else if (std::memcmp(d + pos, "data", 4) == 0)
++            {
++                samples = c;
++                sampleBytes = std::min<size_t>(csize, avail);
++                break;
++            }
++            pos += 8 + (size_t)csize + (csize & 1);
++        }
+     }
+-    cvt.len = (int)len;
+-    cvt.buf = (Uint8 *)std::malloc((size_t)len * (size_t)cvt.len_mult);
+-    if (!cvt.buf)
++
++    const bool pcm = (tag == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32)) || (tag == 3 && bits == 32);
++    if (!samples || !pcm || channels < 1 || rate == 0)
+     {
+-        SDL_FreeWAV(buf);
+-        return MA_ERROR;
++        std::printf("audio: unsupported/invalid wav (tag %u, %u ch, %u Hz, %u bit) -> silence\n", tag, channels, rate,
++                    bits);
++        MakeSilence(pFrameCount, ppFrames);
++        return MA_SUCCESS;
+     }
+-    std::memcpy(cvt.buf, buf, len);
+-    SDL_FreeWAV(buf);
+-    if (cvt.needed && SDL_ConvertAudio(&cvt) < 0)
++
++    const size_t bytesPerSample = bits / 8;
++    const size_t srcFrames = sampleBytes / (bytesPerSample * channels);
++    if (srcFrames == 0)
+     {
+-        std::free(cvt.buf);
+-        return MA_ERROR;
++        MakeSilence(pFrameCount, ppFrames);
++        return MA_SUCCESS;
++    }
++
++    auto sampleAt = [&](size_t frame, int ch) -> float {
++        const uint8_t *p = samples + (frame * channels + ch) * bytesPerSample;
++        if (tag == 3)
++        {
++            float f;
++            std::memcpy(&f, p, 4);
++            return f;
++        }
++        switch (bits)
++        {
++        case 8:
++            return ((int)p[0] - 128) / 128.0f;
++        case 16:
++            return (int16_t)Rd16(p) / 32768.0f;
++        case 24:
++            return (int32_t)((p[0] << 8) | (p[1] << 16) | ((uint32_t)p[2] << 24)) / 2147483648.0f;
++        default:
++            return (int32_t)Rd32(p) / 2147483648.0f;
++        }
++    };
++
++    const ma_uint64 outFrames = (ma_uint64)srcFrames * kRate / rate;
++    float *out = (float *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(float) * 2);
++    if (!out)
++    {
++        MakeSilence(pFrameCount, ppFrames);
++        return MA_SUCCESS;
++    }
++    for (ma_uint64 i = 0; i < outFrames; i++)
++    {
++        const double pos = (double)i * rate / kRate;
++        const size_t i0 = (size_t)pos;
++        const size_t i1 = std::min(i0 + 1, srcFrames - 1);
++        const float t = (float)(pos - (double)i0);
++        float l = sampleAt(i0, 0) * (1 - t) + sampleAt(i1, 0) * t;
++        float r = channels > 1 ? sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t : l;
++        out[i * 2] = l;
++        out[i * 2 + 1] = r;
+     }
+-    *ppFrames = cvt.buf;
+-    *pFrameCount = (ma_uint64)cvt.len_cvt / 8;
++    *ppFrames = out;
++    *pFrameCount = outFrames;
+     return MA_SUCCESS;
+ }
+ 
+-- 
+2.43.0
+
+
+From 1a78ec4f5a1cf9d8939ca9e22b71099c05ebc755 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:49:26 -0300
+Subject: [PATCH 08/10] PS2: keep sound effects as 16 bit (mono when possible)
+ to save RAM; handle archive read failures
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/FileSystem.cpp |  7 ++++++-
+ src/ps2audio.cpp   | 35 ++++++++++++++++++++++++++++++-----
+ src/ps2boot.cpp    |  3 +++
+ 3 files changed, 39 insertions(+), 6 deletions(-)
+
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index 2a5a839..2f3c884 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -52,7 +52,12 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+                 return NULL;
+             }
+ 
+-            g_Pbg4Archive.ReadDecompressEntry(filename, buf);
++            if (!g_Pbg4Archive.ReadDecompressEntry(filename, buf))
++            {
++                g_GameErrorContext.Fatal("error : %s could not be read from the archive (out of memory?)\n", filename);
++                free(buf);
++                return NULL;
++            }
+             return buf;
+         }
+     }
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index e4753c8..80caee7 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -148,6 +148,19 @@ ma_result BufLength(ma_data_source *ds, ma_uint64 *l)
+     return MA_SUCCESS;
+ }
+ const ma_data_source_vtable g_bufVtable = {BufRead, BufSeek, BufFormat, BufCursor, BufLength, nullptr, 0};
++// Decoded effects are kept as 16 bit (mono when the source is mono) to save RAM; remember each buffer's layout
++struct PcmInfo
++{
++    const void *ptr;
++    uint32_t channels;
++};
++PcmInfo g_pcmInfo[128];
++int g_pcmCount = 0;
++void RegisterPcm(const void *p, uint32_t ch)
++{
++    if (g_pcmCount < 128)
++        g_pcmInfo[g_pcmCount++] = {p, ch};
++}
+ } // namespace
+ 
+ float ma_volume_db_to_linear(float db)
+@@ -163,6 +176,14 @@ void ma_free(void *p, const void *)
+ ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
+                                                    const void *pData, const void *)
+ {
++    for (int i = 0; i < g_pcmCount; i++)
++    {
++        if (g_pcmInfo[i].ptr == pData)
++        {
++            format = ma_format_s16;
++            channels = g_pcmInfo[i].channels;
++        }
++    }
+     return {format, channels, sizeInFrames, pData};
+ }
+ 
+@@ -190,9 +211,10 @@ static uint16_t Rd16(const uint8_t *p)
+ // A sound that cannot be decoded becomes a short silence instead of an error, so one odd file cannot stop the game.
+ static void MakeSilence(ma_uint64 *pFrameCount, void **ppFrames)
+ {
+-    float *buf = (float *)std::calloc(64, sizeof(float) * 2);
++    int16_t *buf = (int16_t *)std::calloc(64, sizeof(int16_t));
+     *ppFrames = buf;
+     *pFrameCount = 64;
++    RegisterPcm(buf, 1);
+ }
+ 
+ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *, ma_uint64 *pFrameCount,
+@@ -270,7 +292,8 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+     };
+ 
+     const ma_uint64 outFrames = (ma_uint64)srcFrames * kRate / rate;
+-    float *out = (float *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(float) * 2);
++    const uint32_t outCh = channels > 1 ? 2 : 1;
++    int16_t *out = (int16_t *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(int16_t) * outCh);
+     if (!out)
+     {
+         MakeSilence(pFrameCount, ppFrames);
+@@ -283,10 +306,12 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+         const size_t i1 = std::min(i0 + 1, srcFrames - 1);
+         const float t = (float)(pos - (double)i0);
+         float l = sampleAt(i0, 0) * (1 - t) + sampleAt(i1, 0) * t;
+-        float r = channels > 1 ? sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t : l;
+-        out[i * 2] = l;
+-        out[i * 2 + 1] = r;
++        auto toS16 = [](float v) { return (int16_t)(std::clamp(v, -1.0f, 1.0f) * 32767.0f); };
++        out[i * outCh] = toS16(l);
++        if (outCh == 2)
++            out[i * 2 + 1] = toS16(sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t);
+     }
++    RegisterPcm(out, outCh);
+     *ppFrames = out;
+     *pFrameCount = outFrames;
+     return MA_SUCCESS;
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index e453605..fd6327b 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -2,6 +2,7 @@
+ #include <cstdio>
+ #include <cstring>
+ #include <debug.h>
++#include <malloc.h>
+ #include <unistd.h>
+ 
+ // Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
+@@ -55,6 +56,8 @@ void Ps2ShowExitScreen(int result)
+ {
+     init_scr();
+     scr_printf("\n  Touhou 7 PS2 - the game exited (result %d)\n", result);
++    struct mallinfo mi = mallinfo();
++    scr_printf("  Heap: %d KB in use, %d KB free inside heap\n", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
+     scr_printf("  Last messages (Japanese text is not shown):\n\n");
+     // Keep only plain ASCII lines, last 24 of them
+     static char lines[40][100];
+-- 
+2.43.0
+
+
+From a50f370fd60285635513453c084b0f277f44334a Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:53:01 -0300
+Subject: [PATCH 09/10] Convert embedded anm textures by hand instead of
+ through SDL surfaces
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/AnmManager.cpp | 105 +++++++++++++++++++++++++++++++--------------
+ 1 file changed, 73 insertions(+), 32 deletions(-)
+
+diff --git a/src/AnmManager.cpp b/src/AnmManager.cpp
+index f6f0177..55ac1b6 100644
+--- a/src/AnmManager.cpp
++++ b/src/AnmManager.cpp
+@@ -152,50 +152,91 @@ ZunResult AnmManager::LoadTexture(i32 textureIdx, const char *texturePath, u32 c
+ 
+ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *imageInfo)
+ {
+-    SDL_Surface *surface;
++    SDL_Surface *surface = NULL;
+ 
+     ReleaseTexture(textureIdx);
+ 
++    if (imageInfo->format < 1 || imageInfo->format > 5)
++    {
++        Supervisor::DebugPrint("embedded texture: bad format %u\n", (u32)imageInfo->format);
++        return ZUN_ERROR;
++    }
+     u32 bpp = g_TextureBytesPerPixel[imageInfo->format];
+-    u32 depth = bpp * 8;
+     u32 pitch = imageInfo->width * bpp;
+ 
+-    u32 sdlFormat = SDL_PIXELFORMAT_UNKNOWN;
+-    switch (imageInfo->format)
+-    {
+-    case 1:
+-        sdlFormat = SDL_PIXELFORMAT_ARGB8888;
+-        break;
+-    case 2:
+-        sdlFormat = SDL_PIXELFORMAT_ARGB1555;
+-        break;
+-    case 3:
+-        sdlFormat = SDL_PIXELFORMAT_RGB565;
+-        break;
+-    case 4:
+-        sdlFormat = SDL_PIXELFORMAT_BGR24;
+-        break;
+-    case 5:
+-        sdlFormat = SDL_PIXELFORMAT_ARGB4444;
+-        break;
+-    default:
++    // Convert to RGBA32 by hand (no dependency on SDL's blitter / pixel format support)
++    if (imageInfo->format < 1 || imageInfo->format > 5 || imageInfo->width == 0 || imageInfo->height == 0)
++    {
++        Supervisor::DebugPrint("embedded texture: bad format %u (%ux%u)\n", (u32)imageInfo->format,
++                               (u32)imageInfo->width, (u32)imageInfo->height);
+         return ZUN_ERROR;
+     }
+-
+-    surface = SDL_CreateRGBSurfaceWithFormatFrom(imageInfo->data, imageInfo->width,
+-                                                 imageInfo->height, depth, pitch, sdlFormat);
+-    if (!surface)
++    u8 *rgba = (u8 *)malloc((size_t)imageInfo->width * imageInfo->height * 4);
++    if (!rgba)
+     {
++        Supervisor::DebugPrint("embedded texture: out of memory (%ux%u)\n", (u32)imageInfo->width,
++                               (u32)imageInfo->height);
+         return ZUN_ERROR;
+     }
+-
+-    SDL_Surface *converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+-    SDL_FreeSurface(surface);
+-
+-    if (!converted)
++    for (u32 y = 0; y < (u32)imageInfo->height; y++)
+     {
+-        return ZUN_ERROR;
++        const u8 *src = (const u8 *)imageInfo->data + (size_t)y * pitch;
++        u8 *dst = rgba + (size_t)y * imageInfo->width * 4;
++        for (u32 x = 0; x < (u32)imageInfo->width; x++, dst += 4)
++        {
++            u32 r, g, b, a;
++            switch (imageInfo->format)
++            {
++            case 1: // ARGB8888 (B,G,R,A in memory)
++                b = src[x * 4];
++                g = src[x * 4 + 1];
++                r = src[x * 4 + 2];
++                a = src[x * 4 + 3];
++                break;
++            case 2: { // ARGB1555
++                u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
++                a = (v & 0x8000) ? 255 : 0;
++                r = ((v >> 10) & 31) * 255 / 31;
++                g = ((v >> 5) & 31) * 255 / 31;
++                b = (v & 31) * 255 / 31;
++                break;
++            }
++            case 3: { // RGB565
++                u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
++                a = 255;
++                r = ((v >> 11) & 31) * 255 / 31;
++                g = ((v >> 5) & 63) * 255 / 63;
++                b = (v & 31) * 255 / 31;
++                break;
++            }
++            case 4: // BGR24
++                b = src[x * 3];
++                g = src[x * 3 + 1];
++                r = src[x * 3 + 2];
++                a = 255;
++                break;
++            default: { // 5: ARGB4444
++                u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
++                a = ((v >> 12) & 15) * 17;
++                r = ((v >> 8) & 15) * 17;
++                g = ((v >> 4) & 15) * 17;
++                b = (v & 15) * 17;
++                break;
++            }
++            }
++            dst[0] = (u8)r;
++            dst[1] = (u8)g;
++            dst[2] = (u8)b;
++            dst[3] = (u8)a;
++        }
+     }
++    struct
++    {
++        i32 w, h, pitch;
++        u8 *pixels;
++    } conv = {(i32)imageInfo->width, (i32)imageInfo->height, (i32)imageInfo->width * 4, rgba};
++    auto *converted = &conv;
++    (void)surface;
+ 
+     this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
+     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
+@@ -209,7 +250,7 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+     textureHeights[textureIdx] = converted->h;
+     texturePitches[textureIdx] = converted->pitch;
+ 
+-    SDL_FreeSurface(converted);
++    free(rgba);
+     return ZUN_SUCCESS;
+ }
+ 
+-- 
+2.43.0
+
+
+From 13bbfc213352b39e842f2836c1467f050c23ea2c Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 19:56:36 -0300
+Subject: [PATCH 10/10] PS2: limit simultaneous enemies to 160 (frees ~6.5 MB
+ of static RAM); report out-of-memory loads
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/EnemyManager.hpp | 6 ++++++
+ src/FileSystem.cpp   | 1 +
+ 2 files changed, 7 insertions(+)
+
+diff --git a/src/EnemyManager.hpp b/src/EnemyManager.hpp
+index 3327079..72d94ce 100644
+--- a/src/EnemyManager.hpp
++++ b/src/EnemyManager.hpp
+@@ -261,7 +261,13 @@ struct Enemy
+     Enemy *next;
+ };
+ 
++#ifdef __PS2__
++// The PS2 only has 32 MB of RAM and EnemyManager is a static array of full Enemy structs (~20 KB each):
++// 480 of them take ~10 MB. 160 simultaneous enemies is plenty for normal play.
++#define MAX_ENEMIES 160
++#else
+ #define MAX_ENEMIES 480
++#endif
+ 
+ struct EnemyManager
+ {
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index 2f3c884..416b166 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -49,6 +49,7 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+             buf = (u8 *)malloc(fsize);
+             if (!buf)
+             {
++                g_GameErrorContext.Fatal("error : out of memory loading %s (%u bytes)\n", filename, fsize);
+                 return NULL;
+             }
+ 
+-- 
+2.43.0
+

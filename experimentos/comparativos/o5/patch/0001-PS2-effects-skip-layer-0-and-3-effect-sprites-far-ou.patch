@@ -1,0 +1,90 @@
+From a7785c9a31f44c462acef2ada8ac5fc47d276eff Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 22:00:48 -0300
+Subject: [PATCH] PS2 effects: skip layer 0 and 3 effect sprites far outside
+ the play field
+
+Drawing only: an effect whose sprite is entirely outside the play field
+(384x448, plus 64 px and its own size) is not sent to the GS. The effect
+still updates, times out and can be cleared normally. Billboard effects
+(layer 2) are not culled. Set TH07_PS2_NO_EFFECT_CULL to disable.
+
+Risk: a large sprite drawn further out than the margin would disappear
+early. Not measured on console yet.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/EffectManager.cpp | 42 ++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
+
+diff --git a/src/EffectManager.cpp b/src/EffectManager.cpp
+index 2c291c4..015eac4 100644
+--- a/src/EffectManager.cpp
++++ b/src/EffectManager.cpp
+@@ -696,6 +696,38 @@ u32 EffectManager::OnUpdate(EffectManager *arg)
+     }
+ }
+ 
++#ifdef __PS2__
++#ifndef TH07_PS2_EFFECT_CULL_MARGIN
++// Effects in layers 0 and 3 further than this (plus their own size) outside the play field (384x448) are not
++// drawn. Same convention as the bullet and enemy culls. Drawing only: the effect keeps updating and timing out.
++#define TH07_PS2_EFFECT_CULL_MARGIN 64.0f
++#endif
++static inline bool Ps2EffectVisible(const Effect *effect)
++{
++#ifndef TH07_PS2_NO_EFFECT_CULL
++    const AnmVm *vm = &effect->vm;
++    if (vm->sprite == NULL)
++    {
++        return true;
++    }
++    const f32 r = 0.5f * (vm->sprite->widthPx * vm->scale.x + vm->sprite->heightPx * vm->scale.y) +
++                  TH07_PS2_EFFECT_CULL_MARGIN;
++    const f32 x = effect->pos.x;
++    const f32 y = effect->pos.y;
++    return !(x < -r || x > 384.0f + r || y < -r || y > 448.0f + r);
++#else
++    (void)effect;
++    return true;
++#endif
++}
++#else
++static inline bool Ps2EffectVisible(const Effect *effect)
++{
++    (void)effect;
++    return true;
++}
++#endif
++
+ u32 EffectManager::OnDraw(EffectManager *arg)
+ {
+     PS2_TIME(PS2_T_EFFECT_DRAW);
+@@ -707,7 +739,10 @@ u32 EffectManager::OnDraw(EffectManager *arg)
+         effect->vm.pos = effect->pos;
+         effect->vm.pos.x += g_GameManager.arcadeRegionTopLeftPos.x;
+         effect->vm.pos.y += g_GameManager.arcadeRegionTopLeftPos.y;
+-        g_AnmManager->Draw(&effect->vm);
++        if (Ps2EffectVisible(effect))
++        {
++            g_AnmManager->Draw(&effect->vm);
++        }
+         effect = effect->next;
+     }
+     effect = arg->layer2.next;
+@@ -723,7 +758,10 @@ u32 EffectManager::OnDraw(EffectManager *arg)
+         effect->vm.pos = effect->pos;
+         effect->vm.pos.x += g_GameManager.arcadeRegionTopLeftPos.x;
+         effect->vm.pos.y += g_GameManager.arcadeRegionTopLeftPos.y;
+-        g_AnmManager->Draw(&effect->vm);
++        if (Ps2EffectVisible(effect))
++        {
++            g_AnmManager->Draw(&effect->vm);
++        }
+         effect = effect->next;
+     }
+     return CHAIN_CALLBACK_RESULT_CONTINUE;
+-- 
+2.43.0
+

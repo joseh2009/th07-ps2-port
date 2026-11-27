@@ -1,0 +1,3 @@
+src/pbg4/Pbg4Archive.cpp:178:18: warning: multi-character character constant [-Wmultichar]
+  178 |     if (magic != '4GBP')
+      |                  ^~~~~~

@@ -1,0 +1,66 @@
+From 163ee53582f84900d48b791be938a5b67d61f64d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 09:10:16 -0300
+Subject: [PATCH] PS2 GS: vertex path: integer floor instead of std::floor
+
+EmitTriangle snaps every vertex to the pixel grid with std::floor, which
+is a libm call per coordinate on the EE. FloorFast gives the same result
+(truncate, then subtract one when the value was negative) and was checked
+against std::floor on 20 million values, zero mismatches.
+
+Already in place before this change, so not changed here:
+- strip and fan vertices are transformed once into clipVerts and shared by
+  their triangles;
+- triangles that are fully inside are passed by reference (no copy);
+- clipVerts and the batch vectors are reserved in Init, so a resize does
+  not allocate per draw call.
+
+Not done, with reasons:
+- Writing the batch straight into the gsKit packet: gsKit's list functions
+  copy the vertices into their own queue, and the gsKit source is not
+  available here to build a direct path safely.
+- Trivial reject before MakeVertex: it would need the clip position without
+  the colour and UV work, which means splitting MakeVertex. Left for a
+  measured follow-up.
+
+Expected gain: small (one libm call per coordinate). Not measured.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/graphics/PS2GS.cpp | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 10b27df..fac837b 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -111,6 +111,14 @@ inline f32 PlaneDist(int plane, f32 x, f32 y, f32 w)
+     }
+ }
+ 
++// Same result as std::floor for |v| < 2^30 (screen coordinates after clipping are far smaller). It is a
++// truncation plus one compare, so no libm call per vertex on the EE. w >= kNearW keeps v finite here.
++inline f32 FloorFast(f32 v)
++{
++    const int i = (int)v; // truncates toward zero
++    return (f32)(i - (v < (f32)i ? 1 : 0));
++}
++
+ inline u32 OutCode(f32 x, f32 y, f32 w)
+ {
+     u32 code = 0;
+@@ -780,8 +788,8 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
+         // scaleY is not an integer and sprite edges would land on fractional rows. Neighbouring quads then
+         // leave a gap or overlap on a shared edge, which shows as light horizontal lines. Snapping gives
+         // shared vertices identical coordinates.
+-        const f32 sx = std::floor((((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX + 0.5f) - 0.5f;
+-        const f32 sy = std::floor((((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY + 0.5f) - 0.5f;
++        const f32 sx = FloorFast((((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX + 0.5f) - 0.5f;
++        const f32 sy = FloorFast((((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY + 0.5f) - 0.5f;
+ 
+         // PerspectiveFovLH (ZunMath.hpp) and the 2D projections already produce ndcZ in [0,1] (D3D convention)
+         f32 depth = ndcZ * (viewport.maxZ - viewport.minZ) + viewport.minZ;
+-- 
+2.43.0
+

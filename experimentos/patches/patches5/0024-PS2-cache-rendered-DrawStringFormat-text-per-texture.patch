@@ -1,0 +1,261 @@
+From dca8ddd60c46e9e40c0604efff6d86bdaa4dd2bc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 23:27:27 -0300
+Subject: [PATCH 24/24] PS2: cache rendered DrawStringFormat text per texture
+
+DrawStringFormat and DrawStringFormat2 re-rendered the same string into
+the same texture every frame (two TTF renders and two texture uploads
+per call, and the upload invalidates the whole texture in VRAM). Each
+texture now keeps the key of its last text write. The key is reused only
+when the inputs match and no other texture write happened since
+(textureWriteGen, bumped by every SetTextureImage/SetTextureSubImage in
+AnmManager). DrawTextToSprite invalidates the destination's key, so
+DrawVmTextFmt writes cannot leave a stale key behind. PS2 only; not
+measured on hardware or in PCSX2.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/AnmManager.cpp | 78 ++++++++++++++++++++++++++++++++++++++++++++++
+ src/AnmManager.hpp | 11 +++++++
+ 2 files changed, 89 insertions(+)
+
+diff --git a/src/AnmManager.cpp b/src/AnmManager.cpp
+index e1b31c0..00410d8 100644
+--- a/src/AnmManager.cpp
++++ b/src/AnmManager.cpp
+@@ -65,6 +65,8 @@ AnmManager::AnmManager()
+     this->currentCameraMode = 255;
+     this->currentZWriteDisable = 0;
+     this->screenshotTextureId = -1;
++    memset(this->textCache, 0, sizeof(this->textCache));
++    this->textureWriteGen = 0;
+ }
+ 
+ AnmManager::~AnmManager()
+@@ -141,6 +143,7 @@ ZunResult AnmManager::LoadTexture(i32 textureIdx, const char *texturePath, u32 c
+ 
+     this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
+     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
++    ++this->textureWriteGen;
+     g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
+                                             PIXEL_UNSIGNED_BYTE, converted->pixels);
+ 
+@@ -205,6 +208,7 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+ 
+     this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
+     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
++    ++this->textureWriteGen;
+     g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
+                                             PIXEL_UNSIGNED_BYTE, converted->pixels);
+ 
+@@ -325,12 +329,14 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+             return ZUN_ERROR;
+         }
+         ConvertEmbeddedRows(imageInfo, 0, h, cpu);
++        ++this->textureWriteGen;
+         g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, cpu);
+         this->imageDataArray[textureIdx] = cpu;
+     }
+     else
+     {
+         Ps2SetNextTexture16(Ps2UseCt16ForFormat(imageInfo->format));
++        ++this->textureWriteGen;
+         g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, NULL);
+         const u32 stripRows = (u32)std::max<size_t>(1, 65536 / ((size_t)w * 4));
+         u8 *strip = (u8 *)malloc((size_t)stripRows * w * 4);
+@@ -343,6 +349,7 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+         {
+             const u32 rows = std::min(stripRows, h - y0);
+             ConvertEmbeddedRows(imageInfo, y0, rows, strip);
++            ++this->textureWriteGen;
+             g_Supervisor.gfxDevice->SetTextureSubImage(0, (i32)y0, (i32)w, (i32)rows, strip);
+         }
+         free(strip);
+@@ -416,6 +423,7 @@ ZunResult AnmManager::LoadTextureAlphaChannel(i32 textureIdx, const char *textur
+     }
+ 
+     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
++    ++this->textureWriteGen;
+     g_Supervisor.gfxDevice->SetTextureImage(this->textureWidths[textureIdx],
+                                             this->textureHeights[textureIdx], PIXEL_RGBA,
+                                             PIXEL_UNSIGNED_BYTE, basePixels);
+@@ -436,6 +444,7 @@ ZunResult AnmManager::CreateEmptyTexture(i32 textureIdx, u32 width, u32 height)
+     void *emptyData = calloc(width * height, 4);
+ #endif
+     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
++    ++this->textureWriteGen;
+     g_Supervisor.gfxDevice->SetTextureImage(width, height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
+                                             emptyData);
+ 
+@@ -2181,6 +2190,10 @@ void AnmManager::DrawTextToSprite(u32 spriteDstIdx, i32 x, i32 y, i32 width, i32
+     {
+         fontHeight = 15;
+     }
++    if (spriteDstIdx < MAX_TEXTURES)
++    {
++        this->textCache[spriteDstIdx].valid = false;
++    }
+     TextHelper::RenderTextToTextureBold(x, y, width, height, (f32)fontWidth * scaleY,
+                                         (f32)fontHeight * scaleX, textColor, outlineType,
+                                         strToPrint, this->textures[spriteDstIdx]);
+@@ -2207,6 +2220,34 @@ void AnmManager::DrawVmTextFmt(AnmManager *manager, AnmVm *vm, u32 textColor, u3
+     vm->visible = 1;
+ }
+ 
++// FNV-1a over the inputs that decide what DrawStringFormat draws into its texture.
++static u64 TextCacheKey(const AnmVm *vm, u32 textColor, u32 outlineType, i32 fontWidth, const char *buf)
++{
++    u64 h = 1469598103934665603ULL;
++    auto mix = [&h](const void *p, size_t n) {
++        const u8 *b = (const u8 *)p;
++        for (size_t i = 0; i < n; i++)
++        {
++            h ^= b[i];
++            h *= 1099511628211ULL;
++        }
++    };
++    const AnmLoadedSprite *sp = vm->sprite;
++    mix(&sp->startPixelInclusive.x, sizeof(f32));
++    mix(&sp->startPixelInclusive.y, sizeof(f32));
++    mix(&sp->textureWidth, sizeof(f32));
++    mix(&sp->textureHeight, sizeof(f32));
++    mix(&sp->widthPx, sizeof(f32));
++    mix(&sp->cols, sizeof(f32));
++    mix(&sp->rows, sizeof(f32));
++    mix(&vm->fontHeight, sizeof(vm->fontHeight));
++    mix(&fontWidth, sizeof(fontWidth));
++    mix(&textColor, sizeof(textColor));
++    mix(&outlineType, sizeof(outlineType));
++    mix(buf, strlen(buf) + 1);
++    return h;
++}
++
+ void AnmManager::DrawStringFormat(AnmVm *vm, u32 textColor, u32 outlineType, const char *text, ...)
+ {
+     i32 fontWidth;
+@@ -2219,6 +2260,16 @@ void AnmManager::DrawStringFormat(AnmVm *vm, u32 textColor, u32 outlineType, con
+     vsprintf(buf, text, args);
+     va_end(args);
+ 
++    const i32 texIdx = vm->sprite->sourceFileIndex;
++    const bool cacheable = texIdx >= 0 && texIdx < MAX_TEXTURES;
++    const u64 key = cacheable ? TextCacheKey(vm, textColor, outlineType, fontWidth, buf) : 0;
++    if (cacheable && this->textCache[texIdx].valid && this->textCache[texIdx].gen == this->textureWriteGen &&
++        this->textCache[texIdx].key == key)
++    {
++        vm->visible = 1;
++        return;
++    }
++
+     this->DrawTextToSprite(vm->sprite->sourceFileIndex, vm->sprite->startPixelInclusive.x,
+                            vm->sprite->startPixelInclusive.y, vm->sprite->textureWidth,
+                            vm->sprite->textureHeight, fontWidth, vm->fontHeight, textColor,
+@@ -2232,6 +2283,12 @@ void AnmManager::DrawStringFormat(AnmVm *vm, u32 textColor, u32 outlineType, con
+                            vm->fontHeight, textColor, outlineType, buf, vm->sprite->cols,
+                            vm->sprite->rows);
+ 
++    if (cacheable)
++    {
++        this->textCache[texIdx].key = key;
++        this->textCache[texIdx].gen = this->textureWriteGen;
++        this->textCache[texIdx].valid = true;
++    }
+     vm->visible = 1;
+ }
+ 
+@@ -2247,6 +2304,16 @@ void AnmManager::DrawStringFormat2(AnmVm *vm, u32 textColor, u32 outlineType, co
+     vsprintf(buf, text, args);
+     va_end(args);
+ 
++    const i32 texIdx = vm->sprite->sourceFileIndex;
++    const bool cacheable = texIdx >= 0 && texIdx < MAX_TEXTURES;
++    const u64 key = cacheable ? TextCacheKey(vm, textColor, outlineType, fontWidth, buf) : 0;
++    if (cacheable && this->textCache[texIdx].valid && this->textCache[texIdx].gen == this->textureWriteGen &&
++        this->textCache[texIdx].key == key)
++    {
++        vm->visible = 1;
++        return;
++    }
++
+     this->DrawTextToSprite(vm->sprite->sourceFileIndex, vm->sprite->startPixelInclusive.x,
+                            vm->sprite->startPixelInclusive.y, vm->sprite->textureWidth,
+                            vm->sprite->textureHeight, fontWidth, vm->fontHeight, textColor,
+@@ -2260,6 +2327,12 @@ void AnmManager::DrawStringFormat2(AnmVm *vm, u32 textColor, u32 outlineType, co
+                            vm->fontHeight, textColor, outlineType, buf, vm->sprite->cols,
+                            vm->sprite->rows);
+ 
++    if (cacheable)
++    {
++        this->textCache[texIdx].key = key;
++        this->textCache[texIdx].gen = this->textureWriteGen;
++        this->textCache[texIdx].valid = true;
++    }
+     vm->visible = 1;
+ }
+ 
+@@ -2322,6 +2395,7 @@ void AnmManager::CopySurfaceToBackBuffer(i32 surfaceIdx, i32 left, i32 top, i32
+ 
+     GfxTextureHandle tex = g_Supervisor.gfxDevice->CreateTexture();
+     g_Supervisor.gfxDevice->BindTexture(tex);
++    ++this->textureWriteGen;
+     g_Supervisor.gfxDevice->SetTextureImage(surf->w, surf->h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
+                                             surf->pixels);
+ 
+@@ -2372,6 +2446,7 @@ void AnmManager::DrawEndingRect(i32 surfaceIdx, i32 rectX, i32 rectY, i32 rectLe
+ 
+     GfxTextureHandle tex = g_Supervisor.gfxDevice->CreateTexture();
+     g_Supervisor.gfxDevice->BindTexture(tex);
++    ++this->textureWriteGen;
+     g_Supervisor.gfxDevice->SetTextureImage(surf->w, surf->h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
+                                             surf->pixels);
+ 
+@@ -2424,6 +2499,7 @@ void AnmManager::TakeScreenshot(i32 textureId, i32 srcLeft, i32 srcTop, i32 srcW
+     if (srcWidth == dstWidth && srcHeight == dstHeight)
+     {
+         g_Supervisor.gfxDevice->BindTexture(this->textures[textureId]);
++        ++this->textureWriteGen;
+         g_Supervisor.gfxDevice->SetTextureSubImage(dstLeft, dstTop, dstWidth, dstHeight, pixelData);
+     }
+     else
+@@ -2438,6 +2514,7 @@ void AnmManager::TakeScreenshot(i32 textureId, i32 srcLeft, i32 srcTop, i32 srcW
+         {
+             SDL_BlitScaled(srcSurf, NULL, dstSurf, NULL);
+             g_Supervisor.gfxDevice->BindTexture(this->textures[textureId]);
++            ++this->textureWriteGen;
+             g_Supervisor.gfxDevice->SetTextureSubImage(dstLeft, dstTop, dstWidth, dstHeight,
+                                                        dstSurf->pixels);
+         }
+@@ -2491,6 +2568,7 @@ void AnmManager::CopyTexture(i32 dstIdx, i32 srcIdx, SDL_Rect *dstRect, SDL_Rect
+         SDL_BlitScaled(srcSurface, srcRect, dstSurface, dstRect);
+ 
+         g_Supervisor.gfxDevice->BindTexture(this->textures[dstIdx]);
++        ++this->textureWriteGen;
+         g_Supervisor.gfxDevice->SetTextureImage(this->textureWidths[dstIdx],
+                                                 this->textureHeights[dstIdx], PIXEL_RGBA,
+                                                 PIXEL_UNSIGNED_BYTE, dstPixels);
+diff --git a/src/AnmManager.hpp b/src/AnmManager.hpp
+index 336dbd5..30d6c45 100644
+--- a/src/AnmManager.hpp
++++ b/src/AnmManager.hpp
+@@ -370,6 +370,17 @@ struct AnmManager
+     SDL_Surface *surfaces[MAX_SURFACES];
+     SDL_Surface *surfacesBis[MAX_SURFACES];
+     u32 textureWidths[MAX_TEXTURES];
++
++    // Text cache (PS2 speed): DrawStringFormat re-renders the same string into the same texture every frame. A texture
++    // keeps its last text key; the key is reused only while no other texture write happened (textureWriteGen).
++    struct TextCacheEntry
++    {
++        u64 key;
++        u32 gen;
++        bool valid;
++    };
++    TextCacheEntry textCache[MAX_TEXTURES];
++    u32 textureWriteGen;
+     u32 textureHeights[MAX_TEXTURES];
+     u32 texturePitches[MAX_TEXTURES];
+     ZunImageInfo surfaceSourceInfo[MAX_SURFACES];
+-- 
+2.43.0
+

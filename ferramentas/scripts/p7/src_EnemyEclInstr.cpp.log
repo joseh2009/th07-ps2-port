@@ -1,0 +1,9 @@
+In file included from src/EclManager.hpp:4,
+                 from src/EnemyEclInstr.hpp:3,
+                 from src/EnemyEclInstr.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~

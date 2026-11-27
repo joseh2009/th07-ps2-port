@@ -1,0 +1,23 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/Stage.hpp:3,
+                 from src/Stage.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/Stage.cpp: In static member function 'static void Stage::UpdateScriptAndCamera(Stage*, i32, ZunVec3*, ZunVec3*, ZunVec3*, ZunVec3*, ZunVec3*)':
+src/Stage.cpp:67:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+   67 |         stage->timers[param_2]++;
+      |         ~~~~~~~~~~~~~~~~~~~~~~^~
+src/Stage.cpp: In static member function 'static u32 Stage::OnUpdate(Stage*)':
+src/Stage.cpp:361:32: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  361 |             arg->timers[camIdx]++;
+      |             ~~~~~~~~~~~~~~~~~~~^~
+src/Stage.cpp:400:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  400 |         arg->skyFogInterpTimer++;
+      |         ~~~~~~~~~~~~~~~~~~~~~~^~
+src/Stage.cpp:424:24: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  424 |         arg->scriptTime++;
+      |         ~~~~~~~~~~~~~~~^~

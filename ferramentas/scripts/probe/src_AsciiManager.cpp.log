@@ -1,0 +1,4 @@
+src/AsciiManager.cpp: In member function 'void AsciiManager::DrawStrings()':
+src/AsciiManager.cpp:252:25: warning: NULL used in arithmetic [-Wpointer-arith]
+  252 |         while (*text != NULL)
+      |                         ^~~~

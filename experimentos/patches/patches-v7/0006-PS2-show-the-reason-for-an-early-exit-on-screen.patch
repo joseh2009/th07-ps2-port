@@ -1,0 +1,211 @@
+From 3aab54d99b8a8e68e1c5bb36e82ad42b98b86666 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:42:20 -0300
+Subject: [PATCH 06/26] PS2: show the reason for an early exit on screen
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/GameErrorContext.cpp |  7 +++++
+ src/Supervisor.cpp       | 14 ++++++++++
+ src/main.cpp             | 12 +++++++-
+ src/ps2boot.cpp          | 60 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 92 insertions(+), 1 deletion(-)
+
+diff --git a/src/GameErrorContext.cpp b/src/GameErrorContext.cpp
+index 2e1d5a9..895ab9a 100644
+--- a/src/GameErrorContext.cpp
++++ b/src/GameErrorContext.cpp
+@@ -4,6 +4,10 @@
+ #include <cstdio>
+ #include <cstring>
+ 
++#ifdef __PS2__
++void Ps2LogAppend(const char *text);
++#endif
++
+ GameErrorContext g_GameErrorContext;
+ 
+ const char *GameErrorContext::Log(const char *fmt, ...)
+@@ -16,6 +20,7 @@ const char *GameErrorContext::Log(const char *fmt, ...)
+     vsprintf(tmp, fmt, args);
+     tmpSize = strlen(tmp);
+ #ifdef __PS2__
++    Ps2LogAppend(tmp);
+     printf("LOG: %s", tmp);
+     fflush(stdout);
+ #endif
+@@ -40,6 +45,8 @@ const char *GameErrorContext::Fatal(const char *fmt, ...)
+     vsprintf(tmp, fmt, args);
+     tmpSize = strlen(tmp);
+ #ifdef __PS2__
++    Ps2LogAppend("FATAL: ");
++    Ps2LogAppend(tmp);
+     printf("FATAL: %s", tmp);
+     fflush(stdout);
+ #endif
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 953ec4e..905643f 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -42,10 +42,24 @@ char g_FpsCounterBuffer[256];
+ u32 g_NumFramesSinceLastTime;
+ u64 g_PerformanceCounter;
+ 
++#ifdef __PS2__
++void Ps2LogAppend(const char *text);
++#endif
++
+ void Supervisor::DebugPrint(const char *fmt, ...)
+ {
+     va_list args;
+     va_start(args, fmt);
++#ifdef __PS2__
++    {
++        char tmp[512];
++        va_list args2;
++        va_copy(args2, args);
++        vsnprintf(tmp, sizeof(tmp), fmt, args2);
++        va_end(args2);
++        Ps2LogAppend(tmp);
++    }
++#endif
+     vprintf(fmt, args);
+     va_end(args);
+ #ifdef __PS2__
+diff --git a/src/main.cpp b/src/main.cpp
+index 8439ccd..4c5e954 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -29,6 +29,7 @@ void AnmManager::TakeScreenshotIfRequested()
+ #ifdef __PS2__
+ #include "Ps2Pad.hpp"
+ void Ps2BootScreen(int argc, char **argv);
++void Ps2ShowExitScreen(int result);
+ #endif
+ 
+ int main(int argc, char *argv[])
+@@ -47,6 +48,7 @@ int main(int argc, char *argv[])
+     fflush(stdout);
+     if (g_Supervisor.LoadConfig("th07.cfg") != ZUN_SUCCESS)
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+@@ -56,16 +58,19 @@ int main(int argc, char *argv[])
+ start:
+     if (GameWindow::CreateGameWindow())
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+     if (GameWindow::InitInterface())
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+     if (GameWindow::InitRendering())
+     {
++        Supervisor::DebugPrint("main: leaving through stop (line %d)\n", __LINE__);
+         goto stop;
+     }
+ 
+@@ -83,9 +88,11 @@ start:
+     {
+         if (res == ZUN_ERROR)
+         {
+-            goto cleanup;
++            Supervisor::DebugPrint("main: leaving through cleanup (line %d)\n", __LINE__);
++        goto cleanup;
+         }
+         res = RENDER_RESULT_EXIT_ERROR;
++        Supervisor::DebugPrint("main: leaving through cleanup (line %d)\n", __LINE__);
+         goto cleanup;
+     }
+     res = RENDER_RESULT_KEEP_RUNNING;
+@@ -178,5 +185,8 @@ stop:
+     }
+     FileSystem::WriteDataToFile("th07.cfg", &g_Supervisor.cfg, sizeof(GameConfiguration));
+     g_GameErrorContext.Flush();
++#ifdef __PS2__
++    Ps2ShowExitScreen(res);
++#endif
+     return 0;
+ }
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index 7342e6a..e453605 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -28,6 +28,66 @@ extern "C" FILE *__wrap_fopen(const char *path, const char *mode)
+     return f;
+ }
+ 
++// Last few KB of everything the game logged, so the reason for an early exit can be shown on screen
++static char s_LogTail[3072];
++static size_t s_LogLen = 0;
++
++void Ps2LogAppend(const char *text)
++{
++    size_t n = strlen(text);
++    if (n >= sizeof(s_LogTail))
++    {
++        text += n - (sizeof(s_LogTail) - 1);
++        n = sizeof(s_LogTail) - 1;
++    }
++    if (s_LogLen + n >= sizeof(s_LogTail))
++    {
++        size_t drop = s_LogLen + n - (sizeof(s_LogTail) - 1);
++        memmove(s_LogTail, s_LogTail + drop, s_LogLen - drop);
++        s_LogLen -= drop;
++    }
++    memcpy(s_LogTail + s_LogLen, text, n);
++    s_LogLen += n;
++    s_LogTail[s_LogLen] = 0;
++}
++
++void Ps2ShowExitScreen(int result)
++{
++    init_scr();
++    scr_printf("\n  Touhou 7 PS2 - the game exited (result %d)\n", result);
++    scr_printf("  Last messages (Japanese text is not shown):\n\n");
++    // Keep only plain ASCII lines, last 24 of them
++    static char lines[40][100];
++    int count = 0;
++    char cur[100];
++    size_t ci = 0;
++    for (size_t i = 0; i <= s_LogLen; i++)
++    {
++        char ch = s_LogTail[i];
++        if (ch == '\n' || ch == 0)
++        {
++            cur[ci] = 0;
++            if (ci > 0)
++            {
++                strncpy(lines[count % 40], cur, 99);
++                lines[count % 40][99] = 0;
++                count++;
++            }
++            ci = 0;
++        }
++        else if (ch >= 32 && ch < 127 && ci < 96)
++            cur[ci++] = ch;
++        else if (ch < 0 && ci < 96)
++            cur[ci++] = '?';
++    }
++    int start = count > 24 ? count - 24 : 0;
++    for (int i = start; i < count; i++)
++        scr_printf("  %s\n", lines[i % 40]);
++    scr_printf("\n  Halted. Close the emulator window.\n");
++    for (;;)
++        sleep(1);
++}
++
+ static bool CanOpen(const char *prefix, const char *name, long *size)
+ {
+     char full[320];
+-- 
+2.43.0
+

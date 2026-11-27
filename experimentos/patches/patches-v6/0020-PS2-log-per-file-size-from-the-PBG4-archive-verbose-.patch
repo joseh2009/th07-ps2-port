@@ -1,0 +1,33 @@
+From 376d0edb2f280b4421df7969fff968a7d0d92e80 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 15:34:02 -0300
+Subject: [PATCH 20/25] PS2: log per-file size from the PBG4 archive (verbose
+ only)
+
+Prints "size <file>: <KB>" for every archive entry read on PS2 so the
+memory budget can be measured per file instead of guessed.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/FileSystem.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index 1612e45..55d067c 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -48,6 +48,10 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+         }
+         if (fsize != 0)
+         {
++#ifdef __PS2__
++            /* Per-file size table for memory budgeting (printed only when verbose). */
++            Supervisor::DebugPrint("size %s: %u KB\n", filename, fsize / 1024);
++#endif
+             Supervisor::DebugPrint("%s Decode ... \n", filename);
+             buf = (u8 *)malloc(fsize);
+             if (!buf)
+-- 
+2.43.0
+

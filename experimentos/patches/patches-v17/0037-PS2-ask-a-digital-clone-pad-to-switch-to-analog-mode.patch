@@ -1,0 +1,48 @@
+From 7077586fc3b02d89b2c4ed6d249fe1081aa1c1ff Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 16:27:29 -0300
+Subject: [PATCH 37/37] PS2: ask a digital clone pad to switch to analog mode
+ once if it stays idle
+
+Some clone pads only send button data in analog mode. After about 3 seconds
+of a digital pad reporting no buttons, padSetMainMode(port, slot, 1, 0) is
+sent once. Genuine pads are not affected.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Ps2Pad.cpp | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index 2d2588e..260510c 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -74,6 +74,24 @@ u16 Ps2Pad::GetButtons()
+     u16 held = ~pad.btns; // active low
+     g_Ps2PadHeld = held;
+     g_Ps2PadMode = pad.mode;
++
++    // Some clone pads only send button data after they are switched to analog mode. If a digital pad has reported
++    // no buttons for about 3 seconds, ask it once to switch. A genuine DualShock is unaffected: it is already analog
++    // or it ignores the request, and buttons are read the same way either way.
++    static int s_idleDigitalFrames = 0;
++    static bool s_analogTried = false;
++    if (pad.mode == 0x41 && held == 0)
++    {
++        if (!s_analogTried && ++s_idleDigitalFrames > 180)
++        {
++            padSetMainMode(0, 0, 1, 0);
++            s_analogTried = true;
++        }
++    }
++    else
++    {
++        s_idleDigitalFrames = 0;
++    }
+     u16 out = 0;
+     if (held & PAD_UP)
+         out |= TH_BUTTON_UP;
+-- 
+2.43.0
+

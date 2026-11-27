@@ -1,0 +1,33 @@
+From e3f9aa8fd7e03cf8c847691056ce3e656f3c445b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 09:04:33 -0300
+Subject: [PATCH 1/8] PS2 build: turn off console printf logging by default
+
+printf plus fflush on every log line is slow on real hardware. The on-screen log is kept.
+Add -DTH07_PS2_VERBOSE only when debugging with a console or emulator log.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2 | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index 2a85921..7120ee5 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -35,9 +35,8 @@ EE_CXXFLAGS += -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi \
+ 	-Wno-unused-parameter -Wno-missing-field-initializers
+ EE_OPTFLAGS = -O2
+ 
+-# Keep the EE console messages (printf per log line). Remove this for release builds: printing and flushing on
+-# every message is slow on real hardware. The on-screen exit log is always kept.
+-EE_CXXFLAGS += -DTH07_PS2_VERBOSE
++# Console printf logging is off by default: printing and flushing on every message is slow on real hardware.
++# Add -DTH07_PS2_VERBOSE here only when debugging with a console or emulator log. The on-screen log is always kept.
+ 
+ # Store every embedded texture as CT16 (A1B5G5R5): half the EE RAM and VRAM, but 8 bit colours drop to 5 bits
+ # and semi-transparent sprites become cut-outs. Use only if the default build still runs out of memory.
+-- 
+2.43.0
+

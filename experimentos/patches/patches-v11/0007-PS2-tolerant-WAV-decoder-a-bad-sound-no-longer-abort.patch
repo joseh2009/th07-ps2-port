@@ -1,0 +1,180 @@
+From a167e0490e09e023f0e9d71ad1e218fd1084ecb8 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:46:07 -0300
+Subject: [PATCH 07/31] PS2: tolerant WAV decoder; a bad sound no longer aborts
+ start-up
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/SoundPlayer.cpp |   7 +++
+ src/ps2audio.cpp    | 126 ++++++++++++++++++++++++++++++++++++--------
+ 2 files changed, 110 insertions(+), 23 deletions(-)
+
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index c99b78d..b0547d9 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -540,6 +540,13 @@ ZunResult SoundPlayer::LoadSound(i32 idx, const char *path)
+     }
+ 
+     i32 fileSize = *(u32 *)(soundFileDat + 4) + 8;
++#ifdef __PS2__
++    // trust the real size of the file over the RIFF header (which may be wrong or too large)
++    if (g_LastFileSize >= 12 && (u32)fileSize > g_LastFileSize)
++    {
++        fileSize = g_LastFileSize;
++    }
++#endif
+ 
+     ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 44100);
+     if (ma_decode_memory(soundFileDat, fileSize, &decoderConfig, &frameCount, &frames) !=
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index a351041..e4753c8 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -177,38 +177,118 @@ ma_result ma_audio_buffer_init(const ma_audio_buffer_config *cfg, ma_audio_buffe
+     return MA_SUCCESS;
+ }
+ 
+-ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *cfg, ma_uint64 *pFrameCount,
++static uint32_t Rd32(const uint8_t *p)
++{
++    return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24);
++}
++static uint16_t Rd16(const uint8_t *p)
++{
++    return (uint16_t)(p[0] | (p[1] << 8));
++}
++
++// Own RIFF/WAVE parser: PCM 8/16/24/32 bit and float, any channel count and rate -> f32 stereo @ 44100.
++// A sound that cannot be decoded becomes a short silence instead of an error, so one odd file cannot stop the game.
++static void MakeSilence(ma_uint64 *pFrameCount, void **ppFrames)
++{
++    float *buf = (float *)std::calloc(64, sizeof(float) * 2);
++    *ppFrames = buf;
++    *pFrameCount = 64;
++}
++
++ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *, ma_uint64 *pFrameCount,
+                            void **ppFrames)
+ {
+-    SDL_RWops *rw = SDL_RWFromConstMem(pData, (int)dataSize);
+-    SDL_AudioSpec spec;
+-    Uint8 *buf = nullptr;
+-    Uint32 len = 0;
+-    if (!rw || !SDL_LoadWAV_RW(rw, 1, &spec, &buf, &len))
+-        return MA_ERROR;
++    const uint8_t *d = (const uint8_t *)pData;
++    uint16_t tag = 0, channels = 0, bits = 0;
++    uint32_t rate = 0;
++    const uint8_t *samples = nullptr;
++    size_t sampleBytes = 0;
+ 
+-    SDL_AudioCVT cvt;
+-    if (SDL_BuildAudioCVT(&cvt, spec.format, spec.channels, spec.freq, AUDIO_F32SYS, 2, kRate) < 0)
++    if (dataSize >= 12 && std::memcmp(d, "RIFF", 4) == 0 && std::memcmp(d + 8, "WAVE", 4) == 0)
+     {
+-        SDL_FreeWAV(buf);
+-        return MA_ERROR;
++        size_t pos = 12;
++        while (pos + 8 <= dataSize)
++        {
++            uint32_t csize = Rd32(d + pos + 4);
++            const uint8_t *c = d + pos + 8;
++            size_t avail = dataSize - (pos + 8);
++            if (std::memcmp(d + pos, "fmt ", 4) == 0 && csize >= 16 && avail >= 16)
++            {
++                tag = Rd16(c);
++                channels = Rd16(c + 2);
++                rate = Rd32(c + 4);
++                bits = Rd16(c + 14);
++                if (tag == 0xFFFE && csize >= 26 && avail >= 26)
++                    tag = Rd16(c + 24); // WAVE_FORMAT_EXTENSIBLE: sub format
++            }
++            else if (std::memcmp(d + pos, "data", 4) == 0)
++            {
++                samples = c;
++                sampleBytes = std::min<size_t>(csize, avail);
++                break;
++            }
++            pos += 8 + (size_t)csize + (csize & 1);
++        }
+     }
+-    cvt.len = (int)len;
+-    cvt.buf = (Uint8 *)std::malloc((size_t)len * (size_t)cvt.len_mult);
+-    if (!cvt.buf)
++
++    const bool pcm = (tag == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32)) || (tag == 3 && bits == 32);
++    if (!samples || !pcm || channels < 1 || rate == 0)
+     {
+-        SDL_FreeWAV(buf);
+-        return MA_ERROR;
++        std::printf("audio: unsupported/invalid wav (tag %u, %u ch, %u Hz, %u bit) -> silence\n", tag, channels, rate,
++                    bits);
++        MakeSilence(pFrameCount, ppFrames);
++        return MA_SUCCESS;
+     }
+-    std::memcpy(cvt.buf, buf, len);
+-    SDL_FreeWAV(buf);
+-    if (cvt.needed && SDL_ConvertAudio(&cvt) < 0)
++
++    const size_t bytesPerSample = bits / 8;
++    const size_t srcFrames = sampleBytes / (bytesPerSample * channels);
++    if (srcFrames == 0)
+     {
+-        std::free(cvt.buf);
+-        return MA_ERROR;
++        MakeSilence(pFrameCount, ppFrames);
++        return MA_SUCCESS;
++    }
++
++    auto sampleAt = [&](size_t frame, int ch) -> float {
++        const uint8_t *p = samples + (frame * channels + ch) * bytesPerSample;
++        if (tag == 3)
++        {
++            float f;
++            std::memcpy(&f, p, 4);
++            return f;
++        }
++        switch (bits)
++        {
++        case 8:
++            return ((int)p[0] - 128) / 128.0f;
++        case 16:
++            return (int16_t)Rd16(p) / 32768.0f;
++        case 24:
++            return (int32_t)((p[0] << 8) | (p[1] << 16) | ((uint32_t)p[2] << 24)) / 2147483648.0f;
++        default:
++            return (int32_t)Rd32(p) / 2147483648.0f;
++        }
++    };
++
++    const ma_uint64 outFrames = (ma_uint64)srcFrames * kRate / rate;
++    float *out = (float *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(float) * 2);
++    if (!out)
++    {
++        MakeSilence(pFrameCount, ppFrames);
++        return MA_SUCCESS;
++    }
++    for (ma_uint64 i = 0; i < outFrames; i++)
++    {
++        const double pos = (double)i * rate / kRate;
++        const size_t i0 = (size_t)pos;
++        const size_t i1 = std::min(i0 + 1, srcFrames - 1);
++        const float t = (float)(pos - (double)i0);
++        float l = sampleAt(i0, 0) * (1 - t) + sampleAt(i1, 0) * t;
++        float r = channels > 1 ? sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t : l;
++        out[i * 2] = l;
++        out[i * 2 + 1] = r;
+     }
+-    *ppFrames = cvt.buf;
+-    *pFrameCount = (ma_uint64)cvt.len_cvt / 8;
++    *ppFrames = out;
++    *pFrameCount = outFrames;
+     return MA_SUCCESS;
+ }
+ 
+-- 
+2.43.0
+

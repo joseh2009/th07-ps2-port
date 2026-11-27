@@ -1,0 +1,61 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/Player.hpp:3,
+                 from src/BombData.hpp:3,
+                 from src/BombData.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/BombData.cpp: In static member function 'static void BombData::BombReimuACalc(Player*)':
+src/BombData.cpp:228:24: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  228 |     bombInfo->bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombReimuACalcFocus(Player*)':
+src/BombData.cpp:421:24: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  421 |     bombInfo->bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombReimuBCalc(Player*)':
+src/BombData.cpp:529:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  529 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombReimuBCalcFocus(Player*)':
+src/BombData.cpp:600:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  600 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombMarisaACalc(Player*)':
+src/BombData.cpp:675:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  675 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombMarisaACalcFocus(Player*)':
+src/BombData.cpp:803:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  803 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombMarisaBCalc(Player*)':
+src/BombData.cpp:934:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  934 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombMarisaBCalcFocus(Player*)':
+src/BombData.cpp:1023:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1023 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombSakuyaACalc(Player*)':
+src/BombData.cpp:1140:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1140 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombSakuyaACalcFocus(Player*)':
+src/BombData.cpp:1284:23: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1284 |         subInfo->timer++;
+      |         ~~~~~~~~~~~~~~^~
+src/BombData.cpp:1287:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1287 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombSakuyaBCalc(Player*)':
+src/BombData.cpp:1405:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1405 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/BombData.cpp: In static member function 'static void BombData::BombSakuyaBCalcFocus(Player*)':
+src/BombData.cpp:1520:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1520 |     player->bombInfo.bombTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~

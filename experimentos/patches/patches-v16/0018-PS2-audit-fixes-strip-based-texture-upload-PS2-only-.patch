@@ -1,0 +1,686 @@
+From d10f04cf95fd0016dfd8cd7f75b5f408bb8c511a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 10:40:55 -0300
+Subject: [PATCH 18/36] PS2: audit fixes - strip-based texture upload, PS2-only
+ RGBA path, tolerant SFX setup, no per-draw heap vector, D3D depth, gsKit pool
+ 512 KB, safer ma_free/audsrv writes, single SIF init, verbose logging flag
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2             |   4 +
+ README-PS2.md            |   7 ++
+ src/AnmManager.cpp       | 192 +++++++++++++++++++++++++++++----------
+ src/EnemyManager.cpp     |  18 ++++
+ src/GameErrorContext.cpp |   4 +
+ src/Ps2Pad.cpp           |   4 +-
+ src/SoundPlayer.cpp      |  20 ++++
+ src/Supervisor.cpp       |   9 +-
+ src/graphics/PS2GS.cpp   |  17 +++-
+ src/graphics/PS2GS.hpp   |   1 +
+ src/main.cpp             |   5 +-
+ src/ps2audio.cpp         |  17 +++-
+ src/ps2boot.cpp          |  17 +++-
+ 13 files changed, 250 insertions(+), 65 deletions(-)
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index 6750d18..e62206b 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -35,6 +35,10 @@ EE_CXXFLAGS += -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi \
+ 	-Wno-unused-parameter -Wno-missing-field-initializers
+ EE_OPTFLAGS = -O2
+ 
++# Keep the EE console messages (printf per log line). Remove this for release builds: printing and flushing on
++# every message is slow on real hardware. The on-screen exit log is always kept.
++EE_CXXFLAGS += -DTH07_PS2_VERBOSE
++
+ ifeq ($(CT32),1)
+ EE_CXXFLAGS += -DTH07_PS2_CT32
+ endif
+diff --git a/README-PS2.md b/README-PS2.md
+index 00e0602..31ade67 100644
+--- a/README-PS2.md
++++ b/README-PS2.md
+@@ -42,3 +42,10 @@ Controls: standard pad (cross = shoot, circle = bomb, ...).
+ * MIDI output and 16 bit colour options are not available.
+ * Audio is mixed in the SDL audio thread; BGM is streamed from `thbgm.dat` (enable "preload BGM" if it stutters).
+ * Memory (32 MB) and VRAM (4 MB, textures are swapped by gsKit's texture manager) are tight.
++
++## Build options
++
++- `CT32=1`: 32 bit frame buffer (more VRAM use, no 16 bit dithering).
++- `TH07_PS2_VERBOSE` (on by default in `Makefile.ps2`): also prints every log line to the EE console (`printf` +
++  flush). This is slow on real hardware; remove the line from `Makefile.ps2` for release builds. The on-screen exit
++  log is kept either way.
+diff --git a/src/AnmManager.cpp b/src/AnmManager.cpp
+index 619534c..744e728 100644
+--- a/src/AnmManager.cpp
++++ b/src/AnmManager.cpp
+@@ -1,5 +1,6 @@
+ #ifdef __PS2__
+ void Ps2HeapLog(const char *where);
++extern bool g_Ps2TexAllocFailed; // PS2GS.cpp
+ #endif
+ #include "AnmManager.hpp"
+ 
+@@ -153,44 +154,86 @@ ZunResult AnmManager::LoadTexture(i32 textureIdx, const char *texturePath, u32 c
+     return ZUN_SUCCESS;
+ }
+ 
++#ifndef __PS2__
+ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *imageInfo)
+ {
+-    SDL_Surface *surface = NULL;
++    SDL_Surface *surface;
+ 
+     ReleaseTexture(textureIdx);
+ 
+-    if (imageInfo->format < 1 || imageInfo->format > 5)
+-    {
+-        Supervisor::DebugPrint("embedded texture: bad format %u\n", (u32)imageInfo->format);
+-        return ZUN_ERROR;
+-    }
+     u32 bpp = g_TextureBytesPerPixel[imageInfo->format];
++    u32 depth = bpp * 8;
+     u32 pitch = imageInfo->width * bpp;
+ 
+-    // Convert to RGBA32 by hand (no dependency on SDL's blitter / pixel format support)
+-    if (imageInfo->format < 1 || imageInfo->format > 5 || imageInfo->width == 0 || imageInfo->height == 0)
++    u32 sdlFormat = SDL_PIXELFORMAT_UNKNOWN;
++    switch (imageInfo->format)
++    {
++    case 1:
++        sdlFormat = SDL_PIXELFORMAT_ARGB8888;
++        break;
++    case 2:
++        sdlFormat = SDL_PIXELFORMAT_ARGB1555;
++        break;
++    case 3:
++        sdlFormat = SDL_PIXELFORMAT_RGB565;
++        break;
++    case 4:
++        sdlFormat = SDL_PIXELFORMAT_BGR24;
++        break;
++    case 5:
++        sdlFormat = SDL_PIXELFORMAT_ARGB4444;
++        break;
++    default:
++        return ZUN_ERROR;
++    }
++
++    surface = SDL_CreateRGBSurfaceWithFormatFrom(imageInfo->data, imageInfo->width,
++                                                 imageInfo->height, depth, pitch, sdlFormat);
++    if (!surface)
+     {
+-        Supervisor::DebugPrint("embedded texture: bad format %u (%ux%u)\n", (u32)imageInfo->format,
+-                               (u32)imageInfo->width, (u32)imageInfo->height);
+         return ZUN_ERROR;
+     }
+-    u8 *rgba = (u8 *)malloc((size_t)imageInfo->width * imageInfo->height * 4);
+-    if (!rgba)
++
++    SDL_Surface *converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
++    SDL_FreeSurface(surface);
++
++    if (!converted)
+     {
+-        Supervisor::DebugPrint("embedded texture: out of memory (%ux%u)\n", (u32)imageInfo->width,
+-                               (u32)imageInfo->height);
+         return ZUN_ERROR;
+     }
+-    for (u32 y = 0; y < (u32)imageInfo->height; y++)
++
++    this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
++    g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
++    g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
++                                            PIXEL_UNSIGNED_BYTE, converted->pixels);
++
++    this->imageDataArray[textureIdx] = malloc(converted->pitch * converted->h);
++    memcpy(this->imageDataArray[textureIdx], converted->pixels, converted->pitch * converted->h);
++
++    textureWidths[textureIdx] = converted->w;
++    textureHeights[textureIdx] = converted->h;
++    texturePitches[textureIdx] = converted->pitch;
++
++    SDL_FreeSurface(converted);
++    return ZUN_SUCCESS;
++}
++#else
++// Pixel conversion for the five embedded formats, written to RGBA32. Bit replication (x<<3 | x>>2, ...) gives the same
++// colours as SDL's own expansion, so the PS2 build matches the PC build.
++static void ConvertEmbeddedRows(const ZunImageInfoEmbedded *info, u32 y0, u32 rows, u8 *dst)
++{
++    const u32 w = (u32)info->width;
++    const u32 bpp = g_TextureBytesPerPixel[info->format];
++    for (u32 y = 0; y < rows; y++)
+     {
+-        const u8 *src = (const u8 *)imageInfo->data + (size_t)y * pitch;
+-        u8 *dst = rgba + (size_t)y * imageInfo->width * 4;
+-        for (u32 x = 0; x < (u32)imageInfo->width; x++, dst += 4)
++        const u8 *src = (const u8 *)info->data + (size_t)(y0 + y) * w * bpp;
++        u8 *out = dst + (size_t)y * w * 4;
++        for (u32 x = 0; x < w; x++, out += 4)
+         {
+             u32 r, g, b, a;
+-            switch (imageInfo->format)
++            switch (info->format)
+             {
+-            case 1: // ARGB8888 (B,G,R,A in memory)
++            case 1: // ARGB8888, bytes B,G,R,A
+                 b = src[x * 4];
+                 g = src[x * 4 + 1];
+                 r = src[x * 4 + 2];
+@@ -199,17 +242,17 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+             case 2: { // ARGB1555
+                 u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
+                 a = (v & 0x8000) ? 255 : 0;
+-                r = ((v >> 10) & 31) * 255 / 31;
+-                g = ((v >> 5) & 31) * 255 / 31;
+-                b = (v & 31) * 255 / 31;
++                r = (((v >> 10) & 31) << 3) | (((v >> 10) & 31) >> 2);
++                g = (((v >> 5) & 31) << 3) | (((v >> 5) & 31) >> 2);
++                b = ((v & 31) << 3) | ((v & 31) >> 2);
+                 break;
+             }
+             case 3: { // RGB565
+                 u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
+                 a = 255;
+-                r = ((v >> 11) & 31) * 255 / 31;
+-                g = ((v >> 5) & 63) * 255 / 63;
+-                b = (v & 31) * 255 / 31;
++                r = (((v >> 11) & 31) << 3) | (((v >> 11) & 31) >> 2);
++                g = (((v >> 5) & 63) << 2) | (((v >> 5) & 63) >> 4);
++                b = ((v & 31) << 3) | ((v & 31) >> 2);
+                 break;
+             }
+             case 4: // BGR24
+@@ -220,44 +263,88 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+                 break;
+             default: { // 5: ARGB4444
+                 u32 v = src[x * 2] | (src[x * 2 + 1] << 8);
+-                a = ((v >> 12) & 15) * 17;
+-                r = ((v >> 8) & 15) * 17;
+-                g = ((v >> 4) & 15) * 17;
+-                b = (v & 15) * 17;
++                a = (v >> 12) & 15;
++                r = (v >> 8) & 15;
++                g = (v >> 4) & 15;
++                b = v & 15;
++                a = (a << 4) | a;
++                r = (r << 4) | r;
++                g = (g << 4) | g;
++                b = (b << 4) | b;
+                 break;
+             }
+             }
+-            dst[0] = (u8)r;
+-            dst[1] = (u8)g;
+-            dst[2] = (u8)b;
+-            dst[3] = (u8)a;
++            out[0] = (u8)r;
++            out[1] = (u8)g;
++            out[2] = (u8)b;
++            out[3] = (u8)a;
+         }
+     }
+-    struct
++}
++
++// PS2: the texture is created empty on the GS and filled a strip at a time (about 64 KB of temporary RAM instead of a
++// full-size RGBA copy). Only the two textures that CopyTexture() blits between keep a CPU copy.
++ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *imageInfo)
++{
++    ReleaseTexture(textureIdx);
++
++    if (imageInfo->format < 1 || imageInfo->format > 5 || imageInfo->width <= 0 || imageInfo->height <= 0)
+     {
+-        i32 w, h, pitch;
+-        u8 *pixels;
+-    } conv = {(i32)imageInfo->width, (i32)imageInfo->height, (i32)imageInfo->width * 4, rgba};
+-    auto *converted = &conv;
+-    (void)surface;
++        Supervisor::DebugPrint("embedded texture: bad format %u (%dx%d)\n", (u32)imageInfo->format,
++                               (i32)imageInfo->width, (i32)imageInfo->height);
++        return ZUN_ERROR;
++    }
++    const u32 w = (u32)imageInfo->width;
++    const u32 h = (u32)imageInfo->height;
++    const bool keepCpuCopy = (textureIdx == 21 || textureIdx == 22);
+ 
+     this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
+     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
+-    g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
+-                                            PIXEL_UNSIGNED_BYTE, converted->pixels);
+ 
+-    // The converted buffer itself becomes the CPU-side copy (no second allocation + memcpy).
+-    this->imageDataArray[textureIdx] = rgba;
+-
+-    textureWidths[textureIdx] = converted->w;
+-    textureHeights[textureIdx] = converted->h;
+-    texturePitches[textureIdx] = converted->pitch;
++    g_Ps2TexAllocFailed = false;
++    if (keepCpuCopy)
++    {
++        u8 *cpu = (u8 *)malloc((size_t)w * h * 4);
++        if (!cpu)
++        {
++            Supervisor::DebugPrint("embedded texture %u: out of memory (%ux%u)\n", textureIdx, w, h);
++            return ZUN_ERROR;
++        }
++        ConvertEmbeddedRows(imageInfo, 0, h, cpu);
++        g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, cpu);
++        this->imageDataArray[textureIdx] = cpu;
++    }
++    else
++    {
++        g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, NULL);
++        const u32 stripRows = (u32)std::max<size_t>(1, 65536 / ((size_t)w * 4));
++        u8 *strip = (u8 *)malloc((size_t)stripRows * w * 4);
++        if (!strip)
++        {
++            Supervisor::DebugPrint("embedded texture: out of memory for a strip (%ux%u)\n", w, h);
++            return ZUN_ERROR;
++        }
++        for (u32 y0 = 0; y0 < h; y0 += stripRows)
++        {
++            const u32 rows = std::min(stripRows, h - y0);
++            ConvertEmbeddedRows(imageInfo, y0, rows, strip);
++            g_Supervisor.gfxDevice->SetTextureSubImage(0, (i32)y0, (i32)w, (i32)rows, strip);
++        }
++        free(strip);
++        this->imageDataArray[textureIdx] = NULL;
++    }
++    if (g_Ps2TexAllocFailed)
++    {
++        return ZUN_ERROR; // already reported by PS2GS
++    }
+ 
+-#ifdef __PS2__
++    textureWidths[textureIdx] = w;
++    textureHeights[textureIdx] = h;
++    texturePitches[textureIdx] = w * 4;
+     Ps2HeapLog("embedded tex");
+-#endif
+     return ZUN_SUCCESS;
+ }
++#endif
+ 
+ ZunResult AnmManager::LoadTextureAlphaChannel(i32 textureIdx, const char *texturePath)
+ {
+@@ -325,7 +412,12 @@ ZunResult AnmManager::CreateEmptyTexture(i32 textureIdx, u32 width, u32 height)
+     ReleaseTexture(textureIdx);
+     this->textures[textureIdx] = g_Supervisor.gfxDevice->CreateTexture();
+ 
++#ifdef __PS2__
++    // The GS allocates a zeroed texture itself; a CPU copy is only needed for the blitted textures (21, 22)
++    void *emptyData = (textureIdx == 21 || textureIdx == 22) ? calloc(width * height, 4) : NULL;
++#else
+     void *emptyData = calloc(width * height, 4);
++#endif
+     g_Supervisor.gfxDevice->BindTexture(this->textures[textureIdx]);
+     g_Supervisor.gfxDevice->SetTextureImage(width, height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
+                                             emptyData);
+diff --git a/src/EnemyManager.cpp b/src/EnemyManager.cpp
+index c7a0b40..59e46e3 100644
+--- a/src/EnemyManager.cpp
++++ b/src/EnemyManager.cpp
+@@ -105,6 +105,15 @@ Enemy *EnemyManager::SpawnEnemy(i32 eclSubId, ZunVec3 *pos, i32 life, i32 itemDr
+         }
+         break;
+     }
++#ifdef __PS2__
++    if (i >= MAX_ENEMIES)
++    {
++        // Pool full: the caller gets the spare slot, which is not in the active list, so the spawn has no effect
++        static unsigned overflows = 0;
++        if (overflows++ < 5)
++            Supervisor::DebugPrint("EnemyManager: pool full (%d enemies), spawn ignored\n", MAX_ENEMIES);
++    }
++#endif
+     return enemy;
+ }
+ 
+@@ -150,6 +159,15 @@ Enemy *EnemyManager::SpawnEnemyEx(i32 eclSubId, ZunVec3 *pos, i32 life, i32 item
+         }
+         break;
+     }
++#ifdef __PS2__
++    if (i >= MAX_ENEMIES)
++    {
++        // Pool full: the caller gets the spare slot, which is not in the active list, so the spawn has no effect
++        static unsigned overflows = 0;
++        if (overflows++ < 5)
++            Supervisor::DebugPrint("EnemyManager: pool full (%d enemies), spawn ignored\n", MAX_ENEMIES);
++    }
++#endif
+     return enemy;
+ }
+ 
+diff --git a/src/GameErrorContext.cpp b/src/GameErrorContext.cpp
+index 895ab9a..77433e6 100644
+--- a/src/GameErrorContext.cpp
++++ b/src/GameErrorContext.cpp
+@@ -21,8 +21,10 @@ const char *GameErrorContext::Log(const char *fmt, ...)
+     tmpSize = strlen(tmp);
+ #ifdef __PS2__
+     Ps2LogAppend(tmp);
++#ifdef TH07_PS2_VERBOSE
+     printf("LOG: %s", tmp);
+     fflush(stdout);
++#endif
+ #endif
+     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
+     {
+@@ -47,8 +49,10 @@ const char *GameErrorContext::Fatal(const char *fmt, ...)
+ #ifdef __PS2__
+     Ps2LogAppend("FATAL: ");
+     Ps2LogAppend(tmp);
++#ifdef TH07_PS2_VERBOSE
+     printf("FATAL: %s", tmp);
+     fflush(stdout);
++#endif
+ #endif
+     if (this->m_BufferEnd + tmpSize < this->m_Buffer + 0x1fff)
+     {
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index 45b7c6c..9bc252b 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -7,6 +7,8 @@
+ #include <loadfile.h>
+ #include <sifrpc.h>
+ 
++void Ps2SifInitOnce(); // ps2boot.cpp
++
+ // The pad DMA buffer must be 64-byte aligned and 256 bytes long.
+ static char s_PadBuf[256] __attribute__((aligned(64)));
+ static bool s_Ready = false;
+@@ -15,7 +17,7 @@ static bool s_Ready = false;
+ 
+ bool Ps2Pad::Init()
+ {
+-    SifInitRpc(0);
++    Ps2SifInitOnce();
+     // The newer X modules go with libpadx; the old rom0:PADMAN can hang padInit under emulation.
+     if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) < 0)
+     {
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index 5d52927..14b18c2 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -534,6 +534,12 @@ ZunResult SoundPlayer::LoadSound(i32 idx, const char *path)
+     {
+         return ZUN_ERROR;
+     }
++    if (g_LastFileSize < 12) // the RIFF header below is 12 bytes; reading it from a shorter buffer is out of bounds
++    {
++        g_GameErrorContext.Log("Wav ファイルが短すぎる %s (%u bytes)\n", path, (unsigned)g_LastFileSize);
++        free(soundFileDat);
++        return ZUN_ERROR;
++    }
+ 
+     if (strncmp((char *)soundFileDat, "RIFF", 4) != 0)
+     {
+@@ -757,7 +763,12 @@ ZunResult SoundPlayer::InitSoundBuffers()
+         {
+             g_GameErrorContext.Log("error : Sound ファイルが読み込めない データを確認 %s\n",
+                                    g_SFXList[i]);
++#ifdef __PS2__
++            // Keep going: the effects that use this buffer stay silent (their sound stays NULL, see below)
++            continue;
++#else
+             return ZUN_ERROR;
++#endif
+         }
+     }
+ #ifdef __PS2__
+@@ -766,6 +777,15 @@ ZunResult SoundPlayer::InitSoundBuffers()
+     for (i = 0; i < ARRAY_SIZE(SOUND_BUFFER_IDX_VOL); i++)
+     {
+         i32 bufIdx = SOUND_BUFFER_IDX_VOL[i].bufferIdx;
++#ifdef __PS2__
++        if (!this->sfxPCMData[bufIdx])
++        {
++            // no PCM data for this effect: leave soundBuffers[i] NULL (ProcessQueues checks it before playing)
++            this->duplicateSfxData[i] = NULL;
++            this->soundBuffers[i] = NULL;
++            continue;
++        }
++#endif
+ 
+         this->duplicateSfxData[i] = new ma_audio_buffer;
+         ma_audio_buffer_config bufCfg = ma_audio_buffer_config_init(
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index f11a55c..28cef15 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -60,9 +60,11 @@ void Supervisor::DebugPrint(const char *fmt, ...)
+         Ps2LogAppend(tmp);
+     }
+ #endif
++#if !defined(__PS2__) || defined(TH07_PS2_VERBOSE)
+     vprintf(fmt, args);
++#endif
+     va_end(args);
+-#ifdef __PS2__
++#if !defined(__PS2__) || defined(TH07_PS2_VERBOSE)
+     fflush(stdout);
+ #endif
+ }
+@@ -545,7 +547,10 @@ ZunResult Supervisor::AddedCallback(Supervisor *arg)
+     {
+         arg->midiOutput->ReadFileData(30, "bgm/init.mid");
+     }
+-    g_SoundPlayer.InitSoundBuffers();
++    if (g_SoundPlayer.InitSoundBuffers() != ZUN_SUCCESS)
++    {
++        g_GameErrorContext.Log("sound: InitSoundBuffers failed, some effects may be missing\n");
++    }
+     if (g_AnmManager->LoadAnms(ANM_FILE_TEXT, "data/text.anm", ANM_OFFSET_TEXT) != ZUN_SUCCESS)
+     {
+         return ZUN_ERROR;
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 810af6e..6a62400 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -1,6 +1,7 @@
+ #include "PS2GS.hpp"
+ 
+ #include "AnmManager.hpp"
++#include "GameErrorContext.hpp"
+ #include "GameWindow.hpp"
+ #include "Supervisor.hpp"
+ 
+@@ -29,6 +30,7 @@
+ 
+ size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
+ unsigned g_Ps2TexCount = 0;
++bool g_Ps2TexAllocFailed = false; // set when a texture could not be allocated; AnmManager turns it into a load error
+ 
+ namespace
+ {
+@@ -119,7 +121,7 @@ ZunGraphics *PS2GS::Init()
+     self->mvp.Identity();
+     self->textures.emplace_back(); // reserve handle 0
+ 
+-    GSGLOBAL *gs = gsKit_init_global_custom(1536 * 1024, 128 * 1024);
++    GSGLOBAL *gs = gsKit_init_global_custom(512 * 1024, 128 * 1024);
+     if (gs == nullptr)
+     {
+         delete self;
+@@ -555,7 +557,8 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
+     tex->gs.Mem = (u32 *)memalign(128, bytes);
+     if (tex->gs.Mem == nullptr)
+     {
+-        printf("PS2GS: out of memory for a %ux%u texture\n", width, height);
++        g_Ps2TexAllocFailed = true;
++        g_GameErrorContext.Fatal("error : out of EE memory for a %ux%u texture (%u bytes)\n", width, height, bytes);
+         return;
+     }
+     std::memset(tex->gs.Mem, 0, bytes);
+@@ -703,7 +706,8 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
+         const f32 sx = (((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX - 0.5f;
+         const f32 sy = (((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY - 0.5f;
+ 
+-        f32 depth = (ndcZ * 0.5f + 0.5f) * (viewport.maxZ - viewport.minZ) + viewport.minZ;
++        // PerspectiveFovLH (ZunMath.hpp) and the 2D projections already produce ndcZ in [0,1] (D3D convention)
++        f32 depth = ndcZ * (viewport.maxZ - viewport.minZ) + viewport.minZ;
+         depth = std::clamp(depth, 0.0f, 1.0f);
+         const int iz = (int)((1.0f - depth) * 65535.0f); // inverted: the GS test is GEQUAL
+ 
+@@ -890,7 +894,8 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
+         return;
+     }
+ 
+-    std::vector<InVert> in(count);
++    upVerts.resize(count);
++    InVert *in = upVerts.data();
+     const u8 *base = (const u8 *)vertexData;
+     for (i32 i = 0; i < count; i++)
+     {
+@@ -915,15 +920,17 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
+                  v->diffuse.bytes.r, v->diffuse.bytes.g, v->diffuse.bytes.b, v->diffuse.bytes.a};
+         }
+     }
+-    DrawVertices(type, in.data(), count, hasTex, screenSpace);
++    DrawVertices(type, in, count, hasTex, screenSpace);
+ }
+ 
+ void PS2GS::SwapBuffers()
+ {
+     static int frame = 0;
++#ifdef TH07_PS2_VERBOSE
+     if (frame < 5)
+         printf("PS2GS: SwapBuffers frame %d (queue used: %d bytes)\n", frame,
+                (int)((u8 *)gs->CurQueue->pool_cur - (u8 *)gs->CurQueue->pool[gs->CurQueue->dbuf]));
++#endif
+     frame++;
+ 
+     gsKit_queue_exec(gs);
+diff --git a/src/graphics/PS2GS.hpp b/src/graphics/PS2GS.hpp
+index 04f85a7..976dbc0 100644
+--- a/src/graphics/PS2GS.hpp
++++ b/src/graphics/PS2GS.hpp
+@@ -112,6 +112,7 @@ class PS2GS : public ZunGraphics
+     std::vector<ClipVert> clipVerts;
+     std::vector<GSPRIMSTQPOINT> texBatch;
+     std::vector<GSPRIMPOINT> flatBatch;
++    std::vector<InVert> upVerts; // DrawPrimitiveUP input, reused (a per-call heap vector fragmented the 32 MB heap)
+ 
+     void ApplyRenderState();
+     void PushRegister(u64 data, u64 address);
+diff --git a/src/main.cpp b/src/main.cpp
+index de42804..a83aed9 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -37,7 +37,10 @@ int main(int argc, char *argv[])
+ #ifdef __PS2__
+     setbuf(stdout, NULL);
+     Ps2BootScreen(argc, argv);
+-    Ps2Pad::Init();
++    if (!Ps2Pad::Init())
++    {
++        Supervisor::DebugPrint("main: pad init failed, the game will have no controller input\n");
++    }
+ #endif
+ 
+     i32 res;
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index b21a533..01d3a80 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -13,6 +13,7 @@
+ #include <vector>
+ 
+ void Ps2LogAppend(const char *text); // ps2boot.cpp
++void Ps2SifInitOnce();              // ps2boot.cpp
+ 
+ size_t g_Ps2AudioBytes = 0; // EE RAM held by decoded effects (read by Ps2HeapLog)
+ 
+@@ -242,7 +243,8 @@ void ma_free(void *p, const void *)
+     }
+     else
+     {
+-        std::free(p);
++        // Not one of ours: freeing it could corrupt the heap, so report it and leave it alone
++        AudioLog("audio: ma_free of a pointer that was not made by ma_decode_memory (%p), not freed\n", p);
+     }
+ }
+ 
+@@ -377,7 +379,7 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+     // Long effects (> 1 s) go to quarter rate: they are the bulk of the memory and mostly noise/low frequency anyway.
+     const uint32_t div = (srcFrames * 1000 / rate > 1000) ? kSfxRateDiv * 2 : kSfxRateDiv;
+     const uint32_t storeRate = kRate / div;
+-    const uint64_t outFrames = srcFrames * storeRate / rate;
++    const uint64_t outFrames = std::max<uint64_t>(1, srcFrames * storeRate / rate);
+     const uint32_t outCh = 1; // effects are stored mono (stereo sources are averaged) to save RAM
+     int16_t *out = outFrames ? AllocPcm(outFrames, outCh, div) : nullptr;
+     if (!out)
+@@ -434,7 +436,7 @@ extern "C" unsigned int size_audsrv_irx;
+ 
+ ma_result ps2audio_engine_init(ma_engine *e)
+ {
+-    SifInitRpc(0);
++    Ps2SifInitOnce();
+     int r = SifLoadModule("rom0:LIBSD", 0, NULL);
+     if (r < 0)
+         AudioLog("audio: LIBSD load returned %d (continuing: it may already be resident)\n", r);
+@@ -480,7 +482,14 @@ void ps2audio_pump()
+         if (avail < (int)sizeof(out))
+             break;
+         MixFrames(out, kChunk);
+-        audsrv_play_audio((const char *)out, sizeof(out));
++        const int wrote = audsrv_play_audio((const char *)out, sizeof(out));
++        if (wrote != (int)sizeof(out))
++        {
++            static unsigned shortWrites = 0;
++            if (shortWrites++ < 5)
++                AudioLog("audio: audsrv accepted %d of %u bytes (%u short writes so far)\n", wrote,
++                         (unsigned)sizeof(out), shortWrites);
++        }
+     }
+ }
+ 
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index 23aaef9..1de154a 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -3,6 +3,7 @@
+ #include <cstring>
+ #include <debug.h>
+ #include <malloc.h>
++#include <sifrpc.h>
+ #include <unistd.h>
+ 
+ // Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
+@@ -72,8 +73,9 @@ void Ps2ShowExitScreen(int result)
+             cur[ci] = 0;
+             if (ci > 0)
+             {
+-                strncpy(lines[count % 40], cur, 99);
+-                lines[count % 40][99] = 0;
++                const size_t len = ci < 99 ? ci : 99;
++                memcpy(lines[count % 40], cur, len);
++                lines[count % 40][len] = 0;
+                 count++;
+             }
+             ci = 0;
+@@ -198,3 +200,14 @@ void Ps2HeapLog(const char *where)
+     Ps2LogAppend(tmp);
+     printf("%s", tmp);
+ }
++
++// SifInitRpc must run once: the pad and the audio driver both call it at start-up
++void Ps2SifInitOnce()
++{
++    static bool done = false;
++    if (!done)
++    {
++        SifInitRpc(0);
++        done = true;
++    }
++}
+-- 
+2.43.0
+

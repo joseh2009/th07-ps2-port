@@ -1,0 +1,41 @@
+From 508295182799fb064842bbd5ecefec6d9a3ce369 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 16:13:30 -0300
+Subject: [PATCH 35/37] PS2: read the pad buffer through the uncached address
+
+The IOP writes pad data into the buffer by DMA. Passing the cached address
+let the EE keep returning the first (idle) value from its data cache, so
+buttons never changed. Pass UNCACHED_SEG(buffer) to padPortOpen instead.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Ps2Pad.cpp | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index f961de0..754ad14 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -5,6 +5,7 @@
+ #include <cstdio>
+ #include <libpad.h>
+ #include <loadfile.h>
++#include <kernel.h>
+ #include <sifrpc.h>
+ 
+ void Ps2SifInitOnce(); // ps2boot.cpp
+@@ -41,7 +42,9 @@ bool Ps2Pad::Init()
+         return false;
+     }
+     padInit(0);
+-    int r = padPortOpen(0, 0, s_PadBuf);
++    // The IOP writes pad data straight into this buffer by DMA. Read it through the uncached alias, otherwise the EE
++    // can keep returning the first (idle) value from its data cache.
++    int r = padPortOpen(0, 0, UNCACHED_SEG(s_PadBuf));
+     printf("Ps2Pad: padPortOpen -> %d\n", r);
+     if (r == 0)
+         return false;
+-- 
+2.43.0
+

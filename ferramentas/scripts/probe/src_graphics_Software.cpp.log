@@ -1,0 +1,37 @@
+src/graphics/Software.cpp: In function 'u8 AlphaBlendU8(u8, u8, u8, u8)':
+src/graphics/Software.cpp:411:20: error: no matching function for call to 'min(long unsigned int, unsigned int)'
+  411 |     return std::min(((u32)src * a + (u32)dst * ia + 128) >> 8, 255u);
+      |            ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/graphics/Software.cpp:411:20: note: there are 4 candidates
+In file included from /opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/specfun.h:43,
+                 from /opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/cmath:3913,
+                 from /opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/math.h:36,
+                 from /opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2/SDL_stdinc.h:88,
+                 from /opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2/SDL_video.h:31,
+                 from src/AnmManager.hpp:6,
+                 from src/graphics/Software.hpp:3,
+                 from src/graphics/Software.cpp:1:
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algobase.h:234:5: note: candidate 1: 'template<class _Tp> constexpr const _Tp& std::min(const _Tp&, const _Tp&)'
+  234 |     min(const _Tp& __a, const _Tp& __b)
+      |     ^~~
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algobase.h:234:5: note: template argument deduction/substitution failed:
+src/graphics/Software.cpp:411:20: note:   deduced conflicting types for parameter 'const _Tp' ('long unsigned int' and 'unsigned int')
+  411 |     return std::min(((u32)src * a + (u32)dst * ia + 128) >> 8, 255u);
+      |            ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algobase.h:282:5: note: candidate 2: 'template<class _Tp, class _Compare> constexpr const _Tp& std::min(const _Tp&, const _Tp&, _Compare)'
+  282 |     min(const _Tp& __a, const _Tp& __b, _Compare __comp)
+      |     ^~~
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algobase.h:282:5: note: candidate expects 3 arguments, 2 provided
+In file included from /opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/algorithm:63,
+                 from src/graphics/Software.hpp:6:
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algo.h:5764:5: note: candidate 3: 'template<class _Tp> constexpr _Tp std::min(initializer_list<_Tp>)'
+ 5764 |     min(initializer_list<_Tp> __l)
+      |     ^~~
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algo.h:5764:5: note: candidate expects 1 argument, 2 provided
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algo.h:5774:5: note: candidate 4: 'template<class _Tp, class _Compare> constexpr _Tp std::min(initializer_list<_Tp>, _Compare)'
+ 5774 |     min(initializer_list<_Tp> __l, _Compare __comp)
+      |     ^~~
+/opt/ps2dev-x/ps2dev/ee/mips64r5900el-ps2-elf/include/c++/15.2.0/bits/stl_algo.h:5774:5: note: template argument deduction/substitution failed:
+src/graphics/Software.cpp:411:20: note:   mismatched types 'std::initializer_list<_Tp>' and 'long unsigned int'
+  411 |     return std::min(((u32)src * a + (u32)dst * ia + 128) >> 8, 255u);
+      |            ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

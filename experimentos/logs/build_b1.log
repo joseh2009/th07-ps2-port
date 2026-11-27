@@ -1,0 +1,1460 @@
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/AnmManager.cpp -o obj/ps2/src/AnmManager.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/AnmVm.cpp -o obj/ps2/src/AnmVm.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/AsciiManager.cpp -o obj/ps2/src/AsciiManager.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/BombData.cpp -o obj/ps2/src/BombData.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/BulletManager.cpp -o obj/ps2/src/BulletManager.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Chain.cpp -o obj/ps2/src/Chain.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Controller.cpp -o obj/ps2/src/Controller.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/EclManager.cpp -o obj/ps2/src/EclManager.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/EffectManager.cpp -o obj/ps2/src/EffectManager.o
+In file included from src/Player.hpp:3,
+                 from src/BombData.hpp:3,
+                 from src/BombData.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/AnmManager.hpp:3,
+                 from src/AnmManager.cpp:6:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/AnmVm.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/AnmVm.cpp: In member function 'void AnmVm::Initialize()':
+src/AnmVm.cpp:17:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+   17 |     memset(this, 0, (u8 *)&this->pos - (u8 *)this);
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/AsciiManager.hpp:3,
+                 from src/AsciiManager.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/BombData.cpp:5:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+In file included from src/AnmManager.hpp:3,
+                 from src/EclManager.cpp:6:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ItemManager.hpp:3,
+                 from src/BulletManager.hpp:3,
+                 from src/BulletManager.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/AnmManager.cpp: In member function 'void AnmManager::ReleaseTexture(i32)':
+src/AnmManager.cpp:676:38: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  676 |     if (textureIdx < 0 || textureIdx >= ARRAY_SIZE(this->textures))
+src/AnmManager.cpp: In member function 'void AnmManager::SetAndExecuteScript(AnmVm*, AnmRawInstr*)':
+src/AnmManager.cpp:735:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  735 |         memset(vm, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/AsciiManager.cpp: In member function 'void AsciiManager::InitializeVms()':
+src/AsciiManager.cpp:123:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |     memset(&this->largeTextVm, 0, sizeof(AnmVm));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/AsciiManager.cpp:124:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  124 |     memset(&this->smallScorePopupVm, 0, sizeof(AnmVm));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/AsciiManager.cpp:126:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct PauseMenu'; use assignment or value-initialization instead [-Wclass-memaccess]
+  126 |     memset(&this->pauseMenu, 0, sizeof(PauseMenu));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/AsciiManager.hpp:32:8: note: 'struct PauseMenu' declared here
+   32 | struct PauseMenu
+      |        ^~~~~~~~~
+src/AsciiManager.cpp:127:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct RetryMenu'; use assignment or value-initialization instead [-Wclass-memaccess]
+  127 |     memset(&this->retryMenu, 0, sizeof(RetryMenu));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/AsciiManager.hpp:47:8: note: 'struct RetryMenu' declared here
+   47 | struct RetryMenu
+      |        ^~~~~~~~~
+src/AsciiManager.cpp: In static member function 'static ZunResult AsciiManager::AddedCallback(AsciiManager*)':
+src/AsciiManager.cpp:162:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AsciiManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  162 |     memset(arg, 0, sizeof(AsciiManager));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/AsciiManager.hpp:84:8: note: 'struct AsciiManager' declared here
+   84 | struct AsciiManager
+      |        ^~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+src/AsciiManager.cpp: In member function 'i32 PauseMenu::OnUpdate()':
+src/AsciiManager.cpp:451:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  451 |         for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+src/AsciiManager.cpp:465:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  465 |         for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+src/AsciiManager.cpp:479:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  479 |         for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+src/AsciiManager.cpp:491:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  491 |         for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+src/AsciiManager.cpp:658:27: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  658 |             for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+src/AsciiManager.cpp:757:27: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  757 |             for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+src/AsciiManager.cpp:770:27: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  770 |             for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+src/AsciiManager.cpp:777:19: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  777 |     for (i = 0; i < ARRAY_SIZE(this->menuSprites); i++)
+In file included from src/ZunTimer.hpp:3,
+                 from src/EclManager.hpp:4,
+                 from src/EclManager.cpp:1:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/EnemyManager.hpp:4,
+                 from src/EclManager.cpp:9:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+src/EclManager.cpp: In static member function 'static void EclManager::BeginSpellcard(Enemy*, EclRawInstr*)':
+src/EclManager.cpp:644:19: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  644 |     for (i = 0; i < ARRAY_SIZE(spellcardName); i++)
+src/BulletManager.cpp: In member function 'void BulletManager::RemoveAllBullets(i32)':
+src/BulletManager.cpp:431:19: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Bullet'; use assignment or value-initialization instead [-Wclass-memaccess]
+  431 |             memset(bullet, 0, sizeof(Bullet));
+      |             ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:185:8: note: 'struct Bullet' declared here
+  185 | struct Bullet
+      |        ^~~~~~
+src/BulletManager.cpp: In member function 'void BulletManager::RemoveBulletsInRadius(ZunVec3*, f32)':
+src/BulletManager.cpp:571:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Bullet'; use assignment or value-initialization instead [-Wclass-memaccess]
+  571 |         memset(bullet, 0, sizeof(Bullet));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:185:8: note: 'struct Bullet' declared here
+  185 | struct Bullet
+      |        ^~~~~~
+src/BulletManager.cpp: In static member function 'static ZunResult BulletManager::AddedCallback(BulletManager*)':
+src/BulletManager.cpp:1413:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct ItemManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+ 1413 |     memset(&g_ItemManager, 0, sizeof(ItemManager));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/ItemManager.hpp:67:8: note: 'struct ItemManager' declared here
+   67 | struct ItemManager
+      |        ^~~~~~~~~~~
+src/BulletManager.cpp: In static member function 'static void BulletManager::CutChain()':
+src/BulletManager.cpp:1458:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+ 1458 |     memset(&g_BulletManager, 0, sizeof(BulletManager));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+In file included from src/EffectManager.hpp:3,
+                 from src/EffectManager.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/EffectManager.cpp: In member function 'void EffectManager::Reset()':
+src/EffectManager.cpp:91:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EffectManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+   91 |     memset(this, 0, sizeof(EffectManager));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EffectManager.hpp:45:8: note: 'struct EffectManager' declared here
+   45 | struct EffectManager
+      |        ^~~~~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Ending.cpp -o obj/ps2/src/Ending.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/EnemyEclInstr.cpp -o obj/ps2/src/EnemyEclInstr.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/EnemyManager.cpp -o obj/ps2/src/EnemyManager.o
+src/EffectManager.cpp: In member function 'i32 EffectManager::DrawLayer1Effects()':
+src/EffectManager.cpp:793:40: warning: 'r' may be used uninitialized [-Wmaybe-uninitialized]
+  793 |             effect->vm.color.bytes.r = (u8)r;
+      |                                        ^~~~~
+src/EffectManager.cpp:735:9: note: 'r' was declared here
+  735 |     f32 r;
+      |         ^
+src/EffectManager.cpp:794:40: warning: 'g' may be used uninitialized [-Wmaybe-uninitialized]
+  794 |             effect->vm.color.bytes.g = (u8)g;
+      |                                        ^~~~~
+src/EffectManager.cpp:736:9: note: 'g' was declared here
+  736 |     f32 g;
+      |         ^
+src/EffectManager.cpp:795:40: warning: 'b' may be used uninitialized [-Wmaybe-uninitialized]
+  795 |             effect->vm.color.bytes.b = (u8)b;
+      |                                        ^~~~~
+src/EffectManager.cpp:737:9: note: 'b' was declared here
+  737 |     f32 b;
+      |         ^
+src/EffectManager.cpp:796:40: warning: 'a' may be used uninitialized [-Wmaybe-uninitialized]
+  796 |             effect->vm.color.bytes.a = (u8)a;
+      |                                        ^~~~~
+src/EffectManager.cpp:739:9: note: 'a' was declared here
+  739 |     f32 a;
+      |         ^
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/FileSystem.cpp -o obj/ps2/src/FileSystem.o
+In file included from src/Ending.hpp:3,
+                 from src/Ending.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/GameErrorContext.cpp -o obj/ps2/src/GameErrorContext.o
+src/Ending.hpp: In constructor 'Ending::Ending()':
+src/Ending.hpp:21:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Ending'; use assignment or value-initialization instead [-Wclass-memaccess]
+   21 |         memset(this, 0, sizeof(Ending));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/Ending.hpp:17:8: note: 'struct Ending' declared here
+   17 | struct Ending
+      |        ^~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/GameManager.cpp -o obj/ps2/src/GameManager.o
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/ItemManager.hpp:3,
+                 from src/BulletManager.hpp:3,
+                 from src/EnemyEclInstr.cpp:4:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/EclManager.hpp:4,
+                 from src/EnemyEclInstr.hpp:3,
+                 from src/EnemyEclInstr.cpp:1:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+In file included from src/EnemyEclInstr.cpp:5:
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/GameWindow.cpp -o obj/ps2/src/GameWindow.o
+src/EnemyEclInstr.cpp: In function 'void EnemyEclInstr::ExInsAliceCurveBullets(Enemy*, EclRawInstr*)':
+src/EnemyEclInstr.cpp:110:45: warning: 'angle' may be used uninitialized [-Wmaybe-uninitialized]
+  110 |                 bullet->AddAngleAccelCommand(0, 0, 240, angle, 1.0f / 190.0f);
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyEclInstr.cpp:60:9: note: 'angle' was declared here
+   60 |     f32 angle;
+      |         ^~~~~
+src/EnemyEclInstr.cpp: In function 'void EnemyEclInstr::ExInsTurnBulletsIntoOtherBullets(Enemy*, EclRawInstr*)':
+src/EnemyEclInstr.cpp:152:13: warning: 'maxDistance' may be used uninitialized [-Wmaybe-uninitialized]
+  152 |             if (distance < maxDistance)
+      |             ^~
+src/EnemyEclInstr.cpp:121:9: note: 'maxDistance' was declared here
+  121 |     f32 maxDistance;
+      |         ^~~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Gui.cpp -o obj/ps2/src/Gui.o
+In file included from src/AnmManager.hpp:3,
+                 from src/EnemyManager.hpp:3,
+                 from src/EnemyManager.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/EnemyManager.hpp:4:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/ItemManager.cpp -o obj/ps2/src/ItemManager.o
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+In file included from src/ResultScreen.hpp:7,
+                 from src/GameManager.hpp:3,
+                 from src/GameManager.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/MainMenu.cpp -o obj/ps2/src/MainMenu.o
+In file included from src/EnemyManager.hpp:4,
+                 from src/GameManager.cpp:11:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+src/GameManager.cpp: In constructor 'GameManager::GameManager()':
+src/GameManager.cpp:37:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct GameManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+   37 |     memset(this, 0, sizeof(GameManager));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:50:8: note: 'struct GameManager' declared here
+   50 | struct GameManager
+      |        ^~~~~~~~~~~
+src/GameManager.cpp: In member function 'void GameManager::AddLivesRemaining(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.cpp:50:9: note: in expansion of macro 'NUKE_SUPERVISOR'
+   50 |         NUKE_SUPERVISOR();
+      |         ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.cpp: In member function 'void GameManager::AddBombsRemaining(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.cpp:60:9: note: in expansion of macro 'NUKE_SUPERVISOR'
+   60 |         NUKE_SUPERVISOR();
+      |         ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/MidiOutput.cpp -o obj/ps2/src/MidiOutput.o
+In file included from src/AnmManager.hpp:3,
+                 from src/GameWindow.cpp:12:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/GameWindow.cpp: In static member function 'static void GameWindow::Present()':
+src/GameWindow.cpp:54:50: warning: format '%d' expects argument of type 'int', but argument 3 has type 'i32' {aka 'long int'} [-Wformat=]
+   54 |             sprintf(snapshotPath, "snapshot/th%.3d.bmp", i);
+      |                                               ~~~^       ~
+      |                                                  |       |
+      |                                                  int     i32 {aka long int}
+      |                                               %.3ld
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/MusicRoom.cpp -o obj/ps2/src/MusicRoom.o
+In file included from src/Gui.hpp:4,
+                 from src/Gui.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/Gui.cpp:8:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+In file included from src/Gui.cpp:11:
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+src/Gui.cpp: In static member function 'static u32 Gui::OnDraw(Gui*)':
+src/Gui.cpp:298:28: warning: format '%d' expects argument of type 'int', but argument 3 has type 'i32' {aka 'long int'} [-Wformat=]
+  298 |         sprintf(fmtArg, "+%d", arg->impl->spellCardBonus.fmtArg);
+      |                           ~^   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                            |                             |
+      |                            int                           i32 {aka long int}
+      |                           %ld
+src/Gui.cpp: In member function 'ZunResult Gui::ActualAddedCallback()':
+src/Gui.cpp:386:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct GuiImpl'; use assignment or value-initialization instead [-Wclass-memaccess]
+  386 |         memset(this->impl, 0, sizeof(GuiImpl));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/Gui.hpp:141:8: note: 'struct GuiImpl' declared here
+  141 | struct GuiImpl
+      |        ^~~~~~~
+src/Gui.cpp:451:24: warning: suggest parentheses around '+' in operand of '&' [-Wparentheses]
+  451 |                     (i + j & 1) + ANM_SCRIPT_CAPTURE_TRANSITION_QUAD_ARRAY);
+      |                      ~~^~~
+src/Gui.cpp: In member function 'void GuiImpl::MsgRead(i32)':
+src/Gui.cpp:706:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct GuiMsgVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  706 |     memset(&this->msg, 0, sizeof(GuiMsgVm));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/Gui.hpp:122:8: note: 'struct GuiMsgVm' declared here
+  122 | struct GuiMsgVm
+      |        ^~~~~~~~
+src/Gui.cpp: In member function 'ZunResult GuiImpl::RunMsg()':
+src/Gui.cpp:993:50: warning: comparison of integer expressions of different signedness: 'u32' {aka 'unsigned int'} and 'i32' {aka 'long int'} [-Wsign-compare]
+  993 |                     g_GameManager.globals->score != g_ReplayManager->data->data.score)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from src/ItemManager.hpp:3,
+                 from src/ItemManager.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/ItemManager.cpp:6:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+In file included from src/ItemManager.cpp:8:
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+src/ItemManager.cpp: In member function 'void GameManager::AddCurrentPower(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/ItemManager.cpp:36:9: note: in expansion of macro 'NUKE_SUPERVISOR'
+   36 |         NUKE_SUPERVISOR();
+      |         ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/ItemManager.cpp: In member function 'void ItemManager::OnUpdate()':
+src/ItemManager.cpp:222:62: warning: comparison of integer expressions of different signedness: 'i8' {aka 'signed char'} and 'unsigned int' [-Wsign-compare]
+  222 |                     if (g_GameManager.powerItemCountForScore >= ARRAY_SIZE(g_FullPowerScoreBonus))
+In file included from src/MainMenu.hpp:3,
+                 from src/MainMenu.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/MainMenu.hpp: In constructor 'MainMenu::MainMenu()':
+src/MainMenu.hpp:110:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct MainMenu'; use assignment or value-initialization instead [-Wclass-memaccess]
+  110 |         memset(this, 0, sizeof(MainMenu));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/MainMenu.hpp:106:8: note: 'struct MainMenu' declared here
+  106 | struct MainMenu
+      |        ^~~~~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/MainMenu.cpp: In member function 'u32 MainMenu::OnUpdatePreInput()':
+src/MainMenu.cpp:199:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  199 |         for (i = 0; i < ARRAY_SIZE(g_MainMenuStrings); i++)
+src/MainMenu.cpp: In member function 'u32 MainMenu::OnUpdateOptionsMenu()':
+src/MainMenu.cpp:434:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  434 |         for (i = 0; i < ARRAY_SIZE(g_OptionsStrings); i++)
+src/MainMenu.cpp: In member function 'u32 MainMenu::OnUpdateKeyConfig()':
+src/MainMenu.cpp:820:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  820 |         for (i = 0; i < ARRAY_SIZE(g_KeyConfigStrings); i++)
+src/MainMenu.cpp: In member function 'u32 MainMenu::OnUpdateSelectReplay()':
+src/MainMenu.cpp:1837:47: warning: format '%d' expects argument of type 'int', but argument 3 has type 'long int' [-Wformat=]
+ 1837 |                 sprintf(buf, "./replay/th7_%.2d.rpy", i + 1);
+      |                                            ~~~^       ~~~~~
+      |                                               |         |
+      |                                               int       long int
+      |                                            %.2ld
+src/MainMenu.cpp:1849:67: warning: format '%d' expects argument of type 'int', but argument 3 has type 'long int' [-Wformat=]
+ 1849 |                     sprintf(this->replayLabels[replayIdx], "No.%.2d", i + 1);
+      |                                                                ~~~^   ~~~~~
+      |                                                                   |     |
+      |                                                                   int   long int
+      |                                                                %.2ld
+src/EnemyManager.cpp: In static member function 'static u32 EnemyManager::OnUpdate(EnemyManager*)':
+src/EnemyManager.cpp:1032:14: warning: 'playedDamageSound' may be used uninitialized [-Wmaybe-uninitialized]
+ 1032 |         else if (playedDamageSound != 0)
+      |              ^~
+src/EnemyManager.cpp:612:9: note: 'playedDamageSound' was declared here
+  612 |     i32 playedDamageSound;
+      |         ^~~~~~~~~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Player.cpp -o obj/ps2/src/Player.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/ReplayManager.cpp -o obj/ps2/src/ReplayManager.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/ResultScreen.cpp -o obj/ps2/src/ResultScreen.o
+src/ItemManager.cpp:357:48: warning: 'itemScore' may be used uninitialized [-Wmaybe-uninitialized]
+  357 |                     g_AsciiManager.CreatePopup1(&item->pos, itemScore,
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+  358 |                                                 itemScore >= 1000 ? 0xffffff00 : 0xffffffff);
+      |                                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/ItemManager.cpp:128:9: note: 'itemScore' was declared here
+  128 |     i32 itemScore;
+      |         ^~~~~~~~~
+In file included from src/MusicRoom.hpp:5,
+                 from src/MusicRoom.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/MusicRoom.hpp: In constructor 'MusicRoom::MusicRoom()':
+src/MusicRoom.hpp:27:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct MusicRoom'; use assignment or value-initialization instead [-Wclass-memaccess]
+   27 |         memset(this, 0, sizeof(MusicRoom));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/MusicRoom.hpp:23:8: note: 'struct MusicRoom' declared here
+   23 | struct MusicRoom
+      |        ^~~~~~~~~
+src/ResultScreen.cpp:172:29: warning: multi-character character constant [-Wmultichar]
+  172 |         if (chunk->magic == TH7K_MAGIC)
+      |                             ^~~~~~~~~~
+src/ResultScreen.cpp:177:29: warning: multi-character character constant [-Wmultichar]
+  177 |         if (chunk->magic == VRSM_MAGIC)
+      |                             ^~~~~~~~~~
+src/ResultScreen.cpp:230:39: warning: multi-character character constant [-Wmultichar]
+  230 |         if (parsedHscr->base.magic == HSCR_MAGIC && parsedHscr->base.version == 1 &&
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:269:39: warning: multi-character character constant [-Wmultichar]
+  269 |         if (parsedCatk->base.magic == CATK_MAGIC && parsedCatk->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:293:39: warning: multi-character character constant [-Wmultichar]
+  293 |         if (parsedLsnm->base.magic == LSNM_MAGIC && parsedLsnm->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:320:33: warning: multi-character character constant [-Wmultichar]
+  320 |         outClrd[i].base.magic = CLRD_MAGIC;
+      |                                 ^~~~~~~~~~
+src/ResultScreen.cpp:335:39: warning: multi-character character constant [-Wmultichar]
+  335 |         if (parsedClrd->base.magic == CLRD_MAGIC && parsedClrd->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:372:36: warning: multi-character character constant [-Wmultichar]
+  372 |                 pscr->base.magic = PSCR_MAGIC;
+      |                                    ^~~~~~~~~~
+src/ResultScreen.cpp:387:39: warning: multi-character character constant [-Wmultichar]
+  387 |         if (parsedPscr->base.magic == PSCR_MAGIC && parsedPscr->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:412:39: warning: multi-character character constant [-Wmultichar]
+  412 |         if (parsedPlst->base.magic == PLST_MAGIC && parsedPlst->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:461:30: warning: multi-character character constant [-Wmultichar]
+  461 |     this->th7kHeader.magic = TH7K_MAGIC;
+      |                              ^~~~~~~~~~
+src/ResultScreen.cpp:480:63: warning: multi-character character constant [-Wmultichar]
+  480 |                     if (currentCharacter->data->base.magic == HSCR_MAGIC)
+      |                                                               ^~~~~~~~~~
+src/ResultScreen.cpp:513:28: warning: multi-character character constant [-Wmultichar]
+  513 |         clrd->base.magic = CLRD_MAGIC;
+      |                            ^~~~~~~~~~
+src/ResultScreen.cpp:525:33: warning: multi-character character constant [-Wmultichar]
+  525 |         if (catk->base.magic == CATK_MAGIC)
+      |                                 ^~~~~~~~~~
+src/ResultScreen.cpp:560:23: warning: multi-character character constant [-Wmultichar]
+  560 |     vrsm.base.magic = VRSM_MAGIC;
+      |                       ^~~~~~~~~~
+src/ResultScreen.cpp:2440:34: warning: multi-character character constant [-Wmultichar]
+ 2440 |     arg->lsnmHeader.base.magic = LSNM_MAGIC;
+      |                                  ^~~~~~~~~~
+src/ResultScreen.cpp:2475:37: warning: multi-character character constant [-Wmultichar]
+ 2475 |             if (catk->base.magic != CATK_MAGIC || catk->base.version != 1)
+      |                                     ^~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Rng.cpp -o obj/ps2/src/Rng.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/ScreenEffect.cpp -o obj/ps2/src/ScreenEffect.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/SoundPlayer.cpp -o obj/ps2/src/SoundPlayer.o
+In file included from src/Player.hpp:3,
+                 from src/Player.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/EnemyManager.hpp:4,
+                 from src/Player.cpp:10:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+src/Player.cpp: In static member function 'static ZunResult Player::RegisterChain(u32)':
+src/Player.cpp:2360:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Player'; use assignment or value-initialization instead [-Wclass-memaccess]
+ 2360 |     memset(mgr, 0, sizeof(Player));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/Player.hpp:174:8: note: 'struct Player' declared here
+  174 | struct Player
+      |        ^~~~~~
+In file included from src/EffectManager.hpp:3,
+                 from src/ReplayManager.cpp:4:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ReplayManager.hpp:4,
+                 from src/ReplayManager.cpp:1:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/EnemyManager.hpp:4,
+                 from src/ReplayManager.cpp:5:
+src/BulletManager.hpp: In constructor 'EnemyBulletShooter::EnemyBulletShooter()':
+src/BulletManager.hpp:89:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyBulletShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+   89 |         memset(this, 0, sizeof(EnemyBulletShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:85:8: note: 'struct EnemyBulletShooter' declared here
+   85 | struct EnemyBulletShooter
+      |        ^~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In constructor 'EnemyLaserShooter::EnemyLaserShooter()':
+src/BulletManager.hpp:123:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyLaserShooter'; use assignment or value-initialization instead [-Wclass-memaccess]
+  123 |         memset(this, 0, sizeof(EnemyLaserShooter));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:119:8: note: 'struct EnemyLaserShooter' declared here
+  119 | struct EnemyLaserShooter
+      |        ^~~~~~~~~~~~~~~~~
+src/BulletManager.hpp: In member function 'void BulletManager::Initialize()':
+src/BulletManager.hpp:260:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct BulletManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  260 |         memset(this, 0, sizeof(BulletManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/BulletManager.hpp:251:8: note: 'struct BulletManager' declared here
+  251 | struct BulletManager
+      |        ^~~~~~~~~~~~~
+src/EnemyManager.hpp: In member function 'void EnemyManager::Initialize()':
+src/EnemyManager.hpp:300:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct EnemyManager'; use assignment or value-initialization instead [-Wclass-memaccess]
+  300 |         memset(this, 0, sizeof(EnemyManager));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:272:8: note: 'struct EnemyManager' declared here
+  272 | struct EnemyManager
+      |        ^~~~~~~~~~~~
+src/EnemyManager.hpp:302:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Enemy'; use assignment or value-initialization instead [-Wclass-memaccess]
+  302 |         memset(enemy, 0, sizeof(Enemy));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/EnemyManager.hpp:65:8: note: 'struct Enemy' declared here
+   65 | struct Enemy
+      |        ^~~~~
+src/ReplayManager.cpp: In static member function 'static ReplayFile* ReplayManager::ValidateReplayData(ReplayFile*, i32)':
+src/ReplayManager.cpp:256:23: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'long unsigned int' [-Wsign-compare]
+  256 |     for (i32 i = 0; i < size - offsetof(ReplayHeader, replaySize); i++, curByte++)
+      |                       ^
+src/ReplayManager.cpp: In static member function 'static void ReplayManager::SaveReplay(const char*, char*)':
+src/ReplayManager.cpp:654:31: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  654 |                 for (i = 0; i < sizeof(ReplayHeader) - offsetof(ReplayHeader, key); i++, csumPtr++)
+      |                               ^
+src/ReplayManager.cpp:666:31: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  666 |                 for (i = 0; i < sizeof(ReplayHeader) - offsetof(ReplayHeader, replaySize);
+      |                               ^
+src/ReplayManager.cpp: In static member function 'static void ReplayManager::SaveReplay2(const char*)':
+src/ReplayManager.cpp:780:27: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  780 |             for (i = 0; i < sizeof(ReplayHeader) - offsetof(ReplayHeader, key); i++, csumPtr++)
+      |                           ^
+src/ReplayManager.cpp:792:27: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  792 |             for (i = 0; i < sizeof(ReplayHeader) - offsetof(ReplayHeader, replaySize);
+      |                           ^
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Stage.cpp -o obj/ps2/src/Stage.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Supervisor.cpp -o obj/ps2/src/Supervisor.o
+In file included from src/ResultScreen.hpp:7,
+                 from src/ResultScreen.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+src/Supervisor.cpp:660:37: warning: multi-character character constant [-Wmultichar]
+  660 |     g_GameManager.plst.base.magic = PLST_MAGIC;
+      |                                     ^~~~~~~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/ResultScreen.cpp: In member function 'ZunResult ResultScreen::HandleReplaySaveKeyboard()':
+src/ResultScreen.cpp:1368:54: warning: format '%d' expects argument of type 'int', but argument 3 has type 'long int' [-Wformat=]
+ 1368 |                 sprintf(replayPath, "./replay/th7_%.2d.rpy", i + 1);
+      |                                                   ~~~^       ~~~~~
+      |                                                      |         |
+      |                                                      int       long int
+      |                                                   %.2ld
+src/ResultScreen.cpp:1397:65: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'u32' {aka 'unsigned int'} [-Wsign-compare]
+ 1397 |             if (*(i32 *)&this->replays[this->cursor].head.magic != REPLAY_MAGIC ||
+src/ResultScreen.cpp:1517:55: warning: format '%d' expects argument of type 'int', but argument 3 has type 'long int' [-Wformat=]
+ 1517 |                 sprintf(replayPath2, "./replay/th7_%.2d.rpy", this->chosenReplayIdx + 1);
+      |                                                    ~~~^       ~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                                       |                             |
+      |                                                       int                           long int
+      |                                                    %.2ld
+src/ResultScreen.cpp: In static member function 'static u32 ResultScreen::OnDraw(ResultScreen*)':
+src/ResultScreen.cpp:2338:58: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'u32' {aka 'unsigned int'} [-Wsign-compare]
+ 2338 |             else if (*(i32 *)&arg->replays[i].head.magic != REPLAY_MAGIC ||
+In file included from src/AnmManager.hpp:3,
+                 from src/ScreenEffect.cpp:3:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/ScreenEffect.hpp:4,
+                 from src/ScreenEffect.cpp:1:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/ScreenEffect.cpp: In static member function 'static ScreenEffect* ScreenEffect::RegisterChain(i32, i32, u32, u32, u32)':
+src/ScreenEffect.cpp:279:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct ScreenEffect'; use assignment or value-initialization instead [-Wclass-memaccess]
+  279 |     memset(mgr, 0, sizeof(ScreenEffect));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/ScreenEffect.hpp:24:8: note: 'struct ScreenEffect' declared here
+   24 | struct ScreenEffect
+      |        ^~~~~~~~~~~~
+src/SoundPlayer.cpp: In member function 'ZunResult SoundPlayer::InitSoundBuffers()':
+src/SoundPlayer.cpp:793:19: warning: comparison of integer expressions of different signedness: 'i32' {aka 'long int'} and 'unsigned int' [-Wsign-compare]
+  793 |     for (i = 0; i < ARRAY_SIZE(SOUND_BUFFER_IDX_VOL); i++)
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/TextHelper.cpp -o obj/ps2/src/TextHelper.o
+In file included from src/Stage.hpp:3,
+                 from src/Stage.cpp:1:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/Stage.cpp: In constructor 'Stage::Stage()':
+src/Stage.cpp:40:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Stage'; use assignment or value-initialization instead [-Wclass-memaccess]
+   40 |     memset(this, 0, sizeof(Stage));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/Stage.hpp:155:8: note: 'struct Stage' declared here
+  155 | struct Stage
+      |        ^~~~~
+src/Stage.cpp: In static member function 'static ZunResult Stage::RegisterChain(i32)':
+src/Stage.cpp:758:11: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Stage'; use assignment or value-initialization instead [-Wclass-memaccess]
+  758 |     memset(mgr, 0, sizeof(Stage));
+      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+src/Stage.hpp:155:8: note: 'struct Stage' declared here
+  155 | struct Stage
+      |        ^~~~~
+In file included from src/AnmManager.hpp:3,
+                 from src/Supervisor.cpp:10:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/Supervisor.cpp:14:
+src/Ending.hpp: In constructor 'Ending::Ending()':
+src/Ending.hpp:21:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Ending'; use assignment or value-initialization instead [-Wclass-memaccess]
+   21 |         memset(this, 0, sizeof(Ending));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/Ending.hpp:17:8: note: 'struct Ending' declared here
+   17 | struct Ending
+      |        ^~~~~~
+In file included from src/Supervisor.cpp:1:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/Supervisor.cpp:18:
+src/MainMenu.hpp: In constructor 'MainMenu::MainMenu()':
+src/MainMenu.hpp:110:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct MainMenu'; use assignment or value-initialization instead [-Wclass-memaccess]
+  110 |         memset(this, 0, sizeof(MainMenu));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/MainMenu.hpp:106:8: note: 'struct MainMenu' declared here
+  106 | struct MainMenu
+      |        ^~~~~~~~
+In file included from src/Supervisor.cpp:20:
+src/MusicRoom.hpp: In constructor 'MusicRoom::MusicRoom()':
+src/MusicRoom.hpp:27:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct MusicRoom'; use assignment or value-initialization instead [-Wclass-memaccess]
+   27 |         memset(this, 0, sizeof(MusicRoom));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/MusicRoom.hpp:23:8: note: 'struct MusicRoom' declared here
+   23 | struct MusicRoom
+      |        ^~~~~~~~~
+src/Supervisor.cpp: In static member function 'static ZunResult Supervisor::DeletedCallback(Supervisor*)':
+src/Supervisor.cpp:682:9: warning: deleting object of polymorphic class type 'MidiOutput' which has non-virtual destructor might cause undefined behavior [-Wdelete-non-virtual-dtor]
+  682 |         delete arg->midiOutput;
+      |         ^~~~~~~~~~~~~~~~~~~~~~
+src/Supervisor.cpp:697:9: warning: deleting object of polymorphic class type 'DummyMidiTimer' which has non-virtual destructor might cause undefined behavior [-Wdelete-non-virtual-dtor]
+  697 |         delete g_Supervisor.midiTimer;
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/Supervisor.cpp: In static member function 'static void Supervisor::DrawFpsCounter(i32)':
+src/Supervisor.cpp:813:55: warning: format '%d' expects argument of type 'int', but argument 3 has type 'i32' {aka 'long int'} [-Wformat=]
+  813 |                         sprintf(g_ReplayFpsBuffer, "%2d", (i32)g_Supervisor.curFps);
+      |                                                     ~~^   ~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                                       |   |
+      |                                                       int i32 {aka long int}
+      |                                                     %2ld
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/main.cpp -o obj/ps2/src/main.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/utils.cpp -o obj/ps2/src/utils.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/ps2audio.cpp -o obj/ps2/src/ps2audio.o
+src/MainMenu.cpp: In static member function 'static u32 MainMenu::OnUpdate(MainMenu*)':
+src/MainMenu.cpp:132:12: warning: 'result' may be used uninitialized [-Wmaybe-uninitialized]
+  132 |     return result;
+      |            ^~~~~~
+src/MainMenu.cpp:92:9: note: 'result' was declared here
+   92 |     u32 result;
+      |         ^~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/ps2boot.cpp -o obj/ps2/src/ps2boot.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Ps2Pad.cpp -o obj/ps2/src/Ps2Pad.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/audsrv_irx.cpp -o obj/ps2/src/audsrv_irx.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/padman_irx.cpp -o obj/ps2/src/padman_irx.o
+src/padman_irx.cpp:2303:25: warning: 'size_padman_irx' initialized and declared 'extern'
+ 2303 | extern "C" unsigned int size_padman_irx = 36741;
+      |                         ^~~~~~~~~~~~~~~
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/graphics/PS2GS.cpp -o obj/ps2/src/graphics/PS2GS.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/pbg4/Lzss.cpp -o obj/ps2/src/pbg4/Lzss.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/pbg4/Pbg4Archive.cpp -o obj/ps2/src/pbg4/Pbg4Archive.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/pbg4/Pbg4File.cpp -o obj/ps2/src/pbg4/Pbg4File.o
+In file included from src/AnmManager.hpp:3,
+                 from src/main.cpp:5:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/ZunTimer.hpp:3,
+                 from src/AnmVm.hpp:5:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/pbg4/Pbg4Archive.cpp:185:18: warning: multi-character character constant [-Wmultichar]
+  185 |     if (magic != '4GBP')
+      |                  ^~~~~~
+In file included from src/AnmManager.hpp:3,
+                 from src/graphics/PS2GS.cpp:3:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+mips64r5900el-ps2-elf-g++ -T/opt/ps2dev-x/ps2dev/ps2sdk/ee/startup/linkfile -O2 -o th07.elf obj/ps2/src/AnmManager.o obj/ps2/src/AnmVm.o obj/ps2/src/AsciiManager.o obj/ps2/src/BombData.o obj/ps2/src/BulletManager.o obj/ps2/src/Chain.o obj/ps2/src/Controller.o obj/ps2/src/EclManager.o obj/ps2/src/EffectManager.o obj/ps2/src/Ending.o obj/ps2/src/EnemyEclInstr.o obj/ps2/src/EnemyManager.o obj/ps2/src/FileSystem.o obj/ps2/src/GameErrorContext.o obj/ps2/src/GameManager.o obj/ps2/src/GameWindow.o obj/ps2/src/Gui.o obj/ps2/src/ItemManager.o obj/ps2/src/MainMenu.o obj/ps2/src/MidiOutput.o obj/ps2/src/MusicRoom.o obj/ps2/src/Player.o obj/ps2/src/ReplayManager.o obj/ps2/src/ResultScreen.o obj/ps2/src/Rng.o obj/ps2/src/ScreenEffect.o obj/ps2/src/SoundPlayer.o obj/ps2/src/Stage.o obj/ps2/src/Supervisor.o obj/ps2/src/TextHelper.o obj/ps2/src/main.o obj/ps2/src/utils.o obj/ps2/src/ps2audio.o obj/ps2/src/ps2boot.o obj/ps2/src/Ps2Pad.o obj/ps2/src/audsrv_irx.o obj/ps2/src/padman_irx.o obj/ps2/src/graphics/PS2GS.o obj/ps2/src/pbg4/Lzss.o obj/ps2/src/pbg4/Pbg4Archive.o obj/ps2/src/pbg4/Pbg4File.o -L/opt/ps2dev-x/ps2dev/ps2sdk/ee/lib -Wl,-zmax-page-size=128 -Wl,--wrap=fopen -L/opt/ps2dev-x/ps2dev/ps2sdk/ports/lib -L/opt/ps2dev-x/ps2dev/gsKit/lib -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static -lm -lpatches -lgskit -ldmakit -lpadx -laudsrv -lps2_drivers -lpthreadglue -lpthread -ldebug 

@@ -1,0 +1,169 @@
+From 29652858a7e8f05754433f06f51f9359dc9818bb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 20:56:46 -0300
+Subject: [PATCH 13/34] PS2: store SFX at 22050 Hz and upsample while mixing
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/ps2audio.cpp | 52 ++++++++++++++++++++++++++++++++++++++----------
+ src/ps2audio.hpp |  8 +++++---
+ 2 files changed, 47 insertions(+), 13 deletions(-)
+
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index db6d198..e8156ad 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -123,12 +123,35 @@ void MixFrames(int16_t *dst, int frames)
+ }
+ 
+ // ---- audio buffer data source ----
++// Reads `frames` frames at 44100 Hz. Data stored at 44100/rateDiv Hz is upsampled linearly (no state is needed
++// because the position is derived from the cursor).
+ ma_result BufRead(ma_data_source *ds, void *out, ma_uint64 frames, ma_uint64 *read)
+ {
+     ma_audio_buffer *b = (ma_audio_buffer *)ds;
+     ma_uint64 n = std::min<ma_uint64>(frames, b->frames - b->cursor);
+-    const uint32_t fs = ma_get_bytes_per_frame(b->format, b->channels);
+-    std::memcpy(out, (const uint8_t *)b->pData + b->cursor * fs, n * fs);
++    const uint32_t ch = b->channels;
++    const uint32_t div = b->rateDiv ? b->rateDiv : 1;
++    if (div == 1)
++    {
++        const uint32_t fs = ma_get_bytes_per_frame(b->format, ch);
++        std::memcpy(out, (const uint8_t *)b->pData + b->cursor * fs, n * fs);
++    }
++    else
++    {
++        const int16_t *src = (const int16_t *)b->pData; // rateDiv > 1 is only produced for s16 data
++        const ma_uint64 stored = b->frames / div;
++        int16_t *dst = (int16_t *)out;
++        for (ma_uint64 i = 0; i < n; i++)
++        {
++            const ma_uint64 pos = b->cursor + i;
++            const ma_uint64 i0 = pos / div;
++            const ma_uint64 i1 = std::min(i0 + 1, stored - 1);
++            const int t = (int)(pos % div);
++            for (uint32_t c = 0; c < ch; c++)
++                dst[i * ch + c] =
++                    (int16_t)((src[i0 * ch + c] * (int)(div - t) + src[i1 * ch + c] * t) / (int)div);
++        }
++    }
+     b->cursor += n;
+     *read = n;
+     return n ? MA_SUCCESS : MA_AT_END;
+@@ -164,16 +187,18 @@ const ma_data_source_vtable g_bufVtable = {BufRead, BufSeek, BufFormat, BufCurso
+ // Decoded effects are kept as 16 bit (mono when the source is mono) to save RAM. Each decoded buffer is allocated with
+ // a small header in front of the samples that records its layout, so the format travels with the memory itself and
+ // there is no global table that could go stale when an address is freed and reused.
++constexpr uint32_t kSfxRateDiv = 2;
+ constexpr uint32_t kPcmMagic = 0x314D4350; // "PCM1"
+ struct PcmHeader
+ {
+     uint32_t magic;
+     uint32_t channels; // 1 or 2, samples are always signed 16 bit
+-    uint32_t reserved[2];
++    uint32_t rateDiv; // stored sample rate is 44100 / rateDiv
++    uint32_t reserved;
+ };
+ static_assert(sizeof(PcmHeader) == 16, "keep the samples 16 byte aligned");
+ 
+-int16_t *AllocPcm(ma_uint64 frames, uint32_t channels)
++int16_t *AllocPcm(ma_uint64 frames, uint32_t channels, uint32_t rateDiv)
+ {
+     const ma_uint64 bytes = frames * channels * sizeof(int16_t);
+     if (frames == 0 || bytes > (64ull << 20))
+@@ -183,7 +208,8 @@ int16_t *AllocPcm(ma_uint64 frames, uint32_t channels)
+         return nullptr;
+     h->magic = kPcmMagic;
+     h->channels = channels;
+-    h->reserved[0] = h->reserved[1] = 0;
++    h->rateDiv = rateDiv;
++    h->reserved = 0;
+     return (int16_t *)(h + 1);
+ }
+ 
+@@ -220,16 +246,18 @@ ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 c
+                                                    const void *pData, const void *)
+ {
+     const PcmHeader *h = HeaderOf(pData);
++    ma_uint32 div = 1;
+     if (h)
+     {
+         format = ma_format_s16;
+         channels = h->channels;
++        div = h->rateDiv ? h->rateDiv : 1;
+     }
+     else
+     {
+         AudioLog("audio: buffer %p was not produced by ma_decode_memory; assuming the caller's format\n", pData);
+     }
+-    return {format, channels, sizeInFrames, pData};
++    return {format, channels, sizeInFrames, pData, div};
+ }
+ 
+ ma_result ma_audio_buffer_init(const ma_audio_buffer_config *cfg, ma_audio_buffer *buf)
+@@ -237,7 +265,8 @@ ma_result ma_audio_buffer_init(const ma_audio_buffer_config *cfg, ma_audio_buffe
+     buf->base.vtable = &g_bufVtable;
+     buf->format = cfg->format;
+     buf->channels = cfg->channels;
+-    buf->frames = cfg->sizeInFrames;
++    buf->rateDiv = cfg->rateDiv ? cfg->rateDiv : 1;
++    buf->frames = cfg->sizeInFrames * buf->rateDiv;
+     buf->pData = cfg->pData;
+     buf->cursor = 0;
+     return MA_SUCCESS;
+@@ -340,9 +369,12 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+         AudioLog("audio: wav contains no samples\n");
+         return MA_ERROR;
+     }
+-    const uint64_t outFrames = srcFrames * kRate / rate;
++    // Effects are kept at half rate (22050 Hz) to fit the 32 MB of RAM; BufRead upsamples them while mixing.
++    const uint32_t div = kSfxRateDiv;
++    const uint32_t storeRate = kRate / div;
++    const uint64_t outFrames = srcFrames * storeRate / rate;
+     const uint32_t outCh = channels > 1 ? 2 : 1;
+-    int16_t *out = outFrames ? AllocPcm(outFrames, outCh) : nullptr;
++    int16_t *out = outFrames ? AllocPcm(outFrames, outCh, div) : nullptr;
+     if (!out)
+     {
+         AudioLog("audio: cannot allocate %u frames x %u ch (out of memory or too large)\n", (unsigned)outFrames,
+@@ -374,7 +406,7 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+ 
+     for (uint64_t i = 0; i < outFrames; i++)
+     {
+-        const double srcPos = (double)i * rate / kRate;
++        const double srcPos = (double)i * rate / storeRate;
+         const uint64_t i0 = (uint64_t)srcPos;
+         const uint64_t i1 = std::min(i0 + 1, srcFrames - 1);
+         const float t = (float)(srcPos - (double)i0);
+diff --git a/src/ps2audio.hpp b/src/ps2audio.hpp
+index 7a3aeb0..72f9725 100644
+--- a/src/ps2audio.hpp
++++ b/src/ps2audio.hpp
+@@ -82,17 +82,19 @@ struct ma_audio_buffer_config
+ {
+     ma_format format;
+     ma_uint32 channels;
+-    ma_uint64 sizeInFrames;
++    ma_uint64 sizeInFrames; // frames as stored in memory
+     const void *pData;
++    ma_uint32 rateDiv; // stored data is at 44100/rateDiv Hz and is upsampled while mixing
+ };
+ struct ma_audio_buffer
+ {
+     ma_data_source_base base;
+     ma_format format;
+     ma_uint32 channels;
+-    ma_uint64 frames;
++    ma_uint64 frames; // frames at 44100 Hz (stored frames * rateDiv)
+     const void *pData;
+-    ma_uint64 cursor;
++    ma_uint64 cursor; // in 44100 Hz frames
++    ma_uint32 rateDiv;
+ };
+ ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
+                                                    const void *pData, const void *allocationCallbacks);
+-- 
+2.43.0
+

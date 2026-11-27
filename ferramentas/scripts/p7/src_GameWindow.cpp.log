@@ -1,0 +1,5 @@
+In file included from src/GameWindow.cpp:18:
+src/graphics/Gles.hpp:3:10: fatal error: GLES3/gl3.h: No such file or directory
+    3 | #include <GLES3/gl3.h>
+      |          ^~~~~~~~~~~~~
+compilation terminated.

@@ -1,0 +1,39 @@
+In file included from src/EclManager.hpp:4,
+                 from src/EclManager.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/EclManager.cpp: In member function 'ZunResult EclManager::RunEcl(Enemy*)':
+src/EclManager.cpp:869:31: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  869 |         enemy->periodicCounter++;
+      |         ~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:888:44: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  888 |             enemy->currentContext.waitTimer--;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:889:39: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  889 |             enemy->currentContext.time--;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:1896:43: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1896 |                     enemy->moveInterpTimer--;
+      |                     ~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:1912:43: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1912 |                     enemy->moveInterpTimer--;
+      |                     ~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:1920:39: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1920 |                 enemy->moveInterpTimer--;
+      |                 ~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:1977:46: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1977 |                     enemy->shootIntervalTimer++;
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:2058:39: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 2058 |                         interp2->timer++;
+      |                         ~~~~~~~~~~~~~~^~
+src/EclManager.cpp:2118:39: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 2118 |             enemy->currentContext.time++;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/EclManager.cpp:2133:37: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 2133 |                 g_EnemyManager.timer++;
+      |                 ~~~~~~~~~~~~~~~~~~~~^~

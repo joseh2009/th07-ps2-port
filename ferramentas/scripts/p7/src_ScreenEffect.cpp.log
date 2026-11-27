@@ -1,0 +1,24 @@
+In file included from src/ScreenEffect.hpp:4,
+                 from src/ScreenEffect.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/ScreenEffect.cpp: In static member function 'static u32 ScreenEffect::OnUpdateFadeOut(ScreenEffect*)':
+src/ScreenEffect.cpp:48:15: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+   48 |     arg->timer++;
+      |     ~~~~~~~~~~^~
+src/ScreenEffect.cpp: In static member function 'static u32 ScreenEffect::OnUpdateFadeIn(ScreenEffect*)':
+src/ScreenEffect.cpp:153:15: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  153 |     arg->timer++;
+      |     ~~~~~~~~~~^~
+src/ScreenEffect.cpp: In static member function 'static u32 ScreenEffect::OnUpdatePulse(ScreenEffect*)':
+src/ScreenEffect.cpp:190:15: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  190 |     arg->timer++;
+      |     ~~~~~~~~~~^~
+src/ScreenEffect.cpp: In static member function 'static u32 ScreenEffect::OnUpdateScreenShake(ScreenEffect*)':
+src/ScreenEffect.cpp:218:15: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  218 |     arg->timer++;
+      |     ~~~~~~~~~~^~

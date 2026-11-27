@@ -1,0 +1,86 @@
+From b24c3d02904f45b06662b0917064dd1715b03fc7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 11:25:16 -0300
+Subject: [PATCH 29/29] PS2: show GS time per frame next to the fps counter
+ (diagnostic)
+
+SwapBuffers is timed and the average ms per frame is shown after the
+fps value. A value close to the frame time means the GS is the limit;
+a small value means the EE side is.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Supervisor.cpp     | 12 ++++++++++++
+ src/graphics/PS2GS.cpp |  8 ++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 28cef15..7393ffe 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -38,6 +38,10 @@ u16 g_NumOfFramesInputsWereHeld;
+ Supervisor g_Supervisor;
+ u32 g_FpsUpdateCounter;
+ char g_ReplayFpsBuffer[256];
++#ifdef __PS2__
++extern u64 g_Ps2GsMsTotal;
++extern u32 g_Ps2GsFrames;
++#endif
+ char g_FpsCounterBuffer[256];
+ u32 g_NumFramesSinceLastTime;
+ u64 g_PerformanceCounter;
+@@ -694,7 +698,15 @@ void Supervisor::DrawFpsCounter(i32 param_1)
+             MERGE:
+                 fps = (f32)g_NumFramesSinceLastTime / elapsedTimeInSecs;
+                 g_NumFramesSinceLastTime = 0;
++#ifdef __PS2__
++                // Diagnostic: fps, then the average ms per frame spent in SwapBuffers (GS) since the last update
++                sprintf(g_FpsCounterBuffer, "%.01ffps gs%.0f", (f64)fps,
++                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0);
++                g_Ps2GsMsTotal = 0;
++                g_Ps2GsFrames = 0;
++#else
+                 sprintf(g_FpsCounterBuffer, "%.02ffps", (f64)fps);
++#endif
+                 if (g_GameManager.notInMenu && param_1 != 0)
+                 {
+                     targetFps = 60.0f;
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index feb74a6..2f355d2 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -11,6 +11,7 @@
+ #include <cstdlib>
+ #include <cstring>
+ 
++#include <SDL2/SDL_timer.h>
+ #include <dmaKit.h>
+ #include <gsInline.h>
+ #include <gsToolkit.h>
+@@ -995,6 +996,10 @@ void PS2GS::DrawPrimitiveUP(PrimitiveType type, i32 primitiveCount, const void *
+     DrawVertices(type, in, count, hasTex, screenSpace);
+ }
+ 
++// Diagnostic for the on-screen fps counter: time spent in SwapBuffers (GS work plus waiting for it), in ms.
++u64 g_Ps2GsMsTotal;
++u32 g_Ps2GsFrames;
++
+ void PS2GS::SwapBuffers()
+ {
+     FlushPending();
+@@ -1006,8 +1011,11 @@ void PS2GS::SwapBuffers()
+ #endif
+     frame++;
+ 
++    const u64 gsStart = SDL_GetTicks64();
+     gsKit_queue_exec(gs);
+     gsKit_finish();
+     gsKit_sync_flip(gs);
+     gsKit_TexManager_nextFrame(gs);
++    g_Ps2GsMsTotal += SDL_GetTicks64() - gsStart;
++    g_Ps2GsFrames++;
+ }
+-- 
+2.43.0
+

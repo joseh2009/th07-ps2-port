@@ -1,0 +1,33 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/AnmManager.hpp:3,
+                 from src/EnemyManager.hpp:3,
+                 from src/EnemyManager.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/EnemyManager.cpp: In static member function 'static void EnemyManager::RunEclTimeline(EclTimeline*)':
+src/EnemyManager.cpp:340:43: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  340 |                     timeline->timelineTime--;
+      |                     ~~~~~~~~~~~~~~~~~~~~~~^~
+src/EnemyManager.cpp:356:43: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  356 |                     timeline->timelineTime--;
+      |                     ~~~~~~~~~~~~~~~~~~~~~~^~
+src/EnemyManager.cpp:369:27: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  369 |     timeline->timelineTime++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~^~
+src/EnemyManager.cpp: In static member function 'static u32 EnemyManager::OnUpdate(EnemyManager*)':
+src/EnemyManager.cpp:640:25: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  640 |             enemy->timer--;
+      |             ~~~~~~~~~~~~^~
+src/EnemyManager.cpp:1053:25: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1053 |             enemy->timer++;
+      |             ~~~~~~~~~~~~^~
+src/EnemyManager.cpp:1057:38: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1057 |             enemy->invincibilityTimer--;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/EnemyManager.cpp:1070:22: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1070 |     arg->timelineTime++;
+      |     ~~~~~~~~~~~~~~~~~^~

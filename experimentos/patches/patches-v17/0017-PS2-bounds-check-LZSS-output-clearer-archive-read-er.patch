@@ -1,0 +1,75 @@
+From ca85254f0e286e342f5acc6ce562cd1f80607b6a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 01:08:56 -0300
+Subject: [PATCH 17/37] PS2: bounds-check LZSS output, clearer archive read
+ error
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/FileSystem.cpp |  2 +-
+ src/pbg4/Lzss.cpp  | 14 ++++++++++++++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index 06fff3e..1612e45 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -61,7 +61,7 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+ 
+             if (!g_Pbg4Archive.ReadDecompressEntry(filename, buf))
+             {
+-                g_GameErrorContext.Fatal("error : %s could not be read from the archive (out of memory?)\n", filename);
++                g_GameErrorContext.Fatal("error : %s could not be read or decompressed from the archive (corrupt data, file error or out of memory)\n", filename);
+                 free(buf);
+                 return NULL;
+             }
+diff --git a/src/pbg4/Lzss.cpp b/src/pbg4/Lzss.cpp
+index ce6eff3..198065e 100644
+--- a/src/pbg4/Lzss.cpp
++++ b/src/pbg4/Lzss.cpp
+@@ -179,6 +179,10 @@ u8 *Lzss::Compress(u8 *src, i32 srcLen, i32 *outSize)
+     }
+ 
+ #define DEC_WRITE_BYTE(data)                                                                       \
++    if (dstCursor >= dstEnd)                                                                       \
++    {                                                                                              \
++        goto dst_overflow;                                                                         \
++    }                                                                                              \
+     *dstCursor++ = data;                                                                           \
+     g_LzssDictionary[dictHead] = data;                                                             \
+     dictHead = LZSS_DICTPOS_MOD(dictHead, 1);
+@@ -233,6 +237,7 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
+     (void)checksum;
+     i32 size = srcLen;
+ 
++    const bool ownsDst = (dst == NULL);
+     if (dst == NULL)
+     {
+         dst = (u8 *)malloc(decompressedSize);
+@@ -241,6 +246,7 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
+             return NULL;
+         }
+     }
++    u8 *const dstEnd = dst + decompressedSize;
+ 
+     u8 *srcCursor = src;
+     u8 *dstCursor = dst;
+@@ -286,6 +292,14 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
+     }
+ 
+     return dst;
++
++dst_overflow:
++    // Corrupt or mismatching archive: the stream wants to write past the size recorded in the header
++    if (ownsDst)
++    {
++        free(dst);
++    }
++    return NULL;
+ }
+ 
+ void Lzss::InitTree(i32 root)
+-- 
+2.43.0
+

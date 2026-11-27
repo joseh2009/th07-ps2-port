@@ -1,0 +1,236 @@
+From 5edc3d6b1be5bebdb787f5343f0a0abc89edcae0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 15:30:56 -0300
+Subject: [PATCH 19/26] PS2: CT16 storage for 16-bit embedded textures
+ (TH07_PS2_TEX16_ALL to force)
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2           |  4 ++
+ src/AnmManager.cpp     | 17 +++++++++
+ src/graphics/PS2GS.cpp | 84 +++++++++++++++++++++++++++++-------------
+ 3 files changed, 80 insertions(+), 25 deletions(-)
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index e62206b..85c681b 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -39,6 +39,10 @@ EE_OPTFLAGS = -O2
+ # every message is slow on real hardware. The on-screen exit log is always kept.
+ EE_CXXFLAGS += -DTH07_PS2_VERBOSE
+ 
++# Store every embedded texture as CT16 (A1B5G5R5): half the EE RAM and VRAM, but 8 bit colours drop to 5 bits
++# and semi-transparent sprites become cut-outs. Use only if the default build still runs out of memory.
++# EE_CXXFLAGS += -DTH07_PS2_TEX16_ALL
++
+ ifeq ($(CT32),1)
+ EE_CXXFLAGS += -DTH07_PS2_CT32
+ endif
+diff --git a/src/AnmManager.cpp b/src/AnmManager.cpp
+index 744e728..e1b31c0 100644
+--- a/src/AnmManager.cpp
++++ b/src/AnmManager.cpp
+@@ -1,6 +1,7 @@
+ #ifdef __PS2__
+ void Ps2HeapLog(const char *where);
+ extern bool g_Ps2TexAllocFailed; // PS2GS.cpp
++void Ps2SetNextTexture16(bool on);       // PS2GS.cpp
+ #endif
+ #include "AnmManager.hpp"
+ 
+@@ -282,6 +283,19 @@ static void ConvertEmbeddedRows(const ZunImageInfoEmbedded *info, u32 y0, u32 ro
+     }
+ }
+ 
++// Which GS format an embedded texture gets. ARGB1555 is stored exactly in CT16; RGB565 loses one bit of green. The
++// 8 bit formats and ARGB4444 keep CT32 so their colours and semi-transparency are not cut down. Build with
++// -DTH07_PS2_TEX16_ALL to store everything as CT16 (half the RAM, visible loss on semi-transparent sprites).
++static bool Ps2UseCt16ForFormat(i16 format)
++{
++#ifdef TH07_PS2_TEX16_ALL
++    (void)format;
++    return true;
++#else
++    return format == 2 || format == 3;
++#endif
++}
++
+ // PS2: the texture is created empty on the GS and filled a strip at a time (about 64 KB of temporary RAM instead of a
+ // full-size RGBA copy). Only the two textures that CopyTexture() blits between keep a CPU copy.
+ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *imageInfo)
+@@ -316,6 +330,7 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+     }
+     else
+     {
++        Ps2SetNextTexture16(Ps2UseCt16ForFormat(imageInfo->format));
+         g_Supervisor.gfxDevice->SetTextureImage(w, h, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, NULL);
+         const u32 stripRows = (u32)std::max<size_t>(1, 65536 / ((size_t)w * 4));
+         u8 *strip = (u8 *)malloc((size_t)stripRows * w * 4);
+@@ -341,6 +356,8 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+     textureWidths[textureIdx] = w;
+     textureHeights[textureIdx] = h;
+     texturePitches[textureIdx] = w * 4;
++    Supervisor::DebugPrint("embedded tex %u: format %d, %ux%u, %s\n", textureIdx, (i32)imageInfo->format, w, h,
++                           Ps2UseCt16ForFormat(imageInfo->format) ? "CT16" : "CT32");
+     Ps2HeapLog("embedded tex");
+     return ZUN_SUCCESS;
+ }
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 6a62400..5f6021d 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -31,6 +31,12 @@
+ size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
+ unsigned g_Ps2TexCount = 0;
+ bool g_Ps2TexAllocFailed = false; // set when a texture could not be allocated; AnmManager turns it into a load error
++static bool g_Ps2NextTexture16 = false; // one-shot: the next SetTextureImage stores A1B5G5R5 (CT16), half the RAM
++
++void Ps2SetNextTexture16(bool on)
++{
++    g_Ps2NextTexture16 = on;
++}
+ 
+ namespace
+ {
+@@ -384,6 +390,8 @@ void PS2GS::ApplyRenderState()
+     gs->PrimAlphaEnable = blend ? GS_SETTING_ON : GS_SETTING_OFF;
+ 
+     // Alpha test (alpha is in the 0..128 GS range) + depth test
++    PushRegister(GS_SETREG_TEXA(0, 0, 128), GS_TEXA);
++
+     gs->Test->ATE = alphaTest ? 1 : 0;
+     gs->Test->ATST = 5; // GEQUAL
+     gs->Test->AREF = (alphaRef + 1) >> 1;
+@@ -490,53 +498,79 @@ void PS2GS::DeleteTexture(GfxTextureHandle handle)
+ void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fmt, PixelDataType type, const void *data)
+ {
+     const i32 stride = (i32)tex->gs.Width;
++    const bool ct16 = (tex->gs.PSM == GS_PSM_CT16);
+     const u8 *src = (const u8 *)data;
+ 
+     for (i32 row = 0; row < h; row++)
+     {
+-        u32 *dst = tex->gs.Mem + (size_t)(y + row) * stride + x;
+-        if (type == PIXEL_UNSIGNED_BYTE)
++        u32 *dst32 = tex->gs.Mem + (size_t)(y + row) * stride + x;
++        u16 *dst16 = (u16 *)tex->gs.Mem + (size_t)(y + row) * stride + x;
++        for (i32 i = 0; i < w; i++)
+         {
+-            if (fmt == PIXEL_RGB)
++            u32 r, g, b, a8;
++            if (type == PIXEL_UNSIGNED_BYTE)
+             {
+-                const u8 *s = src + (size_t)row * w * 3;
+-                for (i32 i = 0; i < w; i++, s += 3)
+-                    dst[i] = PackGS(s[0], s[1], s[2], 255);
++                if (fmt == PIXEL_RGB)
++                {
++                    const u8 *s = src + ((size_t)row * w + i) * 3;
++                    r = s[0];
++                    g = s[1];
++                    b = s[2];
++                    a8 = 255;
++                }
++                else
++                {
++                    const u8 *s = src + ((size_t)row * w + i) * 4;
++                    r = s[0];
++                    g = s[1];
++                    b = s[2];
++                    a8 = s[3];
++                }
+             }
+             else
+             {
+-                const u8 *s = src + (size_t)row * w * 4;
+-                for (i32 i = 0; i < w; i++, s += 4)
+-                    dst[i] = PackGS(s[0], s[1], s[2], s[3]);
+-            }
+-        }
+-        else
+-        {
+-            const u16 *s = (const u16 *)src + (size_t)row * w;
+-            for (i32 i = 0; i < w; i++)
+-            {
+-                const u32 p = s[i];
++                const u32 p = ((const u16 *)src)[(size_t)row * w + i];
+                 switch (type)
+                 {
+                 case PIXEL_UNSIGNED_SHORT_4_4_4_4:
+-                    dst[i] = PackGS(Expand(p >> 12, 4), Expand((p >> 8) & 15, 4), Expand((p >> 4) & 15, 4),
+-                                    Expand(p & 15, 4));
++                    r = Expand(p >> 12, 4);
++                    g = Expand((p >> 8) & 15, 4);
++                    b = Expand((p >> 4) & 15, 4);
++                    a8 = Expand(p & 15, 4);
+                     break;
+                 case PIXEL_UNSIGNED_SHORT_5_5_5_1:
+-                    dst[i] = PackGS(Expand(p >> 11, 5), Expand((p >> 6) & 31, 5), Expand((p >> 1) & 31, 5),
+-                                    Expand(p & 1, 1));
++                    r = Expand(p >> 11, 5);
++                    g = Expand((p >> 6) & 31, 5);
++                    b = Expand((p >> 1) & 31, 5);
++                    a8 = Expand(p & 1, 1);
+                     break;
+                 default: // 5_6_5
+-                    dst[i] = PackGS(Expand(p >> 11, 5), Expand((p >> 5) & 63, 6), Expand(p & 31, 5), 255);
++                    r = Expand(p >> 11, 5);
++                    g = Expand((p >> 5) & 63, 6);
++                    b = Expand(p & 31, 5);
++                    a8 = 255;
+                     break;
+                 }
+             }
++
++            if (ct16)
++            {
++                // A1 B5 G5 R5. Alpha is binary here: anything at or above one half is opaque.
++                dst16[i] = (u16)((a8 >= 128 ? 0x8000u : 0u) | ((b >> 3) << 10) | ((g >> 3) << 5) | (r >> 3));
++            }
++            else
++            {
++                dst32[i] = PackGS(r, g, b, a8);
++            }
+         }
+     }
+ }
+ 
+ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataType type, const void *data)
+ {
++    const u32 psm = g_Ps2NextTexture16 ? GS_PSM_CT16 : TH07_TEX_PSM;
++    g_Ps2NextTexture16 = false; // one-shot, even when the call below is ignored
++
+     Tex *tex = boundTexture;
+     if (tex == nullptr)
+         return;
+@@ -551,7 +585,7 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
+         h <<= 1;
+     tex->scaleU = (f32)width / (f32)w;
+     tex->scaleV = (f32)height / (f32)h;
+-    const u32 bytes = gsKit_texture_size_ee(w, h, TH07_TEX_PSM);
++    const u32 bytes = gsKit_texture_size_ee(w, h, psm);
+ 
+     std::memset(&tex->gs, 0, sizeof(GSTEXTURE));
+     tex->gs.Mem = (u32 *)memalign(128, bytes);
+@@ -566,7 +600,7 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
+     g_Ps2TexCount++;
+     tex->gs.Width = w;
+     tex->gs.Height = h;
+-    tex->gs.PSM = TH07_TEX_PSM;
++    tex->gs.PSM = psm;
+     tex->gs.Filter = GS_FILTER_LINEAR;
+     tex->alive = true;
+ 
+@@ -585,7 +619,7 @@ void PS2GS::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height,
+ 
+     ConvertAndStore(tex, xoffset, yoffset, width, height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE, data);
+ 
+-    SyncDCache(tex->gs.Mem, (u8 *)tex->gs.Mem + gsKit_texture_size_ee(tex->gs.Width, tex->gs.Height, TH07_TEX_PSM));
++    SyncDCache(tex->gs.Mem, (u8 *)tex->gs.Mem + gsKit_texture_size_ee(tex->gs.Width, tex->gs.Height, tex->gs.PSM));
+     gsKit_TexManager_invalidate(gs, &tex->gs);
+ }
+ 
+-- 
+2.43.0
+

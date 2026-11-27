@@ -1,0 +1,186 @@
+From ad8d023ba75b72bad8892fee3f3b7f5688f562e8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 15:29:47 -0300
+Subject: [PATCH 31/31] PS2: decode LZSS with a byte-buffered bit reader
+
+The decoder read the stream one bit at a time, with a loop per bit. It
+now reads bytes into a 32-bit buffer and takes each field in one step.
+Output is unchanged: all 197 streams of th07.dat decode byte-identical
+to the previous decoder on the host. Host benchmark, in one process,
+10 passes: 2951 ms before, 1291 ms after (PC, not EE).
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/pbg4/Lzss.cpp | 119 ++++++++++++++++------------------------------
+ 1 file changed, 41 insertions(+), 78 deletions(-)
+
+diff --git a/src/pbg4/Lzss.cpp b/src/pbg4/Lzss.cpp
+index 198065e..6bec51a 100644
+--- a/src/pbg4/Lzss.cpp
++++ b/src/pbg4/Lzss.cpp
+@@ -171,56 +171,26 @@ u8 *Lzss::Compress(u8 *src, i32 srcLen, i32 *outSize)
+     return dst;
+ }
+ 
+-#define DEC_NEXT_BIT()                                                                             \
+-    inBitMask >>= 1;                                                                               \
+-    if (inBitMask == 0)                                                                            \
+-    {                                                                                              \
+-        inBitMask = 0x80;                                                                          \
+-    }
+-
+-#define DEC_WRITE_BYTE(data)                                                                       \
+-    if (dstCursor >= dstEnd)                                                                       \
+-    {                                                                                              \
+-        goto dst_overflow;                                                                         \
+-    }                                                                                              \
+-    *dstCursor++ = data;                                                                           \
+-    g_LzssDictionary[dictHead] = data;                                                             \
+-    dictHead = LZSS_DICTPOS_MOD(dictHead, 1);
+-
+-#define DEC_HANDLE_FETCH_NEW_BYTE()                                                                \
+-    if (inBitMask == 0x80)                                                                         \
+-    {                                                                                              \
+-        if (srcCursor - src >= size)                                                               \
+-        {                                                                                          \
+-            curByte = 0;                                                                           \
+-        }                                                                                          \
+-        else                                                                                       \
+-        {                                                                                          \
+-            curByte = *srcCursor;                                                                  \
+-            srcCursor++;                                                                           \
+-        }                                                                                          \
+-        checksum += curByte;                                                                       \
+-    }
+-
+-#define DEC_READ_FLAG_BIT()                                                                        \
+-    DEC_HANDLE_FETCH_NEW_BYTE();                                                                   \
+-    inBits = curByte & inBitMask;                                                                  \
+-    DEC_NEXT_BIT();
++// Bit reader for the compressed stream: MSB first, and zero bits after the end of the input. It reads whole bytes into a
++// 32-bit buffer, so each field costs a few shifts instead of one loop iteration per bit.
++struct LzssBitReader
++{
++    const u8 *cur;
++    const u8 *end;
++    u32 buf;
++    u32 count;
+ 
+-#define DEC_READ_BITS(bitsCount)                                                                   \
+-    outBitMask = 0x01 << (bitsCount - 1);                                                          \
+-    inBits = 0;                                                                                    \
+-    while (outBitMask != 0)                                                                        \
+-    {                                                                                              \
+-        DEC_HANDLE_FETCH_NEW_BYTE();                                                               \
+-        if ((curByte & inBitMask) != 0)                                                            \
+-        {                                                                                          \
+-            inBits |= outBitMask;                                                                  \
+-        }                                                                                          \
+-                                                                                                   \
+-        outBitMask >>= 1;                                                                          \
+-        DEC_NEXT_BIT();                                                                            \
++    u32 Read(u32 bits)
++    {
++        while (count < bits)
++        {
++            buf = (buf << 8) | (cur < end ? *cur++ : 0);
++            count += 8;
++        }
++        count -= bits;
++        return (buf >> count) & ((1u << bits) - 1);
+     }
++};
+ 
+ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
+ {
+@@ -229,13 +199,6 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
+     u32 inBits;
+     i32 matchLength;
+     u32 dictValue;
+-    u32 outBitMask;
+-
+-    u8 inBitMask = 0x80;
+-    u32 curByte = 0;
+-    u32 checksum = 0;
+-    (void)checksum;
+-    i32 size = srcLen;
+ 
+     const bool ownsDst = (dst == NULL);
+     if (dst == NULL)
+@@ -248,49 +211,49 @@ u8 *Lzss::Decompress(u8 *src, i32 srcLen, u8 *dst, u32 decompressedSize)
+     }
+     u8 *const dstEnd = dst + decompressedSize;
+ 
+-    u8 *srcCursor = src;
++    LzssBitReader in = {src, src + srcLen, 0, 0};
+     u8 *dstCursor = dst;
+     u32 dictHead = 1;
+ 
+     for (;;)
+     {
+-        DEC_READ_FLAG_BIT();
+-
+-        // Read literal byte from next 8 bits
+-        if (inBits != 0)
++        if (in.Read(1))
+         {
+-            DEC_READ_BITS(8);
+-            DEC_WRITE_BYTE(inBits);
++            // Literal byte: next 8 bits
++            inBits = in.Read(8);
++            if (dstCursor >= dstEnd)
++            {
++                goto dst_overflow;
++            }
++            *dstCursor++ = (u8)inBits;
++            g_LzssDictionary[dictHead] = (u8)inBits;
++            dictHead = LZSS_DICTPOS_MOD(dictHead, 1);
+         }
+-        // Copy from dictionary, 13 bit offset, then 4 bit length
+         else
+         {
+-            DEC_READ_BITS(13);
+-
+-            matchOffset = inBits;
++            // Copy from dictionary: 13 bit offset (0 ends the stream), then 4 bit length
++            matchOffset = in.Read(13);
+             if (matchOffset == 0)
+             {
+                 break;
+             }
+ 
+-            DEC_READ_BITS(4);
+-
+-            // Value encoded in 4 bit length is 3 less than the actual length
+-            matchLength = inBits + 2;
+-            for (i = 0; i <= matchLength; i++)
++            // The 4 bit length is 3 less than the copied byte count
++            matchLength = (i32)in.Read(4) + 3;
++            for (i = 0; i < matchLength; i++)
+             {
+                 dictValue = g_LzssDictionary[LZSS_DICTPOS_MOD(matchOffset, i)];
+-                DEC_WRITE_BYTE(dictValue);
++                if (dstCursor >= dstEnd)
++                {
++                    goto dst_overflow;
++                }
++                *dstCursor++ = (u8)dictValue;
++                g_LzssDictionary[dictHead] = (u8)dictValue;
++                dictHead = LZSS_DICTPOS_MOD(dictHead, 1);
+             }
+         }
+     }
+ 
+-    // Read any trailing bits in the data
+-    while (inBitMask != 0x80)
+-    {
+-        DEC_READ_FLAG_BIT();
+-    }
+-
+     return dst;
+ 
+ dst_overflow:
+-- 
+2.43.0
+

@@ -1,0 +1,379 @@
+From 9fad0f2459ef6fcb6a761a1de5625a5ff395cb7a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 22:57:17 -0300
+Subject: [PATCH] PS2: timing panel covers the whole frame, pad, audio, ANM
+ flush, present and the top chain callbacks
+
+Diagnostic only. Adds timers around GameWindow::Render and its parts, the pad read, and per-callback
+timing inside the update and draw chains (top 6 of each shown by address). The panel reports time
+that none of the timers cover as untimed.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Chain.cpp      | 12 +++++--
+ src/GameWindow.cpp | 32 ++++++++++++++----
+ src/Ps2Pad.cpp     |  2 ++
+ src/Ps2Timing.hpp  | 46 ++++++++++++++++++++++++-
+ src/Supervisor.cpp | 84 ++++++++++++++++++++++++++++++++++++++++++----
+ 5 files changed, 160 insertions(+), 16 deletions(-)
+
+diff --git a/src/Chain.cpp b/src/Chain.cpp
+index 2f4d8d9..e65518f 100644
+--- a/src/Chain.cpp
++++ b/src/Chain.cpp
+@@ -5,6 +5,12 @@
+ 
+ Chain g_Chain;
+ 
++#ifdef __PS2__
++Ps2CbStat g_Ps2CalcStats[PS2_CB_SLOTS];
++Ps2CbStat g_Ps2DrawStats[PS2_CB_SLOTS];
++Ps2CbStat *g_Ps2ActiveCbTable = g_Ps2CalcStats;
++#endif
++
+ Chain::~Chain()
+ {
+ }
+@@ -124,6 +130,7 @@ ZunResult Chain::AddToDrawChain(ChainElem *elem, i32 priority)
+ i32 Chain::RunCalcChain()
+ {
+     PS2_TIME(PS2_T_CALC_CHAIN);
++    PS2_SET_CB_TABLE(g_Ps2CalcStats);
+     ChainElem *next;
+     ChainElem *current;
+     i32 updateCount;
+@@ -136,7 +143,7 @@ restart_from_first_job:
+         if (current->callback)
+         {
+         execute_again:
+-            switch (current->callback(current->arg))
++            switch (CHAIN_CALL(current->callback, current->arg))
+             {
+             case CHAIN_CALLBACK_RESULT_CONTINUE_AND_REMOVE_JOB:
+                 next = current;
+@@ -167,6 +174,7 @@ restart_from_first_job:
+ i32 Chain::RunDrawChain()
+ {
+     PS2_TIME(PS2_T_DRAW_CHAIN);
++    PS2_SET_CB_TABLE(g_Ps2DrawStats);
+     ChainElem *next;
+     ChainElem *current;
+     i32 updateCount;
+@@ -178,7 +186,7 @@ i32 Chain::RunDrawChain()
+         if (current->callback)
+         {
+         execute_again:
+-            switch (current->callback(current->arg))
++            switch (CHAIN_CALL(current->callback, current->arg))
+             {
+             case CHAIN_CALLBACK_RESULT_CONTINUE_AND_REMOVE_JOB:
+                 next = current;
+diff --git a/src/GameWindow.cpp b/src/GameWindow.cpp
+index d89afb1..83a843c 100644
+--- a/src/GameWindow.cpp
++++ b/src/GameWindow.cpp
+@@ -1,6 +1,7 @@
+ #ifdef __PS2__
+ #include "ps2audio.hpp"
+ #endif
++#include "Ps2Timing.hpp"
+ #include "GameWindow.hpp"
+ 
+ #include <SDL2/SDL.h>
+@@ -74,6 +75,7 @@ RenderResult GameWindow::Render()
+     u64 perfCounter;
+     i32 chainRes;
+ 
++    PS2_TIME(PS2_T_RENDER);
+     if (!this->isAppActive)
+     {
+         return RENDER_RESULT_KEEP_RUNNING;
+@@ -82,7 +84,10 @@ RenderResult GameWindow::Render()
+ #ifdef __PS2__
+     // Audio is mixed here, once per call, so it keeps flowing in every game state (the sound command queue is only
+     // processed on logic frames).
+-    ps2audio_pump();
++    {
++        PS2_TIME(PS2_T_AUDIO);
++        ps2audio_pump();
++    }
+ #endif
+ 
+     if (this->curFrame == 0)
+@@ -94,11 +99,17 @@ RenderResult GameWindow::Render()
+             g_Supervisor.fogEnabled = 255;
+             g_Supervisor.DisableFog();
+             g_Chain.RunDrawChain();
+-            g_AnmManager->Flush();
++            {
++                PS2_TIME(PS2_T_ANM_FLUSH);
++                g_AnmManager->Flush();
++            }
+             g_Supervisor.gfxDevice->BindTexture({0});
+         }
+ 
+-        g_AnmManager->Flush();
++        {
++            PS2_TIME(PS2_T_ANM_FLUSH);
++            g_AnmManager->Flush();
++        }
+         g_Supervisor.viewport.x = 0;
+         g_Supervisor.viewport.y = 0;
+         g_Supervisor.viewport.width = GAME_WINDOW_WIDTH;
+@@ -106,7 +117,10 @@ RenderResult GameWindow::Render()
+         g_Supervisor.gfxDevice->SetViewport(g_Supervisor.viewport);
+ 
+         chainRes = g_Chain.RunCalcChain();
+-        g_SoundPlayer.ProcessQueues();
++        {
++            PS2_TIME(PS2_T_SNDQUEUE);
++            g_SoundPlayer.ProcessQueues();
++        }
+ 
+         if (!chainRes)
+         {
+@@ -156,12 +170,18 @@ RenderResult GameWindow::Render()
+     {
+         if ((i32)g_Supervisor.cfg.frameskipConfig >= (i32)this->curFrame)
+         {
+-            Present();
++            {
++                PS2_TIME(PS2_T_PRESENT);
++                Present();
++            }
+             goto begin_loop;
+         }
+ 
+     LAB_00434a18:
+-        Present();
++        {
++            PS2_TIME(PS2_T_PRESENT);
++            Present();
++        }
+         this->curFrame = 0;
+         g_FrameCount++;
+     }
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index afc53d9..98ceff2 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -1,6 +1,7 @@
+ #ifdef __PS2__
+ #include "Ps2Pad.hpp"
+ #include "Controller.hpp"
++#include "Ps2Timing.hpp"
+ 
+ #include <cstdio>
+ #include <libpad.h>
+@@ -88,6 +89,7 @@ static int s_stuckFrames = 0; // frames in a state other than stable / find
+ 
+ u16 Ps2Pad::GetButtons()
+ {
++    PS2_TIME(PS2_T_PAD);
+     if (!s_Ready)
+         return 0;
+     int state = padGetState(0, 0);
+diff --git a/src/Ps2Timing.hpp b/src/Ps2Timing.hpp
+index 97c6e27..fdd5f54 100644
+--- a/src/Ps2Timing.hpp
++++ b/src/Ps2Timing.hpp
+@@ -1,7 +1,7 @@
+ #pragma once
+ 
+ // Diagnostic timers for the PS2 build (shown on the R3 panel in Supervisor.cpp).
+-// They only measure: they never change what the game does. On other platforms the macro expands to nothing.
++// They only measure: they never change what the game does. On other platforms the macros expand to nothing.
+ 
+ #ifdef __PS2__
+ #include <SDL2/SDL_timer.h>
+@@ -10,6 +10,12 @@
+ 
+ enum Ps2TimerSlot
+ {
++    PS2_T_RENDER,       // GameWindow::Render, the whole frame body
++    PS2_T_AUDIO,        // ps2audio_pump (audio mixing)
++    PS2_T_SNDQUEUE,     // SoundPlayer::ProcessQueues
++    PS2_T_ANM_FLUSH,    // AnmManager::Flush (both calls)
++    PS2_T_PRESENT,      // Present(), which includes the GS swap
++    PS2_T_PAD,          // Ps2Pad::GetButtons (pad read over SIF RPC)
+     PS2_T_CALC_CHAIN,   // all update callbacks (Chain::RunCalcChain)
+     PS2_T_DRAW_CHAIN,   // all draw callbacks (Chain::RunDrawChain)
+     PS2_T_BULLET_UPD,   // BulletManager::OnUpdate
+@@ -33,6 +39,44 @@ struct Ps2ScopeTimer
+ };
+ 
+ #define PS2_TIME(slot) Ps2ScopeTimer ps2ScopeTimer_(slot)
++
++// Per-callback table for the chains: which callback function took how much time, summed since the last refresh.
++#define PS2_CB_SLOTS 48
++struct Ps2CbStat
++{
++    void *fn;
++    u64 ticks;
++};
++extern Ps2CbStat g_Ps2CalcStats[PS2_CB_SLOTS];
++extern Ps2CbStat g_Ps2DrawStats[PS2_CB_SLOTS];
++
++inline void Ps2CbRecord(Ps2CbStat *table, void *fn, u64 ticks)
++{
++    for (int i = 0; i < PS2_CB_SLOTS; i++)
++    {
++        if (table[i].fn == fn || table[i].fn == nullptr)
++        {
++            table[i].fn = fn;
++            table[i].ticks += ticks;
++            return;
++        }
++    }
++}
++
++typedef u32 (*Ps2ChainFn)(void *);
++inline u32 Ps2TimedChainCall(Ps2ChainFn cb, void *arg, Ps2CbStat *table)
++{
++    const u64 start = SDL_GetPerformanceCounter();
++    const u32 result = cb(arg);
++    Ps2CbRecord(table, (void *)cb, SDL_GetPerformanceCounter() - start);
++    return result;
++}
++// The chain runners set which table their callbacks are recorded in, then call every callback through CHAIN_CALL.
++extern Ps2CbStat *g_Ps2ActiveCbTable;
++#define PS2_SET_CB_TABLE(t) (g_Ps2ActiveCbTable = (t))
++#define CHAIN_CALL(cb, arg) Ps2TimedChainCall((Ps2ChainFn)(cb), (arg), g_Ps2ActiveCbTable)
+ #else
+ #define PS2_TIME(slot)
++#define PS2_SET_CB_TABLE(t)
++#define CHAIN_CALL(cb, arg) (cb)(arg)
+ #endif
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 8cf735f..f725989 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -40,6 +40,7 @@ u32 g_FpsUpdateCounter;
+ char g_ReplayFpsBuffer[256];
+ #ifdef __PS2__
+ #include <malloc.h>
++#include <stdint.h>
+ #include "Ps2Timing.hpp"
+ extern u64 g_Ps2GsMsTotal;
+ extern u32 g_Ps2GsFrames;
+@@ -52,6 +53,46 @@ static f32 g_Ps2DiagFps = 0.0f;
+ static f64 g_Ps2DiagGsMs = 0.0;
+ static f64 g_Ps2DiagMs[PS2_T_COUNT]; // average ms per frame for each timer slot (Ps2Timing.hpp)
+ u64 g_Ps2TimerTicks[PS2_T_COUNT];
++// The most expensive chain callbacks of the last interval, in ms per frame, for the panel.
++struct Ps2DiagTop
++{
++    void *fn;
++    f64 ms;
++};
++static Ps2DiagTop g_Ps2DiagCalcTop[6];
++static Ps2DiagTop g_Ps2DiagDrawTop[6];
++
++// Copies the n most expensive callbacks of table into out (ms per frame, scale = ms per tick / frames), then clears table.
++static void Ps2TakeTopCallbacks(Ps2CbStat *table, f64 scale, Ps2DiagTop *out, int n)
++{
++    for (int k = 0; k < n; k++)
++    {
++        int best = -1;
++        for (int i = 0; i < PS2_CB_SLOTS; i++)
++        {
++            if (table[i].fn && table[i].ticks && (best < 0 || table[i].ticks > table[best].ticks))
++            {
++                best = i;
++            }
++        }
++        if (best < 0)
++        {
++            out[k].fn = nullptr;
++            out[k].ms = 0.0;
++        }
++        else
++        {
++            out[k].fn = table[best].fn;
++            out[k].ms = (f64)table[best].ticks * scale;
++            table[best].ticks = 0;
++        }
++    }
++    for (int i = 0; i < PS2_CB_SLOTS; i++)
++    {
++        table[i].fn = nullptr;
++        table[i].ticks = 0;
++    }
++}
+ extern u32 g_Ps2PadHeld;
+ extern u32 g_Ps2PadMode;
+ extern int g_Ps2PadInit;  // Ps2Pad.cpp
+@@ -729,6 +770,9 @@ void Supervisor::DrawFpsCounter(i32 param_1)
+                         g_Ps2DiagMs[i] = g_Ps2GsFrames ? (f64)g_Ps2TimerTicks[i] * msPerTick / g_Ps2GsFrames : 0.0;
+                         g_Ps2TimerTicks[i] = 0;
+                     }
++                    const f64 scale = g_Ps2GsFrames ? msPerTick / (f64)g_Ps2GsFrames : 0.0;
++                    Ps2TakeTopCallbacks(g_Ps2CalcStats, scale, g_Ps2DiagCalcTop, 6);
++                    Ps2TakeTopCallbacks(g_Ps2DrawStats, scale, g_Ps2DiagDrawTop, 6);
+                 }
+                 g_Ps2GsMsTotal = 0;
+                 g_Ps2GsFrames = 0;
+@@ -839,26 +883,52 @@ LAB_00439350:
+         }
+         if (g_Ps2DiagOn)
+         {
+-            static char s_Diag[6][96];
++            static char s_Diag[23][100];
+             struct mallinfo mi = mallinfo();
++            const f64 *t = g_Ps2DiagMs;
+             // EE estimate: the frame time (1000 / fps) minus the GS time. An estimate, not a measurement.
+             const f64 frameMs = g_Ps2DiagFps > 0.0f ? 1000.0 / (f64)g_Ps2DiagFps : 0.0;
++            // Parts of the frame that are timed on their own. The rest is what none of the timers cover.
++            const f64 untimed = t[PS2_T_RENDER] - t[PS2_T_AUDIO] - t[PS2_T_SNDQUEUE] - t[PS2_T_ANM_FLUSH] -
++                                t[PS2_T_PRESENT] - t[PS2_T_CALC_CHAIN] - t[PS2_T_DRAW_CHAIN];
+             sprintf(s_Diag[0], "FPS %.0f  GS %.2f  EE~ %.1f ms/frame", (f64)g_Ps2DiagFps, g_Ps2DiagGsMs,
+                     frameMs - g_Ps2DiagGsMs);
+             sprintf(s_Diag[1], "RAM heap used %dK  free %dK", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
+             sprintf(s_Diag[2], "TEX %dK in %u textures   SFX %dK", (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount,
+                     (int)(g_Ps2AudioBytes / 1024));
+             sprintf(s_Diag[3], "PAD %04X  mode %02X  reads %u", g_Ps2PadHeld & 0xffff, g_Ps2PadMode, g_Ps2PadReads);
+-            sprintf(s_Diag[4], "UPDATE all %.2f  bul %.2f  ene %.2f  eff %.2f ms", g_Ps2DiagMs[PS2_T_CALC_CHAIN],
+-                    g_Ps2DiagMs[PS2_T_BULLET_UPD], g_Ps2DiagMs[PS2_T_ENEMY_UPD], g_Ps2DiagMs[PS2_T_EFFECT_UPD]);
+-            sprintf(s_Diag[5], "DRAW   all %.2f  bul %.2f  ene %.2f  eff %.2f ms", g_Ps2DiagMs[PS2_T_DRAW_CHAIN],
+-                    g_Ps2DiagMs[PS2_T_BULLET_DRAW], g_Ps2DiagMs[PS2_T_ENEMY_DRAW], g_Ps2DiagMs[PS2_T_EFFECT_DRAW]);
++            sprintf(s_Diag[4], "RENDER %.2f  audio %.2f  sndq %.2f  anm %.2f  present(GS) %.2f", t[PS2_T_RENDER],
++                    t[PS2_T_AUDIO], t[PS2_T_SNDQUEUE], t[PS2_T_ANM_FLUSH], t[PS2_T_PRESENT]);
++            sprintf(s_Diag[5], "CALC %.2f (pad %.2f)  DRAW %.2f  untimed %.2f ms", t[PS2_T_CALC_CHAIN], t[PS2_T_PAD],
++                    t[PS2_T_DRAW_CHAIN], untimed);
++            sprintf(s_Diag[6], "UPDATE bul %.2f  ene %.2f  eff %.2f ms", t[PS2_T_BULLET_UPD], t[PS2_T_ENEMY_UPD],
++                    t[PS2_T_EFFECT_UPD]);
++            sprintf(s_Diag[7], "DRAW   bul %.2f  ene %.2f  eff %.2f ms", t[PS2_T_BULLET_DRAW], t[PS2_T_ENEMY_DRAW],
++                    t[PS2_T_EFFECT_DRAW]);
++            sprintf(s_Diag[8], "CALC callbacks (address, ms/frame):");
++            for (int k = 0; k < 6; k++)
++            {
++                if (g_Ps2DiagCalcTop[k].fn)
++                    sprintf(s_Diag[9 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagCalcTop[k].fn,
++                            g_Ps2DiagCalcTop[k].ms);
++                else
++                    sprintf(s_Diag[9 + k], "  -");
++            }
++            sprintf(s_Diag[15], "DRAW callbacks (address, ms/frame):");
++            for (int k = 0; k < 6; k++)
++            {
++                if (g_Ps2DiagDrawTop[k].fn)
++                    sprintf(s_Diag[16 + k], "  %08lX  %.2f", (unsigned long)(uintptr_t)g_Ps2DiagDrawTop[k].fn,
++                            g_Ps2DiagDrawTop[k].ms);
++                else
++                    sprintf(s_Diag[16 + k], "  -");
++            }
+             ZunVec3 diagPos;
+             diagPos.z = 0.0f;
+-            for (int i = 0; i < 6; i++)
++            for (int i = 0; i < 22; i++)
+             {
+                 diagPos.x = 8.0f;
+-                diagPos.y = 24.0f + 16.0f * i;
++                diagPos.y = 24.0f + 14.0f * i;
+                 g_AsciiManager.AddString(&diagPos, s_Diag[i]);
+             }
+         }
+-- 
+2.43.0
+

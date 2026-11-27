@@ -1,0 +1,74 @@
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Supervisor.cpp -o obj/ps2/src/Supervisor.o
+mips64r5900el-ps2-elf-g++ -D_EE -G0 -O2 -Wall -gdwarf-2 -gz -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi -Wno-unused-parameter -Wno-missing-field-initializers -DTH07_PS2_VERBOSE -I/opt/ps2dev-x/ps2dev/ps2sdk/ee/include -I/opt/ps2dev-x/ps2dev/ps2sdk/common/include -I. -Isrc -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include -I/opt/ps2dev-x/ps2dev/ps2sdk/ports/include/SDL2 -I/opt/ps2dev-x/ps2dev/gsKit/include -c src/Ps2Pad.cpp -o obj/ps2/src/Ps2Pad.o
+src/Supervisor.cpp:603:37: warning: multi-character character constant [-Wmultichar]
+  603 |     g_GameManager.plst.base.magic = PLST_MAGIC;
+      |                                     ^~~~~~~~~~
+In file included from src/AnmManager.hpp:3,
+                 from src/Supervisor.cpp:10:
+src/AnmVm.hpp: In constructor 'AnmVm::AnmVm()':
+src/AnmVm.hpp:166:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct AnmVm'; use assignment or value-initialization instead [-Wclass-memaccess]
+  166 |         memset(this, 0, sizeof(AnmVm));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+src/AnmVm.hpp:162:8: note: 'struct AnmVm' declared here
+  162 | struct AnmVm : AnmVmBase
+      |        ^~~~~
+In file included from src/Supervisor.cpp:14:
+src/Ending.hpp: In constructor 'Ending::Ending()':
+src/Ending.hpp:21:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct Ending'; use assignment or value-initialization instead [-Wclass-memaccess]
+   21 |         memset(this, 0, sizeof(Ending));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+src/Ending.hpp:17:8: note: 'struct Ending' declared here
+   17 | struct Ending
+      |        ^~~~~~
+In file included from src/Supervisor.cpp:1:
+src/GameManager.hpp: In member function 'void GameManager::CheckGameIntegrityOnDeath(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:100:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  100 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+src/GameManager.hpp: In member function 'void GameManager::AddBombsUsed(i32)':
+src/Supervisor.hpp:223:33: warning: 'void* memset(void*, int, size_t)' writing to an object of non-trivial type 'struct Supervisor'; use assignment instead [-Wclass-memaccess]
+  223 | #define NUKE_SUPERVISOR() memset(&g_Supervisor, -1, sizeof(g_Supervisor))
+      |                           ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/GameManager.hpp:110:13: note: in expansion of macro 'NUKE_SUPERVISOR'
+  110 |             NUKE_SUPERVISOR();
+      |             ^~~~~~~~~~~~~~~
+src/Supervisor.hpp:119:8: note: 'struct Supervisor' declared here
+  119 | struct Supervisor
+      |        ^~~~~~~~~~
+In file included from src/Supervisor.cpp:18:
+src/MainMenu.hpp: In constructor 'MainMenu::MainMenu()':
+src/MainMenu.hpp:110:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct MainMenu'; use assignment or value-initialization instead [-Wclass-memaccess]
+  110 |         memset(this, 0, sizeof(MainMenu));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/MainMenu.hpp:106:8: note: 'struct MainMenu' declared here
+  106 | struct MainMenu
+      |        ^~~~~~~~
+In file included from src/Supervisor.cpp:20:
+src/MusicRoom.hpp: In constructor 'MusicRoom::MusicRoom()':
+src/MusicRoom.hpp:27:15: warning: 'void* memset(void*, int, size_t)' clearing an object of non-trivial type 'struct MusicRoom'; use assignment or value-initialization instead [-Wclass-memaccess]
+   27 |         memset(this, 0, sizeof(MusicRoom));
+      |         ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/MusicRoom.hpp:23:8: note: 'struct MusicRoom' declared here
+   23 | struct MusicRoom
+      |        ^~~~~~~~~
+src/Supervisor.cpp: In static member function 'static ZunResult Supervisor::DeletedCallback(Supervisor*)':
+src/Supervisor.cpp:625:9: warning: deleting object of polymorphic class type 'MidiOutput' which has non-virtual destructor might cause undefined behavior [-Wdelete-non-virtual-dtor]
+  625 |         delete arg->midiOutput;
+      |         ^~~~~~~~~~~~~~~~~~~~~~
+src/Supervisor.cpp:640:9: warning: deleting object of polymorphic class type 'DummyMidiTimer' which has non-virtual destructor might cause undefined behavior [-Wdelete-non-virtual-dtor]
+  640 |         delete g_Supervisor.midiTimer;
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/Supervisor.cpp: In static member function 'static void Supervisor::DrawFpsCounter(i32)':
+src/Supervisor.cpp:742:55: warning: format '%d' expects argument of type 'int', but argument 3 has type 'i32' {aka 'long int'} [-Wformat=]
+  742 |                         sprintf(g_ReplayFpsBuffer, "%2d", (i32)g_Supervisor.curFps);
+      |                                                     ~~^   ~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                                       |   |
+      |                                                       int i32 {aka long int}
+      |                                                     %2ld
+mips64r5900el-ps2-elf-g++ -T/opt/ps2dev-x/ps2dev/ps2sdk/ee/startup/linkfile -O2 -o th07.elf obj/ps2/src/AnmManager.o obj/ps2/src/AnmVm.o obj/ps2/src/AsciiManager.o obj/ps2/src/BombData.o obj/ps2/src/BulletManager.o obj/ps2/src/Chain.o obj/ps2/src/Controller.o obj/ps2/src/EclManager.o obj/ps2/src/EffectManager.o obj/ps2/src/Ending.o obj/ps2/src/EnemyEclInstr.o obj/ps2/src/EnemyManager.o obj/ps2/src/FileSystem.o obj/ps2/src/GameErrorContext.o obj/ps2/src/GameManager.o obj/ps2/src/GameWindow.o obj/ps2/src/Gui.o obj/ps2/src/ItemManager.o obj/ps2/src/MainMenu.o obj/ps2/src/MidiOutput.o obj/ps2/src/MusicRoom.o obj/ps2/src/Player.o obj/ps2/src/ReplayManager.o obj/ps2/src/ResultScreen.o obj/ps2/src/Rng.o obj/ps2/src/ScreenEffect.o obj/ps2/src/SoundPlayer.o obj/ps2/src/Stage.o obj/ps2/src/Supervisor.o obj/ps2/src/TextHelper.o obj/ps2/src/main.o obj/ps2/src/utils.o obj/ps2/src/ps2audio.o obj/ps2/src/ps2boot.o obj/ps2/src/Ps2Pad.o obj/ps2/src/audsrv_irx.o obj/ps2/src/graphics/PS2GS.o obj/ps2/src/pbg4/Lzss.o obj/ps2/src/pbg4/Pbg4Archive.o obj/ps2/src/pbg4/Pbg4File.o -L/opt/ps2dev-x/ps2dev/ps2sdk/ee/lib -Wl,-zmax-page-size=128 -Wl,--wrap=fopen -L/opt/ps2dev-x/ps2dev/ps2sdk/ports/lib -L/opt/ps2dev-x/ps2dev/gsKit/lib -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static -lm -lpatches -lgskit -ldmakit -lpadx -laudsrv -lps2_drivers -lpthreadglue -lpthread -ldebug 

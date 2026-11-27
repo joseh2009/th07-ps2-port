@@ -1,0 +1,33 @@
+From 3ec69431d27b4f22fcdea74aa7fd19a145dd354d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 23:40:59 -0300
+Subject: [PATCH 25/36] PS2: flush batched draws before changing the viewport
+
+Batched triangles derive their scissor rectangle from the viewport at
+flush time, so a viewport change must flush the pending batch first.
+Without this, triangles queued under one viewport can be drawn with the
+scissor of the next one, which shows up as horizontal streaks.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/graphics/PS2GS.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index e89da03..d3188f5 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -273,6 +273,9 @@ void PS2GS::GetViewport(ZunViewport &out)
+ 
+ void PS2GS::SetViewport(const ZunViewport &vp)
+ {
++    /* Batched triangles derive their scissor from the viewport at flush time,
++       so flush them under the viewport they were submitted with. */
++    FlushPending();
+     viewport = vp;
+ }
+ 
+-- 
+2.43.0
+

@@ -1,0 +1,138 @@
+#ifdef __PS2__
+void Ps2HeapLog(const char *where);
+#endif
+#include "FileSystem.hpp"
+
+#include <cstdio>
+
+#include "GameErrorContext.hpp"
+#include "Supervisor.hpp"
+#include "pbg4/Pbg4Archive.hpp"
+
+u32 g_LastFileSize;
+
+u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+{
+    FILE *file;
+    u8 *buf;
+    u32 fsize;
+    const char *filename;
+
+    if (!isExternalResource)
+    {
+        filename = strrchr(filepath, '\\');
+        if (!filename)
+        {
+            filename = filepath;
+        }
+        else
+        {
+            filename++;
+        }
+
+        filename = strrchr(filename, '/');
+        if (!filename)
+        {
+            filename = filepath;
+        }
+        else
+        {
+            filename++;
+        }
+        fsize = g_Pbg4Archive.GetEntrySize(filename);
+        g_LastFileSize = fsize;
+        if (fsize == 0)
+        {
+            g_GameErrorContext.Fatal("error : %s is not found in arcfile.\n", filename);
+            return NULL;
+        }
+        if (fsize != 0)
+        {
+#ifdef __PS2__
+            /* Per-file size table for memory budgeting (printed only when verbose). */
+            Supervisor::DebugPrint("size %s: %u KB\n", filename, fsize / 1024);
+#endif
+            Supervisor::DebugPrint("%s Decode ... \n", filename);
+            buf = (u8 *)malloc(fsize);
+            if (!buf)
+            {
+#ifdef __PS2__
+                Ps2HeapLog("oom");
+#endif
+                g_GameErrorContext.Fatal("error : out of memory loading %s (%u bytes)\n", filename, fsize);
+                return NULL;
+            }
+
+            if (!g_Pbg4Archive.ReadDecompressEntry(filename, buf))
+            {
+                g_GameErrorContext.Fatal("error : %s could not be read or decompressed from the archive (corrupt data, file error or out of memory)\n", filename);
+                free(buf);
+                return NULL;
+            }
+            return buf;
+        }
+    }
+    Supervisor::DebugPrint("%s Load ... \n", filepath);
+    file = fopen(filepath, "rb");
+    if (!file)
+    {
+        Supervisor::DebugPrint("error : %s is not found.\n", filepath);
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    fsize = ftell(file);
+    buf = (u8 *)malloc(fsize);
+    if (!buf)
+    {
+        fclose(file);
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_SET);
+    if (fread(buf, 1, fsize, file) != fsize)
+    {
+        fclose(file);
+        return NULL;
+    }
+    g_LastFileSize = fsize;
+    fclose(file);
+    return buf;
+}
+
+i32 FileSystem::CheckFileExists(const char *file)
+{
+    FILE *fp;
+
+    fp = fopen(file, "rb");
+    if (fp)
+    {
+        fclose(fp);
+        return true;
+    }
+    return false;
+}
+
+i32 FileSystem::WriteDataToFile(const char *filename, const void *out, u32 bytesToWrite)
+{
+    FILE *file;
+    u32 bytesWritten;
+
+    file = fopen(filename, "wb");
+    if (!file)
+    {
+        Supervisor::DebugPrint("error : %s write error\n", filename);
+        return -1;
+    }
+
+    bytesWritten = fwrite(out, 1, bytesToWrite, file);
+    if (bytesToWrite != bytesWritten)
+    {
+        fclose(file);
+        Supervisor::DebugPrint("error : %s write error\n", filename);
+        return -2;
+    }
+    fclose(file);
+    Supervisor::DebugPrint("%s write ...\n", filename);
+    return 0;
+}

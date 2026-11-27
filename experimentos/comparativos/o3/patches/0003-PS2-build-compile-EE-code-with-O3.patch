@@ -1,0 +1,30 @@
+From 81116270331e7116328331217a90ac1c3e56ad37 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 21:36:01 -0300
+Subject: [PATCH 3/3] PS2 build: compile EE code with -O3
+
+-O2 -> -O3 for the EE objects. Not measured on console yet: check replay
+determinism and float results (the game's RNG and movement must not change).
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2 | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index 7120ee5..bf8b0c4 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -33,7 +33,7 @@ EE_INCS += -Isrc -I$(PS2SDK)/ports/include -I$(PS2SDK)/ports/include/SDL2 -I$(GS
+ 
+ EE_CXXFLAGS += -std=gnu++20 -D__PS2__ -DNDEBUG -fno-strict-aliasing -Wno-psabi \
+ 	-Wno-unused-parameter -Wno-missing-field-initializers
+-EE_OPTFLAGS = -O2
++EE_OPTFLAGS = -O3
+ 
+ # Console printf logging is off by default: printing and flushing on every message is slow on real hardware.
+ # Add -DTH07_PS2_VERBOSE here only when debugging with a console or emulator log. The on-screen log is always kept.
+-- 
+2.43.0
+

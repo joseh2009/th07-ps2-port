@@ -1,0 +1,77 @@
+From b6d1a6678ead853864627ac57466bb6fec297f9b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 15:50:12 -0300
+Subject: [PATCH 32/37] PS2: short on-screen diagnostic line (fps, GS ms, pad
+ state)
+
+The counter sits at the right edge and the longer text was cut off. It now
+reads "fps g<GS ms> s<pad state>". The pad state is the last padGetState()
+value (6 = stable, -1 = pad never opened).
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Ps2Pad.cpp     | 7 ++++---
+ src/Supervisor.cpp | 7 ++++---
+ 2 files changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index 9c1e5d5..eaf4b8f 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -15,8 +15,9 @@ static bool s_Ready = false;
+ 
+ #define STICK_DEADZONE 48
+ 
+-// Diagnostic shown next to the fps counter: 1 = pad ready, 0 = no pad (the console log is not visible on hardware).
+-int g_Ps2PadReady = 0;
++// Diagnostic shown next to the fps counter: last padGetState() value (6 = stable), or -1 if the pad was never opened.
++// The console log is not visible on hardware, so this is the only way to see it there.
++int g_Ps2PadState = -1;
+ 
+ bool Ps2Pad::Init()
+ {
+@@ -45,7 +46,6 @@ bool Ps2Pad::Init()
+     if (r == 0)
+         return false;
+     s_Ready = true; // the pad settles over the next few frames; GetButtons just polls
+-    g_Ps2PadReady = 1;
+     return true;
+ }
+ 
+@@ -54,6 +54,7 @@ u16 Ps2Pad::GetButtons()
+     if (!s_Ready)
+         return 0;
+     int state = padGetState(0, 0);
++    g_Ps2PadState = state;
+     if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1)
+         return 0;
+ 
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 67b683a..1c4f606 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -41,7 +41,7 @@ char g_ReplayFpsBuffer[256];
+ #ifdef __PS2__
+ extern u64 g_Ps2GsMsTotal;
+ extern u32 g_Ps2GsFrames;
+-extern int g_Ps2PadReady;
++extern int g_Ps2PadState;
+ #endif
+ char g_FpsCounterBuffer[256];
+ u32 g_NumFramesSinceLastTime;
+@@ -701,8 +701,9 @@ void Supervisor::DrawFpsCounter(i32 param_1)
+                 g_NumFramesSinceLastTime = 0;
+ #ifdef __PS2__
+                 // Diagnostic: fps, then the average ms per frame spent in SwapBuffers (GS) since the last update
+-                sprintf(g_FpsCounterBuffer, "%.01ffps gs%.0f p%d", (f64)fps,
+-                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0, g_Ps2PadReady);
++                // Short on purpose: the counter is drawn at the right edge of the screen, so longer text is cut off
++                sprintf(g_FpsCounterBuffer, "%.0f g%.0f s%d", (f64)fps,
++                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0, g_Ps2PadState);
+                 g_Ps2GsMsTotal = 0;
+                 g_Ps2GsFrames = 0;
+ #else
+-- 
+2.43.0
+

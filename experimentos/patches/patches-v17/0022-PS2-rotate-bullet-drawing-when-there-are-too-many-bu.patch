@@ -1,0 +1,74 @@
+From 7ea2761c35333ac9c0ec4653a4a33b175be45f69 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 23:16:34 -0300
+Subject: [PATCH 22/37] PS2: rotate bullet drawing when there are too many
+ bullets
+
+With more than TH07_PS2_BULLET_DRAW_LIMIT (256) bullets on screen, each
+frame draws only every Nth normal bullet and the set rotates between
+frames, similar to the sprite flicker of old arcade and NES games. Spawn
+and despawn effects are always drawn. Only drawing changes; movement and
+collision are untouched. PS2 only; not tested on hardware or in PCSX2.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/BulletManager.cpp | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/src/BulletManager.cpp b/src/BulletManager.cpp
+index 66a0e1e..4fb15ce 100644
+--- a/src/BulletManager.cpp
++++ b/src/BulletManager.cpp
+@@ -11,6 +11,13 @@
+ #include "SoundPlayer.hpp"
+ #include "Supervisor.hpp"
+ #include "ZunMath.hpp"
++
++#ifdef __PS2__
++#ifndef TH07_PS2_BULLET_DRAW_LIMIT
++// Normal bullets drawn per frame before the flicker/rotation kicks in (see BulletManager::OnDraw).
++#define TH07_PS2_BULLET_DRAW_LIMIT 256
++#endif
++#endif
+ #include "utils.hpp"
+ 
+ const BulletTypeInfo g_BulletTypeInfos[11] = {
+@@ -1216,6 +1223,17 @@ u32 BulletManager::OnDraw(BulletManager *arg)
+     Laser *laser;
+     f32 sine;
+     i32 i;
++#ifdef __PS2__
++    // Old-arcade style flicker: when there are more than TH07_PS2_BULLET_DRAW_LIMIT bullets, each frame draws only
++    // every Nth normal bullet, rotating which ones, so the GS and the EE vertex work stay bounded. Spawn and despawn
++    // effects are always drawn. Only drawing changes; bullet movement and collision are untouched.
++    static u32 drawFrame;
++    drawFrame++;
++    const i32 drawStride = arg->bulletCount > TH07_PS2_BULLET_DRAW_LIMIT
++                               ? (arg->bulletCount + TH07_PS2_BULLET_DRAW_LIMIT - 1) / TH07_PS2_BULLET_DRAW_LIMIT
++                               : 1;
++    u32 drawIdx = 0;
++#endif
+ 
+     laser = arg->lasers;
+     for (i = 0; i < ARRAY_SIZE_SIGNED(arg->lasers); i++, laser++)
+@@ -1260,6 +1278,16 @@ u32 BulletManager::OnDraw(BulletManager *arg)
+         bullet = arg->bulletsPtrs[i];
+         while (bullet)
+         {
++#ifdef __PS2__
++            const bool effect = bullet->state == BULLET_SPAWNING_FAST ||
++                                bullet->state == BULLET_SPAWNING_NORMAL ||
++                                bullet->state == BULLET_SPAWNING_SLOW || bullet->state == BULLET_DESPAWN;
++            if (drawStride > 1 && !effect && ((drawIdx++ + drawFrame) % (u32)drawStride) != 0)
++            {
++                bullet = bullet->next;
++                continue;
++            }
++#endif
+             bullet->Draw();
+             bullet = bullet->next;
+         }
+-- 
+2.43.0
+

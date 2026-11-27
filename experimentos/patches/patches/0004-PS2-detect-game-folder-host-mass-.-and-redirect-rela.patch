@@ -1,0 +1,167 @@
+From 0c9cdaf3a5d7c6faac5d6c81b077a297e73ce957 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:11:39 -0300
+Subject: [PATCH 04/20] PS2: detect game folder (host:/mass:/...) and redirect
+ relative fopen through it
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2    |  2 +-
+ src/ps2boot.cpp | 88 ++++++++++++++++++++++++++++++++-----------------
+ 2 files changed, 58 insertions(+), 32 deletions(-)
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index 3784102..6750d18 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -39,7 +39,7 @@ ifeq ($(CT32),1)
+ EE_CXXFLAGS += -DTH07_PS2_CT32
+ endif
+ 
+-EE_LDFLAGS += -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
++EE_LDFLAGS += -Wl,--wrap=fopen -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
+ 
+ # order matters: SDL2main first, SDL2 after the libraries that depend on it
+ EE_LIBS += -lSDL2main -lSDL2_image -lSDL2_ttf -lSDL2 -lfreetype -lpng16 -ljpeg -lz -lbz2_static \
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index cece86f..7342e6a 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -2,24 +2,43 @@
+ #include <cstdio>
+ #include <cstring>
+ #include <debug.h>
+-#include <sys/stat.h>
+ #include <unistd.h>
+ 
+-// Boot screen: runs before anything else (even before the GS backend), using ps2sdk's built-in text console, so
+-// that something is always visible on screen and the user can see which game files were found.
++// Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
++// relative names, so every relative fopen() of the game is redirected through this prefix (see __wrap_fopen).
++char g_Ps2BasePrefix[160] = "";
+ 
+-static long FileSize(const char *path)
++extern "C" FILE *__real_fopen(const char *path, const char *mode);
++
++extern "C" FILE *__wrap_fopen(const char *path, const char *mode)
++{
++    if (!path)
++        return nullptr;
++    if (strchr(path, ':') || path[0] == '/' || path[0] == '\\' || g_Ps2BasePrefix[0] == 0)
++        return __real_fopen(path, mode);
++
++    const char *rel = path;
++    while (rel[0] == '.' && rel[1] == '/')
++        rel += 2;
++    char full[320];
++    snprintf(full, sizeof(full), "%s%s", g_Ps2BasePrefix, rel);
++    FILE *f = __real_fopen(full, mode);
++    if (!f)
++        f = __real_fopen(path, mode);
++    return f;
++}
++
++static bool CanOpen(const char *prefix, const char *name, long *size)
+ {
+-    struct stat st;
+-    if (stat(path, &st) == 0)
+-        return (long)st.st_size;
+-    FILE *f = fopen(path, "rb"); // some file systems (host:) have no working stat()
++    char full[320];
++    snprintf(full, sizeof(full), "%s%s", prefix, name);
++    FILE *f = __real_fopen(full, "rb");
+     if (!f)
+-        return -1;
++        return false;
+     fseek(f, 0, SEEK_END);
+-    long n = ftell(f);
++    *size = ftell(f);
+     fclose(f);
+-    return n;
++    return true;
+ }
+ 
+ void Ps2BootScreen(int argc, char **argv)
+@@ -30,34 +49,42 @@ void Ps2BootScreen(int argc, char **argv)
+     scr_printf("  main() reached - screen output works.\n");
+ 
+     const char *self = (argc > 0 && argv && argv[0]) ? argv[0] : "(none)";
+-    scr_printf("  ELF path: %s\n", self);
++    scr_printf("  ELF path: %s\n\n", self);
+ 
+-    // Make relative file names resolve next to the ELF (host:dir/th07.elf, mass:/dir/th07.elf, cdrom0:...)
+-    char dir[256];
+-    dir[0] = 0;
++    // Candidate folders, first the one the ELF was started from
++    char fromElf[160] = "";
+     if (argc > 0 && argv && argv[0])
+     {
+-        strncpy(dir, argv[0], sizeof(dir) - 1);
+-        dir[sizeof(dir) - 1] = 0;
+-        char *slash = strrchr(dir, '/');
+-        char *colon = strrchr(dir, ':');
+-        if (slash)
+-            slash[1] = 0;
++        strncpy(fromElf, argv[0], sizeof(fromElf) - 1);
++        char *slash = strrchr(fromElf, '/');
++        char *bslash = strrchr(fromElf, '\\');
++        char *colon = strrchr(fromElf, ':');
++        char *cut = slash > bslash ? slash : bslash;
++        if (cut)
++            cut[1] = 0;
+         else if (colon)
+             colon[1] = 0;
+         else
+-            dir[0] = 0;
++            fromElf[0] = 0;
+     }
+-    if (dir[0])
++    const char *candidates[] = {fromElf, "", "host:", "host:/", "mass:/", "mass0:/", "cdrom0:\\", "mc0:/"};
++
++    const char *chosen = nullptr;
++    scr_printf("  Looking for th07.dat:\n");
++    for (const char *c : candidates)
+     {
+-        int r = chdir(dir);
+-        scr_printf("  chdir(%s) = %d\n", dir, r);
++        long n;
++        bool ok = CanOpen(c, "th07.dat", &n);
++        scr_printf("    %-12s %s\n", c[0] ? c : "(cwd)", ok ? "FOUND" : "no");
++        if (ok && !chosen)
++            chosen = c;
+     }
+-    char cwd[256];
+-    if (getcwd(cwd, sizeof(cwd)))
+-        scr_printf("  working dir: %s\n", cwd);
+     scr_printf("\n");
+ 
++    if (chosen)
++        strncpy(g_Ps2BasePrefix, chosen, sizeof(g_Ps2BasePrefix) - 1);
++    scr_printf("  Using prefix: '%s'\n\n", g_Ps2BasePrefix);
++
+     static const struct
+     {
+         const char *name;
+@@ -67,8 +94,8 @@ void Ps2BootScreen(int argc, char **argv)
+     bool missing = false;
+     for (const auto &f : files)
+     {
+-        long n = FileSize(f.name);
+-        if (n >= 0)
++        long n;
++        if (CanOpen(g_Ps2BasePrefix, f.name, &n))
+             scr_printf("  [ OK ]  %-14s %ld bytes\n", f.name, n);
+         else if (f.required)
+         {
+@@ -88,7 +115,6 @@ void Ps2BootScreen(int argc, char **argv)
+             sleep(1);
+     }
+     scr_printf("  All required files found. Starting game...\n");
+-    scr_printf("  (if the screen goes black after this, check the EE log)\n");
+     sleep(4);
+ }
+ #endif
+-- 
+2.43.0
+

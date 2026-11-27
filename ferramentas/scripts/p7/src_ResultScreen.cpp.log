@@ -1,0 +1,60 @@
+src/ResultScreen.cpp:172:29: warning: multi-character character constant [-Wmultichar]
+  172 |         if (chunk->magic == TH7K_MAGIC)
+      |                             ^~~~~~~~~~
+src/ResultScreen.cpp:177:29: warning: multi-character character constant [-Wmultichar]
+  177 |         if (chunk->magic == VRSM_MAGIC)
+      |                             ^~~~~~~~~~
+src/ResultScreen.cpp:230:39: warning: multi-character character constant [-Wmultichar]
+  230 |         if (parsedHscr->base.magic == HSCR_MAGIC && parsedHscr->base.version == 1 &&
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:269:39: warning: multi-character character constant [-Wmultichar]
+  269 |         if (parsedCatk->base.magic == CATK_MAGIC && parsedCatk->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:293:39: warning: multi-character character constant [-Wmultichar]
+  293 |         if (parsedLsnm->base.magic == LSNM_MAGIC && parsedLsnm->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:320:33: warning: multi-character character constant [-Wmultichar]
+  320 |         outClrd[i].base.magic = CLRD_MAGIC;
+      |                                 ^~~~~~~~~~
+src/ResultScreen.cpp:335:39: warning: multi-character character constant [-Wmultichar]
+  335 |         if (parsedClrd->base.magic == CLRD_MAGIC && parsedClrd->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:372:36: warning: multi-character character constant [-Wmultichar]
+  372 |                 pscr->base.magic = PSCR_MAGIC;
+      |                                    ^~~~~~~~~~
+src/ResultScreen.cpp:387:39: warning: multi-character character constant [-Wmultichar]
+  387 |         if (parsedPscr->base.magic == PSCR_MAGIC && parsedPscr->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:412:39: warning: multi-character character constant [-Wmultichar]
+  412 |         if (parsedPlst->base.magic == PLST_MAGIC && parsedPlst->base.version == 1)
+      |                                       ^~~~~~~~~~
+src/ResultScreen.cpp:461:30: warning: multi-character character constant [-Wmultichar]
+  461 |     this->th7kHeader.magic = TH7K_MAGIC;
+      |                              ^~~~~~~~~~
+src/ResultScreen.cpp:480:63: warning: multi-character character constant [-Wmultichar]
+  480 |                     if (currentCharacter->data->base.magic == HSCR_MAGIC)
+      |                                                               ^~~~~~~~~~
+src/ResultScreen.cpp:513:28: warning: multi-character character constant [-Wmultichar]
+  513 |         clrd->base.magic = CLRD_MAGIC;
+      |                            ^~~~~~~~~~
+src/ResultScreen.cpp:525:33: warning: multi-character character constant [-Wmultichar]
+  525 |         if (catk->base.magic == CATK_MAGIC)
+      |                                 ^~~~~~~~~~
+src/ResultScreen.cpp:560:23: warning: multi-character character constant [-Wmultichar]
+  560 |     vrsm.base.magic = VRSM_MAGIC;
+      |                       ^~~~~~~~~~
+src/ResultScreen.cpp:2440:34: warning: multi-character character constant [-Wmultichar]
+ 2440 |     arg->lsnmHeader.base.magic = LSNM_MAGIC;
+      |                                  ^~~~~~~~~~
+src/ResultScreen.cpp:2475:37: warning: multi-character character constant [-Wmultichar]
+ 2475 |             if (catk->base.magic != CATK_MAGIC || catk->base.version != 1)
+      |                                     ^~~~~~~~~~
+In file included from src/AnmVm.hpp:5,
+                 from src/ResultScreen.hpp:7,
+                 from src/ResultScreen.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~

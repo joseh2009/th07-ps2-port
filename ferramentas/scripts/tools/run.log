@@ -1,0 +1,241 @@
+[1/197] ascii.anm
+[2/197] capture.anm
+[3/197] demorpy0.rpy
+[4/197] demorpy1.rpy
+[5/197] demorpy2.rpy
+[6/197] ecldata1.ecl
+[7/197] ecldata2.ecl
+[8/197] ecldata3.ecl
+[9/197] ecldata4.ecl
+[10/197] ecldata5.ecl
+[11/197] ecldata6.ecl
+[12/197] ecldata7.ecl
+[13/197] ecldata8.ecl
+[14/197] eff01.anm
+[15/197] eff02.anm
+[16/197] eff03.anm
+[17/197] eff04.anm
+[18/197] eff04b.anm
+[19/197] eff05.anm
+[20/197] eff06.anm
+[21/197] eff07.anm
+[22/197] eff08.anm
+[23/197] end00.end
+[24/197] end00.jpg
+[25/197] end00b.end
+[26/197] end00b.jpg
+[27/197] end01.end
+[28/197] end01.jpg
+[29/197] end02.jpg
+[30/197] end02b.jpg
+[31/197] end03.jpg
+[32/197] end04.jpg
+[33/197] end05.jpg
+[34/197] end06.jpg
+[35/197] end07.jpg
+[36/197] end08.jpg
+[37/197] end09.jpg
+[38/197] end10.end
+[39/197] end10.jpg
+[40/197] end10b.end
+[41/197] end11.end
+[42/197] end11.jpg
+[43/197] end12.jpg
+[44/197] end13.jpg
+[45/197] end14.jpg
+[46/197] end15.jpg
+[47/197] end16.jpg
+[48/197] end17.jpg
+[49/197] end18.jpg
+[50/197] end19.jpg
+[51/197] end20.end
+[52/197] end20.jpg
+[53/197] end20b.end
+[54/197] end21.end
+[55/197] end21.jpg
+[56/197] etama.anm
+  face_01_00.anm: reduzida 512x512 -> 256x256 (formato 1)
+[57/197] face_01_00.anm
+  face_02_00.anm: reduzida 512x512 -> 256x256 (formato 1)
+[58/197] face_02_00.anm
+  face_03_00.anm: reduzida 512x512 -> 256x256 (formato 1)
+[59/197] face_03_00.anm
+  face_04_00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[60/197] face_04_00.anm
+  face_05_00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[61/197] face_05_00.anm
+  face_06_00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[62/197] face_06_00.anm
+  face_07_00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[63/197] face_07_00.anm
+  face_08_00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[64/197] face_08_00.anm
+  face_mr00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[65/197] face_mr00.anm
+  face_rm00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[66/197] face_rm00.anm
+  face_sk00.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[67/197] face_sk00.anm
+[68/197] front.anm
+[69/197] init.mid
+  loading.anm: reduzida 512x512 -> 256x256 (formato 3)
+[70/197] loading.anm
+  loading2.anm: reduzida 512x512 -> 256x256 (formato 3)
+[71/197] loading2.anm
+  loading3.anm: reduzida 512x512 -> 256x256 (formato 3)
+[72/197] loading3.anm
+[73/197] msg1.dat
+[74/197] msg2.dat
+[75/197] msg3.dat
+[76/197] msg4.dat
+[77/197] msg5.dat
+[78/197] msg6.dat
+[79/197] msg7.dat
+[80/197] msg8.dat
+[81/197] music.jpg
+[82/197] music00.anm
+[83/197] musiccmt.txt
+[84/197] phantasm.jpg
+[85/197] player00.anm
+[86/197] player01.anm
+[87/197] player02.anm
+[88/197] ply00a.sht
+[89/197] ply00as.sht
+[90/197] ply00b.sht
+[91/197] ply00bs.sht
+[92/197] ply01a.sht
+[93/197] ply01as.sht
+[94/197] ply01b.sht
+[95/197] ply01bs.sht
+[96/197] ply02a.sht
+[97/197] ply02as.sht
+[98/197] ply02b.sht
+[99/197] ply02bs.sht
+[100/197] result.jpg
+[101/197] result00.anm
+[102/197] select00.jpg
+[103/197] se_bonus.wav
+[104/197] se_bonus2.wav
+[105/197] se_border.wav
+[106/197] se_cancel00.wav
+[107/197] se_cat00.wav
+[108/197] se_damage00.wav
+[109/197] se_enep00.wav
+[110/197] se_enep01.wav
+[111/197] se_extend.wav
+[112/197] se_graze.wav
+[113/197] se_gun00.wav
+[114/197] se_item00.wav
+[115/197] se_kira00.wav
+[116/197] se_kira01.wav
+[117/197] se_kira02.wav
+[118/197] se_lazer00.wav
+[119/197] se_lazer01.wav
+[120/197] se_nep00.wav
+[121/197] se_ok00.wav
+[122/197] se_pause.wav
+[123/197] se_pldead00.wav
+[124/197] se_plst00.wav
+[125/197] se_power0.wav
+[126/197] se_power1.wav
+[127/197] se_powerup.wav
+[128/197] se_select00.wav
+[129/197] se_tan00.wav
+[130/197] se_tan01.wav
+[131/197] se_tan02.wav
+[132/197] se_timeout.wav
+[133/197] staff00.end
+[134/197] staff00.jpg
+  staff01.anm: reduzida 512x512 -> 256x256 (formato 1)
+[135/197] staff01.anm
+[136/197] stage1.std
+[137/197] stage2.std
+[138/197] stage3.std
+[139/197] stage4.std
+[140/197] stage5.std
+[141/197] stage6.std
+[142/197] stage7.std
+[143/197] stage8.std
+  std1txt.anm: reduzida 512x256 -> 256x128 (formato 5)
+[144/197] std1txt.anm
+  std2txt.anm: reduzida 512x256 -> 256x128 (formato 5)
+[145/197] std2txt.anm
+  std3txt.anm: reduzida 512x256 -> 256x128 (formato 5)
+[146/197] std3txt.anm
+  std4txt.anm: reduzida 512x256 -> 256x128 (formato 1)
+[147/197] std4txt.anm
+  std5txt.anm: reduzida 512x256 -> 256x128 (formato 5)
+[148/197] std5txt.anm
+  std6txt.anm: reduzida 512x256 -> 256x128 (formato 5)
+[149/197] std6txt.anm
+  std7txt.anm: reduzida 512x256 -> 256x128 (formato 1)
+[150/197] std7txt.anm
+  std8txt.anm: reduzida 512x256 -> 256x128 (formato 1)
+[151/197] std8txt.anm
+  stg1bg.anm: reduzida 512x512 -> 256x256 (formato 1)
+[152/197] stg1bg.anm
+  stg1enm.anm: reduzida 512x512 -> 256x256 (formato 5)
+[153/197] stg1enm.anm
+  stg2bg.anm: reduzida 512x512 -> 256x256 (formato 1)
+[154/197] stg2bg.anm
+  stg2enm.anm: reduzida 512x512 -> 256x256 (formato 5)
+[155/197] stg2enm.anm
+  stg3bg.anm: reduzida 512x512 -> 256x256 (formato 1)
+[156/197] stg3bg.anm
+  stg3enm.anm: reduzida 512x512 -> 256x256 (formato 5)
+[157/197] stg3enm.anm
+  stg4bg.anm: reduzida 512x256 -> 256x128 (formato 1)
+[158/197] stg4bg.anm
+  stg4bg2.anm: reduzida 512x256 -> 256x128 (formato 1)
+[159/197] stg4bg2.anm
+[160/197] stg4bg3.anm
+  stg4bg4.anm: reduzida 512x512 -> 256x256 (formato 1)
+[161/197] stg4bg4.anm
+[162/197] stg4bg5.anm
+  stg4enm.anm: reduzida 512x512 -> 256x256 (formato 5)
+[163/197] stg4enm.anm
+  stg5bg.anm: reduzida 512x512 -> 256x256 (formato 1)
+[164/197] stg5bg.anm
+  stg5enm.anm: reduzida 512x512 -> 256x256 (formato 5)
+[165/197] stg5enm.anm
+  stg6bg.anm: reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1)
+[166/197] stg6bg.anm
+  stg6enm.anm: reduzida 512x512 -> 256x256 (formato 5); reduzida 512x512 -> 256x256 (formato 1)
+[167/197] stg6enm.anm
+  stg7bg.anm: reduzida 512x512 -> 256x256 (formato 1)
+[168/197] stg7bg.anm
+  stg7enm.anm: reduzida 512x512 -> 256x256 (formato 5)
+[169/197] stg7enm.anm
+  stg8bg.anm: reduzida 512x512 -> 256x256 (formato 1)
+[170/197] stg8bg.anm
+  stg8enm.anm: reduzida 512x512 -> 256x256 (formato 5)
+[171/197] stg8enm.anm
+[172/197] text.anm
+[173/197] th07logo.jpg
+[174/197] th07_01.mid
+[175/197] th07_0100b.ver
+[176/197] th07_02.mid
+[177/197] th07_03.mid
+[178/197] th07_04.mid
+[179/197] th07_05.mid
+[180/197] th07_06.mid
+[181/197] th07_07.mid
+[182/197] th07_08.mid
+[183/197] th07_09.mid
+[184/197] th07_10.mid
+[185/197] th07_11.mid
+[186/197] th07_12.mid
+[187/197] th07_13.mid
+[188/197] th07_13b.mid
+[189/197] th07_14.mid
+[190/197] th07_15.mid
+[191/197] th07_16.mid
+[192/197] th07_17.mid
+[193/197] th07_18.mid
+[194/197] th07_19.mid
+[195/197] thbgm.fmt
+[196/197] title00.jpg
+  title01.anm: reduzida 512x256 -> 256x128 (formato 5); reduzida 512x512 -> 256x256 (formato 5); reduzida 512x512 -> 256x256 (formato 5); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x512 -> 256x256 (formato 1); reduzida 512x256 -> 256x128 (formato 5); mantida (pequena 256x256); mantida (pequena 256x256); reduzida 512x512 -> 256x256 (formato 5)
+[197/197] title01.anm
+[197/197] gravando o arquivo
+Pronto: 42 arquivos ANM alterados. 23829135 -> 12674381 bytes.

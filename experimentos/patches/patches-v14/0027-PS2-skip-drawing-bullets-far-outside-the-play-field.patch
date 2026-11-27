@@ -1,0 +1,47 @@
+From 87007c70be7ca65e0bc4ea4242eb60c23703a8ab Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 10:43:29 -0300
+Subject: [PATCH 27/34] PS2: skip drawing bullets far outside the play field
+
+Bullets more than 64 px outside the 384x448 play field are not drawn;
+they reappear as soon as they come back into range. Only drawing changes:
+bullet movement, collision and despawn are untouched.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/BulletManager.cpp | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/BulletManager.cpp b/src/BulletManager.cpp
+index 4fb15ce..45a64ca 100644
+--- a/src/BulletManager.cpp
++++ b/src/BulletManager.cpp
+@@ -17,6 +17,10 @@
+ // Normal bullets drawn per frame before the flicker/rotation kicks in (see BulletManager::OnDraw).
+ #define TH07_PS2_BULLET_DRAW_LIMIT 256
+ #endif
++#ifndef TH07_PS2_BULLET_CULL_MARGIN
++// Bullets further than this outside the play field (384x448) are not drawn; they reappear when they come back.
++#define TH07_PS2_BULLET_CULL_MARGIN 64.0f
++#endif
+ #endif
+ #include "utils.hpp"
+ 
+@@ -1279,6 +1283,13 @@ u32 BulletManager::OnDraw(BulletManager *arg)
+         while (bullet)
+         {
+ #ifdef __PS2__
++            // Off-screen bullets are not drawn (drawing only: movement and collision are untouched)
++            if (bullet->pos.x < -TH07_PS2_BULLET_CULL_MARGIN || bullet->pos.x > 384.0f + TH07_PS2_BULLET_CULL_MARGIN ||
++                bullet->pos.y < -TH07_PS2_BULLET_CULL_MARGIN || bullet->pos.y > 448.0f + TH07_PS2_BULLET_CULL_MARGIN)
++            {
++                bullet = bullet->next;
++                continue;
++            }
+             const bool effect = bullet->state == BULLET_SPAWNING_FAST ||
+                                 bullet->state == BULLET_SPAWNING_NORMAL ||
+                                 bullet->state == BULLET_SPAWNING_SLOW || bullet->state == BULLET_DESPAWN;
+-- 
+2.43.0
+

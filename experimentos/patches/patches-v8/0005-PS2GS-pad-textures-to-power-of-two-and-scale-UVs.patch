@@ -1,0 +1,61 @@
+From 6ad6a56bec04a181478258be9ac419b1d6059995 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:41:26 -0300
+Subject: [PATCH 05/28] PS2GS: pad textures to power of two and scale UVs
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/graphics/PS2GS.cpp | 16 ++++++++++++++--
+ src/graphics/PS2GS.hpp |  1 +
+ 2 files changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 46a5b61..59bb4f4 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -536,8 +536,14 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
+ 
+     ReleaseTextureMemory(tex);
+ 
+-    const u32 w = std::max<u32>(width, kMinTexSize);
+-    const u32 h = std::max<u32>(height, kMinTexSize);
++    // The GS wraps/addresses textures in powers of two: pad the allocation and scale the UVs to match
++    u32 w = kMinTexSize, h = kMinTexSize;
++    while (w < width)
++        w <<= 1;
++    while (h < height)
++        h <<= 1;
++    tex->scaleU = (f32)width / (f32)w;
++    tex->scaleV = (f32)height / (f32)h;
+     const u32 bytes = gsKit_texture_size_ee(w, h, TH07_TEX_PSM);
+ 
+     std::memset(&tex->gs, 0, sizeof(GSTEXTURE));
+@@ -628,6 +634,12 @@ PS2GS::ClipVert PS2GS::MakeVertex(const InVert &in, bool textured, bool screenSp
+         }
+     }
+ 
++    if (textured && boundTexture)
++    {
++        o.u *= boundTexture->scaleU;
++        o.v *= boundTexture->scaleV;
++    }
++
+     // Texture stage "argument 2": diffuse colour, texture factor, or nothing
+     f32 arg[4];
+     switch (texArg)
+diff --git a/src/graphics/PS2GS.hpp b/src/graphics/PS2GS.hpp
+index fdeab34..04f85a7 100644
+--- a/src/graphics/PS2GS.hpp
++++ b/src/graphics/PS2GS.hpp
+@@ -58,6 +58,7 @@ class PS2GS : public ZunGraphics
+     {
+         GSTEXTURE gs;
+         bool alive = false;
++        f32 scaleU = 1.0f, scaleV = 1.0f; // image size / (power of two) texture size
+     };
+ 
+     // Vertex after the transform, before the perspective divide.
+-- 
+2.43.0
+

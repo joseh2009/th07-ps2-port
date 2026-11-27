@@ -1,0 +1,550 @@
+From 05ec13df6bcaf63228c2bb0ecea58899fb1646bc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 20:05:08 -0300
+Subject: [PATCH 11/20] PS2: audio audit fixes (in-buffer PCM header, strict
+ WAV decoder, pump from Render), pad remap
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/GameWindow.cpp  |   9 ++
+ src/Ps2Pad.cpp      |  16 +--
+ src/SoundPlayer.cpp |   4 -
+ src/main.cpp        |   6 +-
+ src/ps2audio.cpp    | 256 ++++++++++++++++++++++++++++----------------
+ src/ps2audio.hpp    |   5 +-
+ 6 files changed, 187 insertions(+), 109 deletions(-)
+
+diff --git a/src/GameWindow.cpp b/src/GameWindow.cpp
+index 328be2a..d89afb1 100644
+--- a/src/GameWindow.cpp
++++ b/src/GameWindow.cpp
+@@ -1,3 +1,6 @@
++#ifdef __PS2__
++#include "ps2audio.hpp"
++#endif
+ #include "GameWindow.hpp"
+ 
+ #include <SDL2/SDL.h>
+@@ -76,6 +79,12 @@ RenderResult GameWindow::Render()
+         return RENDER_RESULT_KEEP_RUNNING;
+     }
+ 
++#ifdef __PS2__
++    // Audio is mixed here, once per call, so it keeps flowing in every game state (the sound command queue is only
++    // processed on logic frames).
++    ps2audio_pump();
++#endif
++
+     if (this->curFrame == 0)
+     {
+     begin_loop:
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index 40d8751..45b7c6c 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -58,16 +58,20 @@ u16 Ps2Pad::GetButtons()
+         out |= TH_BUTTON_LEFT;
+     if (held & PAD_RIGHT)
+         out |= TH_BUTTON_RIGHT;
++    // Layout: Cross = shoot/confirm (Z), Circle = bomb/cancel (X), L1 = focus (Shift), R1 = skip dialogue (Ctrl),
++    // Select = pause/back (Esc), Start = Enter. Cancel in menus is MENU|BOMB, so Circle and Select both back out.
+     if (held & PAD_CROSS)
+-        out |= TH_BUTTON_SHOOT | TH_BUTTON_ENTER;
+-    if (held & (PAD_CIRCLE | PAD_TRIANGLE))
++        out |= TH_BUTTON_SHOOT;
++    if (held & PAD_CIRCLE)
+         out |= TH_BUTTON_BOMB;
+-    if (held & (PAD_SQUARE | PAD_L1 | PAD_R1 | PAD_L2 | PAD_R2))
++    if (held & PAD_L1)
+         out |= TH_BUTTON_FOCUS;
+-    if (held & PAD_START)
+-        out |= TH_BUTTON_MENU;
+-    if (held & PAD_SELECT)
++    if (held & PAD_R1)
+         out |= TH_BUTTON_SKIP;
++    if (held & PAD_SELECT)
++        out |= TH_BUTTON_MENU;
++    if (held & PAD_START)
++        out |= TH_BUTTON_ENTER;
+ 
+     if (pad.mode >> 4 == 0x7 || pad.mode >> 4 == 0x5) // analog stick mirrors the d-pad
+     {
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index b0547d9..411024f 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -819,10 +819,6 @@ i32 SoundPlayer::ProcessQueues()
+     {
+         return 0;
+     }
+-#ifdef __PS2__
+-    ps2audio_pump();
+-#endif
+-
+     commandCursor = this->commandQueue;
+ loop:
+     loopAgain = false;
+diff --git a/src/main.cpp b/src/main.cpp
+index 4c5e954..de42804 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -76,7 +76,11 @@ start:
+ 
+     printf("th07 PS2: window/backend/rendering ready\n");
+     fflush(stdout);
+-    g_SoundPlayer.InitializeSound();
++    if (g_SoundPlayer.InitializeSound() != ZUN_SUCCESS)
++    {
++        // SoundPlayer checks its engine pointer everywhere, so the game runs silently; make that visible in the log.
++        Supervisor::DebugPrint("main: audio init FAILED, continuing without sound\n");
++    }
+     Controller::ResetKeyboard();
+     g_AnmManager = new AnmManager();
+     if (!g_Supervisor.cfg.windowed)
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index 80caee7..db6d198 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -6,11 +6,14 @@
+ #include <sifrpc.h>
+ #include <algorithm>
+ #include <cmath>
++#include <cstdarg>
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
+ #include <vector>
+ 
++void Ps2LogAppend(const char *text); // ps2boot.cpp
++
+ namespace
+ {
+ constexpr int kRate = 44100;
+@@ -20,9 +23,19 @@ bool g_dev = false;
+ std::vector<ma_sound *> g_sounds;
+ volatile ma_uint64 g_framesMixed = 0;
+ 
+-struct Lock
++// Everything runs on the main thread (audio is mixed in ps2audio_pump() from the main loop), so no locking is needed.
++
++// Log to the EE console and to the on-screen exit log (see ps2boot.cpp)
++void AudioLog(const char *fmt, ...)
+ {
+-}; // single threaded: audio is mixed from the main loop (ps2audio_pump)
++    char tmp[256];
++    va_list args;
++    va_start(args, fmt);
++    vsnprintf(tmp, sizeof(tmp), fmt, args);
++    va_end(args);
++    Ps2LogAppend(tmp);
++    std::printf("%s", tmp);
++}
+ 
+ float Gain(ma_sound *s, ma_uint64 nowMs)
+ {
+@@ -148,18 +161,36 @@ ma_result BufLength(ma_data_source *ds, ma_uint64 *l)
+     return MA_SUCCESS;
+ }
+ const ma_data_source_vtable g_bufVtable = {BufRead, BufSeek, BufFormat, BufCursor, BufLength, nullptr, 0};
+-// Decoded effects are kept as 16 bit (mono when the source is mono) to save RAM; remember each buffer's layout
+-struct PcmInfo
++// Decoded effects are kept as 16 bit (mono when the source is mono) to save RAM. Each decoded buffer is allocated with
++// a small header in front of the samples that records its layout, so the format travels with the memory itself and
++// there is no global table that could go stale when an address is freed and reused.
++constexpr uint32_t kPcmMagic = 0x314D4350; // "PCM1"
++struct PcmHeader
+ {
+-    const void *ptr;
+-    uint32_t channels;
++    uint32_t magic;
++    uint32_t channels; // 1 or 2, samples are always signed 16 bit
++    uint32_t reserved[2];
+ };
+-PcmInfo g_pcmInfo[128];
+-int g_pcmCount = 0;
+-void RegisterPcm(const void *p, uint32_t ch)
++static_assert(sizeof(PcmHeader) == 16, "keep the samples 16 byte aligned");
++
++int16_t *AllocPcm(ma_uint64 frames, uint32_t channels)
++{
++    const ma_uint64 bytes = frames * channels * sizeof(int16_t);
++    if (frames == 0 || bytes > (64ull << 20))
++        return nullptr;
++    PcmHeader *h = (PcmHeader *)std::malloc(sizeof(PcmHeader) + (size_t)bytes);
++    if (!h)
++        return nullptr;
++    h->magic = kPcmMagic;
++    h->channels = channels;
++    h->reserved[0] = h->reserved[1] = 0;
++    return (int16_t *)(h + 1);
++}
++
++const PcmHeader *HeaderOf(const void *samples)
+ {
+-    if (g_pcmCount < 128)
+-        g_pcmInfo[g_pcmCount++] = {p, ch};
++    const PcmHeader *h = samples ? (const PcmHeader *)samples - 1 : nullptr;
++    return (h && h->magic == kPcmMagic) ? h : nullptr;
+ }
+ } // namespace
+ 
+@@ -170,19 +201,33 @@ float ma_volume_db_to_linear(float db)
+ 
+ void ma_free(void *p, const void *)
+ {
+-    std::free(p);
++    if (!p)
++        return;
++    const PcmHeader *h = HeaderOf(p);
++    if (h)
++    {
++        PcmHeader *base = (PcmHeader *)h;
++        base->magic = 0; // a stale pointer can no longer be mistaken for a live buffer
++        std::free(base);
++    }
++    else
++    {
++        std::free(p);
++    }
+ }
+ 
+ ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
+                                                    const void *pData, const void *)
+ {
+-    for (int i = 0; i < g_pcmCount; i++)
++    const PcmHeader *h = HeaderOf(pData);
++    if (h)
+     {
+-        if (g_pcmInfo[i].ptr == pData)
+-        {
+-            format = ma_format_s16;
+-            channels = g_pcmInfo[i].channels;
+-        }
++        format = ma_format_s16;
++        channels = h->channels;
++    }
++    else
++    {
++        AudioLog("audio: buffer %p was not produced by ma_decode_memory; assuming the caller's format\n", pData);
+     }
+     return {format, channels, sizeInFrames, pData};
+ }
+@@ -207,72 +252,107 @@ static uint16_t Rd16(const uint8_t *p)
+     return (uint16_t)(p[0] | (p[1] << 8));
+ }
+ 
+-// Own RIFF/WAVE parser: PCM 8/16/24/32 bit and float, any channel count and rate -> f32 stereo @ 44100.
+-// A sound that cannot be decoded becomes a short silence instead of an error, so one odd file cannot stop the game.
+-static void MakeSilence(ma_uint64 *pFrameCount, void **ppFrames)
+-{
+-    int16_t *buf = (int16_t *)std::calloc(64, sizeof(int16_t));
+-    *ppFrames = buf;
+-    *pFrameCount = 64;
+-    RegisterPcm(buf, 1);
+-}
+-
++// RIFF/WAVE parser: integer PCM 8/16/24/32 bit and 32 bit float, 1..8 channels (only the first two are used), any
++// sample rate (linear resampling to 44100 Hz). The result is signed 16 bit, mono if the source was mono, else stereo.
++// Every failure is logged with its cause and reported to the caller as MA_ERROR; nothing is replaced by silence.
+ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *, ma_uint64 *pFrameCount,
+                            void **ppFrames)
+ {
++    *pFrameCount = 0;
++    *ppFrames = nullptr;
+     const uint8_t *d = (const uint8_t *)pData;
+-    uint16_t tag = 0, channels = 0, bits = 0;
+-    uint32_t rate = 0;
++
++    if (!d || dataSize < 12 || std::memcmp(d, "RIFF", 4) != 0 || std::memcmp(d + 8, "WAVE", 4) != 0)
++    {
++        AudioLog("audio: not a RIFF/WAVE file (%u bytes)\n", (unsigned)dataSize);
++        return MA_ERROR;
++    }
++
++    uint32_t tag = 0, channels = 0, bits = 0, rate = 0;
++    bool haveFmt = false;
+     const uint8_t *samples = nullptr;
+-    size_t sampleBytes = 0;
++    uint64_t sampleBytes = 0;
+ 
+-    if (dataSize >= 12 && std::memcmp(d, "RIFF", 4) == 0 && std::memcmp(d + 8, "WAVE", 4) == 0)
++    uint64_t pos = 12;
++    while (pos + 8 <= dataSize)
+     {
+-        size_t pos = 12;
+-        while (pos + 8 <= dataSize)
++        const uint32_t csize = Rd32(d + pos + 4);
++        const uint8_t *c = d + pos + 8;
++        const uint64_t avail = dataSize - (pos + 8);
++        if (std::memcmp(d + pos, "fmt ", 4) == 0)
+         {
+-            uint32_t csize = Rd32(d + pos + 4);
+-            const uint8_t *c = d + pos + 8;
+-            size_t avail = dataSize - (pos + 8);
+-            if (std::memcmp(d + pos, "fmt ", 4) == 0 && csize >= 16 && avail >= 16)
++            if (csize < 16 || avail < 16)
+             {
+-                tag = Rd16(c);
+-                channels = Rd16(c + 2);
+-                rate = Rd32(c + 4);
+-                bits = Rd16(c + 14);
+-                if (tag == 0xFFFE && csize >= 26 && avail >= 26)
+-                    tag = Rd16(c + 24); // WAVE_FORMAT_EXTENSIBLE: sub format
++                AudioLog("audio: fmt chunk too small (%u bytes)\n", csize);
++                return MA_ERROR;
+             }
+-            else if (std::memcmp(d + pos, "data", 4) == 0)
++            tag = Rd16(c);
++            channels = Rd16(c + 2);
++            rate = Rd32(c + 4);
++            bits = Rd16(c + 14);
++            if (tag == 0xFFFE) // WAVE_FORMAT_EXTENSIBLE: the real format tag is the first 2 bytes of the sub format
+             {
+-                samples = c;
+-                sampleBytes = std::min<size_t>(csize, avail);
+-                break;
++                if (csize < 26 || avail < 26)
++                {
++                    AudioLog("audio: extensible fmt chunk too small (%u bytes)\n", csize);
++                    return MA_ERROR;
++                }
++                tag = Rd16(c + 24);
+             }
+-            pos += 8 + (size_t)csize + (csize & 1);
++            haveFmt = true;
+         }
++        else if (std::memcmp(d + pos, "data", 4) == 0)
++        {
++            samples = c;
++            if (csize > avail)
++                AudioLog("audio: data chunk truncated (header says %u bytes, %u present); using what is there\n",
++                         csize, (unsigned)avail);
++            sampleBytes = std::min<uint64_t>(csize, avail);
++            break;
++        }
++        pos += 8 + (uint64_t)csize + (csize & 1); // chunks are padded to an even size
+     }
+ 
+-    const bool pcm = (tag == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32)) || (tag == 3 && bits == 32);
+-    if (!samples || !pcm || channels < 1 || rate == 0)
++    if (!haveFmt || !samples)
++    {
++        AudioLog("audio: wav without %s chunk\n", !haveFmt ? "fmt" : "data");
++        return MA_ERROR;
++    }
++    const bool intPcm = tag == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32);
++    const bool floatPcm = tag == 3 && bits == 32;
++    if (!intPcm && !floatPcm)
+     {
+-        std::printf("audio: unsupported/invalid wav (tag %u, %u ch, %u Hz, %u bit) -> silence\n", tag, channels, rate,
+-                    bits);
+-        MakeSilence(pFrameCount, ppFrames);
+-        return MA_SUCCESS;
++        AudioLog("audio: unsupported wav encoding (format tag %u, %u bit; ADPCM and friends are not supported)\n", tag,
++                 bits);
++        return MA_ERROR;
++    }
++    if (channels < 1 || channels > 8 || rate < 1 || rate > 192000)
++    {
++        AudioLog("audio: invalid wav header (%u channels, %u Hz)\n", channels, rate);
++        return MA_ERROR;
+     }
+ 
+-    const size_t bytesPerSample = bits / 8;
+-    const size_t srcFrames = sampleBytes / (bytesPerSample * channels);
++    const uint64_t bytesPerSample = bits / 8;
++    const uint64_t frameBytes = bytesPerSample * channels;
++    const uint64_t srcFrames = sampleBytes / frameBytes; // a trailing partial frame is dropped
+     if (srcFrames == 0)
+     {
+-        MakeSilence(pFrameCount, ppFrames);
+-        return MA_SUCCESS;
++        AudioLog("audio: wav contains no samples\n");
++        return MA_ERROR;
++    }
++    const uint64_t outFrames = srcFrames * kRate / rate;
++    const uint32_t outCh = channels > 1 ? 2 : 1;
++    int16_t *out = outFrames ? AllocPcm(outFrames, outCh) : nullptr;
++    if (!out)
++    {
++        AudioLog("audio: cannot allocate %u frames x %u ch (out of memory or too large)\n", (unsigned)outFrames,
++                 outCh);
++        return MA_ERROR;
+     }
+ 
+-    auto sampleAt = [&](size_t frame, int ch) -> float {
++    auto sampleAt = [&](uint64_t frame, uint32_t ch) -> float {
+         const uint8_t *p = samples + (frame * channels + ch) * bytesPerSample;
+-        if (tag == 3)
++        if (floatPcm)
+         {
+             float f;
+             std::memcpy(&f, p, 4);
+@@ -290,28 +370,17 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+             return (int32_t)Rd32(p) / 2147483648.0f;
+         }
+     };
++    auto toS16 = [](float v) { return (int16_t)(std::clamp(v, -1.0f, 1.0f) * 32767.0f); };
+ 
+-    const ma_uint64 outFrames = (ma_uint64)srcFrames * kRate / rate;
+-    const uint32_t outCh = channels > 1 ? 2 : 1;
+-    int16_t *out = (int16_t *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(int16_t) * outCh);
+-    if (!out)
++    for (uint64_t i = 0; i < outFrames; i++)
+     {
+-        MakeSilence(pFrameCount, ppFrames);
+-        return MA_SUCCESS;
++        const double srcPos = (double)i * rate / kRate;
++        const uint64_t i0 = (uint64_t)srcPos;
++        const uint64_t i1 = std::min(i0 + 1, srcFrames - 1);
++        const float t = (float)(srcPos - (double)i0);
++        for (uint32_t ch = 0; ch < outCh; ch++)
++            out[i * outCh + ch] = toS16(sampleAt(i0, ch) * (1 - t) + sampleAt(i1, ch) * t);
+     }
+-    for (ma_uint64 i = 0; i < outFrames; i++)
+-    {
+-        const double pos = (double)i * rate / kRate;
+-        const size_t i0 = (size_t)pos;
+-        const size_t i1 = std::min(i0 + 1, srcFrames - 1);
+-        const float t = (float)(pos - (double)i0);
+-        float l = sampleAt(i0, 0) * (1 - t) + sampleAt(i1, 0) * t;
+-        auto toS16 = [](float v) { return (int16_t)(std::clamp(v, -1.0f, 1.0f) * 32767.0f); };
+-        out[i * outCh] = toS16(l);
+-        if (outCh == 2)
+-            out[i * 2 + 1] = toS16(sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t);
+-    }
+-    RegisterPcm(out, outCh);
+     *ppFrames = out;
+     *pFrameCount = outFrames;
+     return MA_SUCCESS;
+@@ -324,15 +393,18 @@ ma_result ps2audio_engine_init(ma_engine *e)
+ {
+     SifInitRpc(0);
+     int r = SifLoadModule("rom0:LIBSD", 0, NULL);
+-    std::printf("audio: LIBSD -> %d\n", r);
++    if (r < 0)
++        AudioLog("audio: LIBSD load returned %d (continuing: it may already be resident)\n", r);
+     int ret = 0;
+     r = SifExecModuleBuffer(audsrv_irx, size_audsrv_irx, 0, NULL, &ret);
+-    std::printf("audio: audsrv.irx -> %d (ret %d)\n", r, ret);
+-    if (r < 0)
++    if (r < 0 || ret == 1) // ret 1 = module reported "no resident end"; ID<0 = load failure
++    {
++        AudioLog("audio: audsrv.irx load failed (id %d, ret %d)\n", r, ret);
+         return MA_ERROR;
++    }
+     if (audsrv_init() != AUDSRV_ERR_NOERROR)
+     {
+-        std::printf("audio: audsrv_init failed: %d\n", audsrv_get_error());
++        AudioLog("audio: audsrv_init failed: %d\n", audsrv_get_error());
+         return MA_ERROR;
+     }
+     audsrv_fmt_t fmt;
+@@ -341,14 +413,14 @@ ma_result ps2audio_engine_init(ma_engine *e)
+     fmt.channels = 2;
+     if (audsrv_set_format(&fmt) != 0)
+     {
+-        std::printf("audio: audsrv_set_format failed\n");
++        AudioLog("audio: audsrv_set_format failed: %d\n", audsrv_get_error());
+         audsrv_quit();
+         return MA_ERROR;
+     }
+     audsrv_set_volume(MAX_VOLUME);
+     g_dev = true;
+     e->running = true;
+-    std::printf("audio: audsrv ready\n");
++    AudioLog("audio: audsrv ready (%d Hz, 16 bit, stereo)\n", kRate);
+     return MA_SUCCESS;
+ }
+ 
+@@ -357,8 +429,9 @@ void ps2audio_pump()
+     if (!g_dev)
+         return;
+     static int16_t out[kChunk * 2];
+-    // Feed the SPU2 queue with as much audio as it has room for (bounded so a slow frame cannot stall for long)
+-    for (int i = 0; i < 8; i++)
++    // Called once per rendered frame from GameWindow::Render. Top up the audsrv queue with at most 6 chunks so a slow
++    // frame cannot stall in the mixer; if the queue is full nothing is mixed at all.
++    for (int i = 0; i < 6; i++)
+     {
+         int avail = audsrv_available();
+         if (avail < (int)sizeof(out))
+@@ -393,20 +466,17 @@ ma_result ma_sound_init_from_data_source(ma_engine *, ma_data_source *ds, ma_uin
+         return MA_ERROR;
+     s->ds = ds;
+     s->volume = 1.0f;
+-    Lock l;
+     g_sounds.push_back(s);
+     return MA_SUCCESS;
+ }
+ 
+ void ma_sound_uninit(ma_sound *s)
+ {
+-    Lock l;
+     g_sounds.erase(std::remove(g_sounds.begin(), g_sounds.end(), s), g_sounds.end());
+ }
+ 
+ ma_result ma_sound_start(ma_sound *s)
+ {
+-    Lock l;
+     s->playing = true;
+     s->atEnd = false;
+     return MA_SUCCESS;
+@@ -416,28 +486,24 @@ ma_result ma_sound_stop(ma_sound *s)
+ {
+     if (!s)
+         return MA_INVALID_ARGS;
+-    Lock l;
+     s->playing = false;
+     return MA_SUCCESS;
+ }
+ 
+ ma_result ma_sound_seek_to_pcm_frame(ma_sound *s, ma_uint64 frame)
+ {
+-    Lock l;
+     const ma_data_source_vtable *vt = ((ma_data_source_base *)s->ds)->vtable;
+     return vt->onSeek ? vt->onSeek(s->ds, frame) : MA_ERROR;
+ }
+ 
+ void ma_sound_set_volume(ma_sound *s, float v)
+ {
+-    Lock l;
+     s->volume = v;
+ }
+ 
+ void ma_sound_set_fade_start_in_milliseconds(ma_sound *s, float volBeg, float volEnd, ma_uint64 lenMs,
+                                              ma_uint64 absoluteGlobalTimeMs)
+ {
+-    Lock l;
+     s->fading = true;
+     s->fadeFrom = volBeg < 0 ? 1.0f : volBeg; // -1 = current volume (the per-sound volume is applied separately)
+     s->fadeTo = volEnd;
+diff --git a/src/ps2audio.hpp b/src/ps2audio.hpp
+index 3498a32..7a3aeb0 100644
+--- a/src/ps2audio.hpp
++++ b/src/ps2audio.hpp
+@@ -101,7 +101,7 @@ inline void ma_audio_buffer_uninit(ma_audio_buffer *)
+ {
+ }
+ 
+-// ---- WAV decoding to f32 stereo @ 44100 (malloc'd, release with ma_free) ----
++// ---- WAV decoding to s16 (mono or stereo) @ 44100; release the result with ma_free ----
+ struct ma_decoder_config
+ {
+     ma_format format;
+@@ -135,10 +135,9 @@ struct ma_sound
+     bool fading;
+     float fadeFrom, fadeTo;
+     ma_uint64 fadeStartMs, fadeLenMs;
+-    double srcPos; // for sample rate conversion of streams that are not 44100
+ };
+ 
+-ma_result ps2audio_engine_init(ma_engine *e); // opens the SDL audio device
++ma_result ps2audio_engine_init(ma_engine *e); // loads LIBSD + audsrv.irx, opens audsrv (44100 Hz, 16 bit, stereo)
+ void ps2audio_engine_uninit(ma_engine *e);
+ void ps2audio_pump(); // call once per frame: mixes and queues audio for the SPU2
+ ma_uint64 ma_engine_get_time_in_milliseconds(ma_engine *e);
+-- 
+2.43.0
+

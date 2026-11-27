@@ -1,0 +1,105 @@
+From 0a8aea768ba218fd0eee27b8dbe7b3414674be61 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 10:46:12 -0300
+Subject: [PATCH 28/33] PS2: read streamed BGM through a 32 KB stdio buffer
+
+The mixer asks the BGM stream for about 2 KB at a time, so every mixer
+step was a synchronous read from the archive on the main thread. A 32 KB
+stdio buffer turns those into a few large reads. The buffer is freed
+wherever the stream is closed.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/SoundPlayer.cpp | 34 +++++++++++++++++++++++++---------
+ src/SoundPlayer.hpp |  1 +
+ 2 files changed, 26 insertions(+), 9 deletions(-)
+
+diff --git a/src/SoundPlayer.cpp b/src/SoundPlayer.cpp
+index 14b18c2..a2e9509 100644
+--- a/src/SoundPlayer.cpp
++++ b/src/SoundPlayer.cpp
+@@ -296,6 +296,21 @@ static void InitBgmData(ThBgmDataSource *pBgm, ThBgmFormat *pFmt)
+     pBgm->format = ma_format_s16;
+ }
+ 
++// Streamed BGM reads are small (the mixer asks for about 2 KB at a time). A larger stdio buffer turns them into a
++// few big reads from the disk instead of one synchronous read per mixer step (PS2 only).
++#define TH07_BGM_FILE_BUFFER_SIZE (32 * 1024)
++
++static void ThBgmDataSource_closeFile(ThBgmDataSource *pBgm)
++{
++    if (pBgm->file)
++    {
++        fclose(pBgm->file);
++        pBgm->file = NULL;
++    }
++    free(pBgm->fileBuf);
++    pBgm->fileBuf = NULL;
++}
++
+ static bool ThBgmDataSource_init_file(ThBgmDataSource *pBgm, const char *path, ThBgmFormat *pFmt)
+ {
+     memset(pBgm, 0, sizeof(*pBgm));
+@@ -307,6 +322,13 @@ static bool ThBgmDataSource_init_file(ThBgmDataSource *pBgm, const char *path, T
+     {
+         return false;
+     }
++#ifdef __PS2__
++    pBgm->fileBuf = (u8 *)malloc(TH07_BGM_FILE_BUFFER_SIZE);
++    if (pBgm->fileBuf)
++    {
++        setvbuf(pBgm->file, (char *)pBgm->fileBuf, _IOFBF, TH07_BGM_FILE_BUFFER_SIZE);
++    }
++#endif
+ 
+     fseek(pBgm->file, g_SoundPlayer.bgmSeekOffset + pFmt->startOffset, SEEK_SET);
+ 
+@@ -314,7 +336,7 @@ static bool ThBgmDataSource_init_file(ThBgmDataSource *pBgm, const char *path, T
+     config.vtable = &g_ThBgmDataSourceVtable;
+     if (ma_data_source_init(&config, &pBgm->base) != MA_SUCCESS)
+     {
+-        fclose(pBgm->file);
++        ThBgmDataSource_closeFile(pBgm);
+         return false;
+     }
+     return true;
+@@ -610,10 +632,7 @@ ZunResult SoundPlayer::ReopenBGM(const char *name)
+                                        this->backgroundMusic) != MA_SUCCESS)
+     {
+         SAFE_DELETE(this->backgroundMusic);
+-        if (this->bgmDataSource->file)
+-        {
+-            fclose(this->bgmDataSource->file);
+-        }
++        ThBgmDataSource_closeFile(this->bgmDataSource);
+         ma_data_source_uninit(&this->bgmDataSource->base);
+         SAFE_DELETE(this->bgmDataSource);
+         return ZUN_ERROR;
+@@ -732,10 +751,7 @@ void SoundPlayer::StopBGM()
+     }
+     if (this->bgmDataSource)
+     {
+-        if (this->bgmDataSource->file)
+-        {
+-            fclose(this->bgmDataSource->file);
+-        }
++        ThBgmDataSource_closeFile(this->bgmDataSource);
+         ma_data_source_uninit(&this->bgmDataSource->base);
+         SAFE_DELETE(this->bgmDataSource);
+     }
+diff --git a/src/SoundPlayer.hpp b/src/SoundPlayer.hpp
+index 9bac2ec..25dd94a 100644
+--- a/src/SoundPlayer.hpp
++++ b/src/SoundPlayer.hpp
+@@ -97,6 +97,7 @@ struct ThBgmDataSource
+     bool isMemory;
+ 
+     FILE *file;
++    u8 *fileBuf; // stdio buffer given to file (PS2 only), freed after fclose
+     const u8 *pData;
+     u32 dataSize;
+     u32 currentOffset;
+-- 
+2.43.0
+

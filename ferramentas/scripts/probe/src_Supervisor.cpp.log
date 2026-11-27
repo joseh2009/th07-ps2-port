@@ -1,0 +1,10 @@
+src/Supervisor.cpp: In static member function 'static ChainCallbackResult Supervisor::OnUpdate(Supervisor*)':
+src/Supervisor.cpp:103:49: warning: passing NULL to non-pointer argument 1 of 'static ZunResult ResultScreen::RegisterChain(i32)' [-Wconversion-null]
+  103 |                 if (ResultScreen::RegisterChain(NULL) != ZUN_SUCCESS)
+      |                                                 ^~~~
+In file included from src/GameManager.hpp:8,
+                 from src/AnmManager.hpp:10,
+                 from src/Supervisor.cpp:2:
+src/ResultScreen.hpp:186:40: note: declared here
+  186 |     static ZunResult RegisterChain(i32 unk);
+      |                                    ~~~~^~~

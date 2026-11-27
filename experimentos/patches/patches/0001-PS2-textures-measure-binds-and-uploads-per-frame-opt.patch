@@ -1,0 +1,132 @@
+From ac1f24289d9a9f3d71fcc37631b3840db3b904db Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 09:12:50 -0300
+Subject: [PATCH] PS2 textures: measure binds and uploads per frame; opt-in
+ CT16 for formats 1 and 5
+
+Measurement (on by default, shown on the R3 panel as "TEX binds N upload K
+per frame"):
+- binds: texture binds sent to the GS in batches (FlushBatch);
+- upload: texel bytes written into EE RAM by ConvertAndStore (CT16 = 2
+  bytes, CT32 = 4). This is the CPU side. Whether gsKit then copies a
+  texture into VRAM on a bind is internal to gsKit and not visible here.
+
+Opt-in TH07_PS2_TEX16_FMT15: embedded formats 1 and 5 are stored as CT16
+(half the RAM and VRAM for them). Semi-transparent pixels become cut-outs
+and colours drop to 5 bits, so this changes what the player sees and is
+off by default.
+
+Not done, with reasons:
+- CT8 + CLUT for few-colour textures: needs palette extraction and the
+  gsKit CLUT upload API, neither of which can be checked here. It would also
+  need a per-texture test that the colour count is at most 256.
+- Grouping sprites by texture across the frame: the game draws in a fixed
+  order and sprites overlap with alpha, so reordering changes the picture.
+  Batching already merges consecutive draws that share a texture.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/AnmManager.cpp     |  6 ++++++
+ src/Supervisor.cpp     |  5 ++++-
+ src/graphics/PS2GS.cpp | 11 +++++++++++
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/src/AnmManager.cpp b/src/AnmManager.cpp
+index 00410d8..fda7fa5 100644
+--- a/src/AnmManager.cpp
++++ b/src/AnmManager.cpp
+@@ -296,6 +296,12 @@ static bool Ps2UseCt16ForFormat(i16 format)
+     (void)format;
+     return true;
+ #else
++#ifdef TH07_PS2_TEX16_FMT15
++    // Formats 1 and 5 as CT16 as well: half the RAM and VRAM for them, but semi-transparent pixels become cut-outs
++    // and colours drop to 5 bits. Opt-in, because it changes what the player sees. Off by default.
++    if (format == 1 || format == 5)
++        return true;
++#endif
+     return format == 2 || format == 3;
+ #endif
+ }
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 041bf57..00cbc22 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -46,6 +46,7 @@ extern u64 g_Ps2GsMsTotal;
+ extern u32 g_Ps2GsFrames;
+ extern size_t g_Ps2TexBytes;   // PS2GS.cpp
+ extern unsigned g_Ps2TexCount; // PS2GS.cpp
++extern u32 g_Ps2BindsLastFrame, g_Ps2UploadLastFrame; // PS2GS.cpp: texture binds and texel bytes written last frame
+ extern size_t g_Ps2AudioBytes; // ps2audio.cpp
+ // Diagnostic panel, toggled with R3 (right stick press). Values are refreshed at each fps update.
+ static bool g_Ps2DiagOn = false;
+@@ -898,6 +899,8 @@ LAB_00439350:
+                     (int)(g_Ps2AudioBytes / 1024));
+             sprintf(s_Diag[3], "PAD %04X mode %02X reads %u read %.2f ms", g_Ps2PadHeld & 0xffff, g_Ps2PadMode,
+                     g_Ps2PadReads, t[PS2_T_PAD]);
++            sprintf(s_Diag[20], "TEX binds %u  upload %dK per frame", g_Ps2BindsLastFrame,
++                    (int)(g_Ps2UploadLastFrame / 1024));
+             // Keep every line under 60 characters: AsciiManager drops longer strings silently.
+             sprintf(s_Diag[4], "RENDER %.2f aud %.2f snd %.2f anm %.2f GS %.2f", t[PS2_T_RENDER], t[PS2_T_AUDIO],
+                     t[PS2_T_SNDQUEUE], t[PS2_T_ANM_FLUSH], t[PS2_T_PRESENT]);
+@@ -923,7 +926,7 @@ LAB_00439350:
+             }
+             ZunVec3 diagPos;
+             diagPos.z = 0.0f;
+-            for (int i = 0; i < 20; i++)
++            for (int i = 0; i < 21; i++)
+             {
+                 diagPos.x = 8.0f;
+                 diagPos.y = 24.0f + 14.0f * i;
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 769f8c4..6fba536 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -47,6 +47,10 @@
+ 
+ size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
+ unsigned g_Ps2TexCount = 0;
++// Texture work, measured for the R3 panel (item F). "This frame" counts up until SwapBuffers copies it to "last frame".
++// Binds: texture binds in batches. Upload: bytes of texel data written into EE RAM (CT16 = 2 bytes, CT32 = 4).
++u32 g_Ps2BindsThisFrame = 0, g_Ps2BindsLastFrame = 0;
++u32 g_Ps2UploadThisFrame = 0, g_Ps2UploadLastFrame = 0;
+ bool g_Ps2TexAllocFailed = false; // set when a texture could not be allocated; AnmManager turns it into a load error
+ static bool g_Ps2NextTexture16 = false; // one-shot: the next SetTextureImage stores A1B5G5R5 (CT16), half the RAM
+ 
+@@ -580,6 +584,7 @@ void PS2GS::ConvertAndStore(Tex *tex, i32 x, i32 y, i32 w, i32 h, PixelFormat fm
+     const i32 stride = (i32)tex->gs.Width;
+     const bool ct16 = (tex->gs.PSM == GS_PSM_CT16);
+     const u8 *src = (const u8 *)data;
++    g_Ps2UploadThisFrame += (u32)w * (u32)h * (ct16 ? 2u : 4u);
+ 
+     for (i32 row = 0; row < h; row++)
+     {
+@@ -941,6 +946,7 @@ void PS2GS::FlushBatch(bool textured)
+             return;
+         ApplyRenderState();
+         boundTexture->gs.Filter = GS_FILTER_LINEAR;
++        g_Ps2BindsThisFrame++;
+         gsKit_TexManager_bind(gs, &boundTexture->gs);
+         gsKit_prim_list_triangle_goraud_texture_uv_3d(gs, &boundTexture->gs, (int)uvBatch.size(), uvBatch.data());
+         uvBatch.clear();
+@@ -956,6 +962,7 @@ void PS2GS::FlushBatch(bool textured)
+     if (textured)
+     {
+         boundTexture->gs.Filter = GS_FILTER_LINEAR;
++        g_Ps2BindsThisFrame++;
+         gsKit_TexManager_bind(gs, &boundTexture->gs);
+         gsKit_prim_list_triangle_goraud_texture_stq_3d(gs, &boundTexture->gs, (int)count, texBatch.data());
+         texBatch.clear();
+@@ -1133,4 +1140,8 @@ void PS2GS::SwapBuffers()
+ #endif
+     g_Ps2GsMsTotal += SDL_GetTicks64() - gsStart;
+     g_Ps2GsFrames++;
++    g_Ps2BindsLastFrame = g_Ps2BindsThisFrame;
++    g_Ps2UploadLastFrame = g_Ps2UploadThisFrame;
++    g_Ps2BindsThisFrame = 0;
++    g_Ps2UploadThisFrame = 0;
+ }
+-- 
+2.43.0
+

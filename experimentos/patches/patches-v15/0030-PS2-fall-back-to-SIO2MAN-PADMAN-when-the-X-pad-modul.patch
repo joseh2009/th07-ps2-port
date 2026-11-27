@@ -1,0 +1,90 @@
+From feddc286ef7238f3cda9b0a3623374ab1c0a05f9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 15:27:46 -0300
+Subject: [PATCH 30/35] PS2: fall back to SIO2MAN/PADMAN when the X pad modules
+ are missing
+
+Older ROMs have no XSIO2MAN/XPADMAN, so pad init failed and the game had
+no controller input at all. The X pair is still tried first, so emulated
+runs are unchanged. The fps counter now shows p1 when the pad is ready.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Ps2Pad.cpp     | 23 +++++++++++++++++------
+ src/Supervisor.cpp |  5 +++--
+ 2 files changed, 20 insertions(+), 8 deletions(-)
+
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index 9bc252b..9c1e5d5 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -15,18 +15,28 @@ static bool s_Ready = false;
+ 
+ #define STICK_DEADZONE 48
+ 
++// Diagnostic shown next to the fps counter: 1 = pad ready, 0 = no pad (the console log is not visible on hardware).
++int g_Ps2PadReady = 0;
++
+ bool Ps2Pad::Init()
+ {
+     Ps2SifInitOnce();
+-    // The newer X modules go with libpadx; the old rom0:PADMAN can hang padInit under emulation.
+-    if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) < 0)
++    // Newer ROMs have the X modules (libpadx), which the emulator also uses. Older ROMs, such as early SCPH-9000x
++    // consoles, only have SIO2MAN and PADMAN, so fall back to those when the X pair is missing.
++    // The old pair alone is not used under emulation because PADMAN can hang padInit there.
++    bool modulesOk = false;
++    if (SifLoadModule("rom0:XSIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:XPADMAN", 0, NULL) >= 0)
+     {
+-        printf("Ps2Pad: failed to load XSIO2MAN\n");
+-        return false;
++        modulesOk = true;
++    }
++    else if (SifLoadModule("rom0:SIO2MAN", 0, NULL) >= 0 && SifLoadModule("rom0:PADMAN", 0, NULL) >= 0)
++    {
++        printf("Ps2Pad: using SIO2MAN/PADMAN (X modules not in this ROM)\n");
++        modulesOk = true;
+     }
+-    if (SifLoadModule("rom0:XPADMAN", 0, NULL) < 0)
++    if (!modulesOk)
+     {
+-        printf("Ps2Pad: failed to load XPADMAN\n");
++        printf("Ps2Pad: no pad modules could be loaded\n");
+         return false;
+     }
+     padInit(0);
+@@ -35,6 +45,7 @@ bool Ps2Pad::Init()
+     if (r == 0)
+         return false;
+     s_Ready = true; // the pad settles over the next few frames; GetButtons just polls
++    g_Ps2PadReady = 1;
+     return true;
+ }
+ 
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 7393ffe..67b683a 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -41,6 +41,7 @@ char g_ReplayFpsBuffer[256];
+ #ifdef __PS2__
+ extern u64 g_Ps2GsMsTotal;
+ extern u32 g_Ps2GsFrames;
++extern int g_Ps2PadReady;
+ #endif
+ char g_FpsCounterBuffer[256];
+ u32 g_NumFramesSinceLastTime;
+@@ -700,8 +701,8 @@ void Supervisor::DrawFpsCounter(i32 param_1)
+                 g_NumFramesSinceLastTime = 0;
+ #ifdef __PS2__
+                 // Diagnostic: fps, then the average ms per frame spent in SwapBuffers (GS) since the last update
+-                sprintf(g_FpsCounterBuffer, "%.01ffps gs%.0f", (f64)fps,
+-                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0);
++                sprintf(g_FpsCounterBuffer, "%.01ffps gs%.0f p%d", (f64)fps,
++                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0, g_Ps2PadReady);
+                 g_Ps2GsMsTotal = 0;
+                 g_Ps2GsFrames = 0;
+ #else
+-- 
+2.43.0
+

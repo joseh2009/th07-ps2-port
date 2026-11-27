@@ -1,0 +1,44 @@
+From d967d008c3db09493ac3a2a71effc9c2ccef970c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 21:01:35 -0300
+Subject: [PATCH 15/32] PS2: store SFX mono
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/ps2audio.cpp | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index b1c853c..05fda12 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -374,7 +374,7 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+     const uint32_t div = (srcFrames * 1000 / rate > 1000) ? kSfxRateDiv * 2 : kSfxRateDiv;
+     const uint32_t storeRate = kRate / div;
+     const uint64_t outFrames = srcFrames * storeRate / rate;
+-    const uint32_t outCh = channels > 1 ? 2 : 1;
++    const uint32_t outCh = 1; // effects are stored mono (stereo sources are averaged) to save RAM
+     int16_t *out = outFrames ? AllocPcm(outFrames, outCh, div) : nullptr;
+     if (!out)
+     {
+@@ -411,8 +411,14 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+         const uint64_t i0 = (uint64_t)srcPos;
+         const uint64_t i1 = std::min(i0 + 1, srcFrames - 1);
+         const float t = (float)(srcPos - (double)i0);
+-        for (uint32_t ch = 0; ch < outCh; ch++)
+-            out[i * outCh + ch] = toS16(sampleAt(i0, ch) * (1 - t) + sampleAt(i1, ch) * t);
++        float acc0 = 0, acc1 = 0;
++        for (uint32_t ch = 0; ch < channels && ch < 2; ch++)
++        {
++            acc0 += sampleAt(i0, ch);
++            acc1 += sampleAt(i1, ch);
++        }
++        const float norm = channels > 1 ? 0.5f : 1.0f;
++        out[i] = toS16((acc0 * (1 - t) + acc1 * t) * norm);
+     }
+     *ppFrames = out;
+     *pFrameCount = outFrames;
+-- 
+2.43.0
+

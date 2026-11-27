@@ -1,0 +1,64 @@
+From cda0bbf8a9c306116768a7603ac6ab9eff74c035 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 16:19:30 -0300
+Subject: [PATCH 36/36] PS2: show the pad mode on the diagnostic line
+
+Third-party pads may report a different mode or idle data. The counter now
+shows fps, the button mask in hex, and pad.mode in hex. GS ms is left out
+of the line for now so it fits on screen.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Ps2Pad.cpp     | 2 ++
+ src/Supervisor.cpp | 7 ++++---
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/src/Ps2Pad.cpp b/src/Ps2Pad.cpp
+index 754ad14..2d2588e 100644
+--- a/src/Ps2Pad.cpp
++++ b/src/Ps2Pad.cpp
+@@ -19,6 +19,7 @@ static bool s_Ready = false;
+ // Diagnostic shown next to the fps counter: the buttons GetButtons() reports this frame, in hex (0 = none).
+ // The console log is not visible on hardware, so this is the only way to see it there.
+ u32 g_Ps2PadHeld = 0;
++u32 g_Ps2PadMode = 0; // pad.mode from the last successful read (0x41 digital, 0x73 analog, ...)
+ 
+ bool Ps2Pad::Init()
+ {
+@@ -72,6 +73,7 @@ u16 Ps2Pad::GetButtons()
+ 
+     u16 held = ~pad.btns; // active low
+     g_Ps2PadHeld = held;
++    g_Ps2PadMode = pad.mode;
+     u16 out = 0;
+     if (held & PAD_UP)
+         out |= TH_BUTTON_UP;
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 98a63d7..2d9b4c0 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -42,6 +42,7 @@ char g_ReplayFpsBuffer[256];
+ extern u64 g_Ps2GsMsTotal;
+ extern u32 g_Ps2GsFrames;
+ extern u32 g_Ps2PadHeld;
++extern u32 g_Ps2PadMode;
+ #endif
+ char g_FpsCounterBuffer[256];
+ u32 g_NumFramesSinceLastTime;
+@@ -701,9 +702,9 @@ void Supervisor::DrawFpsCounter(i32 param_1)
+                 g_NumFramesSinceLastTime = 0;
+ #ifdef __PS2__
+                 // Diagnostic: fps, then the average ms per frame spent in SwapBuffers (GS) since the last update
+-                // Short on purpose: the counter is drawn at the right edge of the screen, so longer text is cut off
+-                sprintf(g_FpsCounterBuffer, "%.0f g%.0f %X", (f64)fps,
+-                        g_Ps2GsFrames ? (f64)g_Ps2GsMsTotal / (f64)g_Ps2GsFrames : 0.0, g_Ps2PadHeld);
++                // Short on purpose: the counter is drawn at the right edge of the screen, so longer text is cut off.
++                // Fields: fps, pad buttons (hex), pad mode (hex). GS ms is left out for now to fit.
++                sprintf(g_FpsCounterBuffer, "%.0f %X m%02X", (f64)fps, g_Ps2PadHeld, g_Ps2PadMode);
+                 g_Ps2GsMsTotal = 0;
+                 g_Ps2GsFrames = 0;
+ #else
+-- 
+2.43.0
+

@@ -1,0 +1,40 @@
+From 1b259947fb864c7a2cd5361a213ce692c1ee3129 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 23:47:15 -0300
+Subject: [PATCH 26/32] PS2: snap vertex coordinates to the framebuffer pixel
+ grid
+
+scaleY maps the 480-row game space onto the 448-row NTSC framebuffer,
+so sprite edges fall on fractional rows. Adjacent quads then leave a gap
+or overlap on their shared edge, which shows up as light horizontal
+lines. Rounding each screen-space vertex once gives shared vertices
+identical coordinates.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/graphics/PS2GS.cpp | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index d3188f5..feb74a6 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -757,8 +757,12 @@ void PS2GS::EmitTriangle(const ClipVert &a, const ClipVert &b, const ClipVert &c
+         const f32 ndcY = v.y * invW;
+         const f32 ndcZ = v.z * invW;
+ 
+-        const f32 sx = (((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX - 0.5f;
+-        const f32 sy = (((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY - 0.5f;
++        // Snap to the framebuffer pixel grid. The game is 640x480 but the NTSC framebuffer is 448 rows, so
++        // scaleY is not an integer and sprite edges would land on fractional rows. Neighbouring quads then
++        // leave a gap or overlap on a shared edge, which shows as light horizontal lines. Snapping gives
++        // shared vertices identical coordinates.
++        const f32 sx = std::floor((((ndcX + 1.0f) * 0.5f * (f32)viewport.width) + (f32)viewport.x) * scaleX + 0.5f) - 0.5f;
++        const f32 sy = std::floor((((1.0f - (ndcY + 1.0f) * 0.5f) * (f32)viewport.height) + (f32)viewport.y) * scaleY + 0.5f) - 0.5f;
+ 
+         // PerspectiveFovLH (ZunMath.hpp) and the 2D projections already produce ndcZ in [0,1] (D3D convention)
+         f32 depth = ndcZ * (viewport.maxZ - viewport.minZ) + viewport.minZ;
+-- 
+2.43.0
+

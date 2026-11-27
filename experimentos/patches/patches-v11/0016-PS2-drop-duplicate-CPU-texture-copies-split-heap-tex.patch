@@ -1,0 +1,169 @@
+From a0a7fcbf35d947aefe486e4641568180a20000fc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 23 Nov 2026 00:53:15 -0300
+Subject: [PATCH 16/31] PS2: drop duplicate CPU texture copies, split
+ heap/texture/audio diagnostics
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/AnmManager.cpp     | 21 ++++++++++++++++++---
+ src/graphics/PS2GS.cpp |  7 +++++++
+ src/ps2audio.cpp       |  8 ++++++--
+ src/ps2boot.cpp        | 14 ++++++++++----
+ 4 files changed, 41 insertions(+), 9 deletions(-)
+
+diff --git a/src/AnmManager.cpp b/src/AnmManager.cpp
+index 55ac1b6..619534c 100644
+--- a/src/AnmManager.cpp
++++ b/src/AnmManager.cpp
+@@ -1,3 +1,6 @@
++#ifdef __PS2__
++void Ps2HeapLog(const char *where);
++#endif
+ #include "AnmManager.hpp"
+ 
+ #include <SDL2/SDL_image.h>
+@@ -243,14 +246,16 @@ ZunResult AnmManager::LoadTextureEmbedded(u32 textureIdx, ZunImageInfoEmbedded *
+     g_Supervisor.gfxDevice->SetTextureImage(converted->w, converted->h, PIXEL_RGBA,
+                                             PIXEL_UNSIGNED_BYTE, converted->pixels);
+ 
+-    this->imageDataArray[textureIdx] = malloc(converted->pitch * converted->h);
+-    memcpy(this->imageDataArray[textureIdx], converted->pixels, converted->pitch * converted->h);
++    // The converted buffer itself becomes the CPU-side copy (no second allocation + memcpy).
++    this->imageDataArray[textureIdx] = rgba;
+ 
+     textureWidths[textureIdx] = converted->w;
+     textureHeights[textureIdx] = converted->h;
+     texturePitches[textureIdx] = converted->pitch;
+ 
+-    free(rgba);
++#ifdef __PS2__
++    Ps2HeapLog("embedded tex");
++#endif
+     return ZUN_SUCCESS;
+ }
+ 
+@@ -436,6 +441,16 @@ i32 AnmManager::LoadAnm(i32 textureIdx, AnmRawEntry *rawEntry, i32 spriteIdxOffs
+             return ZUN_ERROR;
+         }
+     }
++#ifdef __PS2__
++    // The GS copy already holds the pixels. The CPU copy (kept by the PC build for later compositing) is only needed
++    // for textures that are blitted into (AnmManager::CopyTexture: sources/destinations 21 and 22) and for the alpha
++    // channel merge above, which is finished by now. Dropping it saves w*h*4 bytes per texture.
++    if (data->textureIdx != 21 && data->textureIdx != 22 && !(*(char *)((u8 *)data + data->nameOffset) == '@'))
++    {
++        free(this->imageDataArray[data->textureIdx]);
++        this->imageDataArray[data->textureIdx] = NULL;
++    }
++#endif
+     this->textureNames[textureIdx] = (char *)((u8 *)data + data->nameOffset);
+ 
+     u32 texWidth = this->textureWidths[textureIdx] ? this->textureWidths[textureIdx] : data->width;
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index 59bb4f4..810af6e 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -27,6 +27,9 @@
+ // Everything is uploaded as RGBA32 (alpha scaled to the GS range 0..128)
+ #define TH07_TEX_PSM GS_PSM_CT32
+ 
++size_t g_Ps2TexBytes = 0; // EE RAM held by GS texture copies (read by Ps2HeapLog)
++unsigned g_Ps2TexCount = 0;
++
+ namespace
+ {
+ constexpr int kMaxBatchVerts = 3 * 256;
+@@ -438,6 +441,8 @@ void PS2GS::ReleaseTextureMemory(Tex *tex)
+         gsKit_TexManager_free(gs, &tex->gs);
+     if (tex->gs.Mem)
+     {
++        g_Ps2TexBytes -= gsKit_texture_size_ee(tex->gs.Width, tex->gs.Height, tex->gs.PSM);
++        g_Ps2TexCount--;
+         free(tex->gs.Mem);
+         tex->gs.Mem = nullptr;
+     }
+@@ -554,6 +559,8 @@ void PS2GS::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
+         return;
+     }
+     std::memset(tex->gs.Mem, 0, bytes);
++    g_Ps2TexBytes += bytes;
++    g_Ps2TexCount++;
+     tex->gs.Width = w;
+     tex->gs.Height = h;
+     tex->gs.PSM = TH07_TEX_PSM;
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index 05fda12..b21a533 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -14,6 +14,8 @@
+ 
+ void Ps2LogAppend(const char *text); // ps2boot.cpp
+ 
++size_t g_Ps2AudioBytes = 0; // EE RAM held by decoded effects (read by Ps2HeapLog)
++
+ namespace
+ {
+ constexpr int kRate = 44100;
+@@ -194,7 +196,7 @@ struct PcmHeader
+     uint32_t magic;
+     uint32_t channels; // 1 or 2, samples are always signed 16 bit
+     uint32_t rateDiv; // stored sample rate is 44100 / rateDiv
+-    uint32_t reserved;
++    uint32_t sampleBytes; // size of the sample area, used for the memory statistics
+ };
+ static_assert(sizeof(PcmHeader) == 16, "keep the samples 16 byte aligned");
+ 
+@@ -206,10 +208,11 @@ int16_t *AllocPcm(ma_uint64 frames, uint32_t channels, uint32_t rateDiv)
+     PcmHeader *h = (PcmHeader *)std::malloc(sizeof(PcmHeader) + (size_t)bytes);
+     if (!h)
+         return nullptr;
++    g_Ps2AudioBytes += sizeof(PcmHeader) + (size_t)bytes;
+     h->magic = kPcmMagic;
+     h->channels = channels;
+     h->rateDiv = rateDiv;
+-    h->reserved = 0;
++    h->sampleBytes = (uint32_t)bytes;
+     return (int16_t *)(h + 1);
+ }
+ 
+@@ -233,6 +236,7 @@ void ma_free(void *p, const void *)
+     if (h)
+     {
+         PcmHeader *base = (PcmHeader *)h;
++        g_Ps2AudioBytes -= sizeof(PcmHeader) + base->sampleBytes;
+         base->magic = 0; // a stale pointer can no longer be mistaken for a live buffer
+         std::free(base);
+     }
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index 65e45b9..23aaef9 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -182,13 +182,19 @@ void Ps2BootScreen(int argc, char **argv)
+ }
+ #endif
+ 
+-// Log how much of the heap is in use and the largest free block (for out-of-memory diagnosis)
++extern size_t g_Ps2TexBytes;   // PS2GS.cpp
++extern unsigned g_Ps2TexCount; // PS2GS.cpp
++extern size_t g_Ps2AudioBytes; // ps2audio.cpp
++
++// Log the EE heap (malloc) state together with the big consumers tracked separately: GS texture copies and decoded
++// effects. This is EE RAM only; the 4 MB of GS VRAM is managed by gsKit and is not covered by mallinfo().
+ void Ps2HeapLog(const char *where)
+ {
+     struct mallinfo mi = mallinfo();
+-    char tmp[160];
+-    snprintf(tmp, sizeof(tmp), "heap@%s: used %d KB, free %d KB, arena %d KB, top %d KB\n", where,
+-             (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024), (int)(mi.arena / 1024), (int)(mi.keepcost / 1024));
++    char tmp[200];
++    snprintf(tmp, sizeof(tmp), "heap@%s: used %dK free %dK arena %dK | tex %dK (%u) sfx %dK\n", where,
++             (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024), (int)(mi.arena / 1024),
++             (int)(g_Ps2TexBytes / 1024), g_Ps2TexCount, (int)(g_Ps2AudioBytes / 1024));
+     Ps2LogAppend(tmp);
+     printf("%s", tmp);
+ }
+-- 
+2.43.0
+

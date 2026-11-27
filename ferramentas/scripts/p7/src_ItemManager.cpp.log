@@ -1,0 +1,13 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/ItemManager.hpp:3,
+                 from src/ItemManager.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/ItemManager.cpp: In member function 'void ItemManager::OnUpdate()':
+src/ItemManager.cpp:500:24: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  500 |             item->timer++;
+      |             ~~~~~~~~~~~^~

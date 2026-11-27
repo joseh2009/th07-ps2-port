@@ -1,0 +1,38 @@
+From c1aa0a36e7b503d4a62b4e91a1d8b6e6916cbc5c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 21:16:37 -0300
+Subject: [PATCH 8/8] PS2 audio: align the embedded audsrv.irx buffer to 64
+ bytes
+
+audsrv_irx[] was the only embedded IRX without an alignment attribute
+(padman_irx already has aligned(64)). SifExecModuleBuffer DMAs the module
+from EE memory, so its start address matters. Without the attribute the
+address depends on the surrounding layout, and small changes elsewhere
+(new globals) were enough to make the audio fail silently: "aud 0.00",
+no sound. Builds with the old layout that had sound still had it, and
+builds with the same audio code but a different layout did not.
+
+Only the declaration changes; no audio logic is touched.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/audsrv_irx.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/audsrv_irx.cpp b/src/audsrv_irx.cpp
+index acdc85c..a0481d9 100644
+--- a/src/audsrv_irx.cpp
++++ b/src/audsrv_irx.cpp
+@@ -1,7 +1,7 @@
+ // audsrv.irx from ps2sdk (AFL-3.0 / ps2sdk licence), embedded so no extra file is needed next to the ELF.
+ #ifdef __PS2__
+ extern "C" {
+-unsigned char audsrv_irx[] = {
++unsigned char audsrv_irx[] __attribute__((aligned(64))) = {
+ 127,69,76,70,1,1,1,0,0,0,0,0,0,0,0,0,
+ 128,255,8,0,1,0,0,0,36,9,0,0,52,0,0,0,
+ 188,59,0,0,1,16,0,0,52,0,32,0,2,0,40,0,
+-- 
+2.43.0
+

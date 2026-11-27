@@ -1,0 +1,28 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/AnmManager.hpp:3,
+                 from src/AnmManager.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/AnmManager.cpp: In member function 'i32 AnmManager::ExecuteScript(AnmVm*)':
+src/AnmManager.cpp:1523:30: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1523 |                 vm->waitTimer--;
+      |                 ~~~~~~~~~~~~~^~
+src/AnmManager.cpp:1530:36: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1530 |             vm->currentTimeInScript--;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~^~
+src/AnmManager.cpp:1538:40: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1538 |                 vm->currentTimeInScript--;
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~^~
+src/AnmManager.cpp:1560:44: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1560 |                     vm->currentTimeInScript--;
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~^~
+src/AnmManager.cpp:1870:36: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1870 |             vm->interpStartTimes[i]++;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~^~
+src/AnmManager.cpp:2002:28: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 2002 |     vm->currentTimeInScript++;
+      |     ~~~~~~~~~~~~~~~~~~~~~~~^~

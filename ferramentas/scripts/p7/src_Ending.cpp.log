@@ -1,0 +1,19 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/Ending.hpp:3,
+                 from src/Ending.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/Ending.cpp: In member function 'ZunResult Ending::ParseEndFile()':
+src/Ending.cpp:164:21: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  164 |         this->timer3--;
+      |         ~~~~~~~~~~~~^~
+src/Ending.cpp:192:21: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  192 |         this->timer2--;
+      |         ~~~~~~~~~~~~^~
+src/Ending.cpp:383:17: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  383 |     this->timer1++;
+      |     ~~~~~~~~~~~~^~

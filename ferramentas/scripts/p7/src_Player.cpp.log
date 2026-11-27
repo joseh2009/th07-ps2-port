@@ -1,0 +1,43 @@
+In file included from src/AnmVm.hpp:5,
+                 from src/Player.hpp:3,
+                 from src/Player.cpp:1:
+src/ZunTimer.hpp:87:10: error: postfix 'void ZunTimer::operator++(i32)' must have 'int' as its argument
+   87 |     void operator++(i32)
+      |          ^~~~~~~~
+src/ZunTimer.hpp:92:10: error: postfix 'void ZunTimer::operator--(i32)' must have 'int' as its argument
+   92 |     void operator--(i32)
+      |          ^~~~~~~~
+src/Player.cpp: In member function 'void Player::UpdateShots()':
+src/Player.cpp:634:34: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+  634 |             this->timers[i].timer--;
+      |             ~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp:671:22: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  671 |         bullet->timer++;
+      |         ~~~~~~~~~~~~~^~
+src/Player.cpp: In member function 'i32 Player::UpdateFireBulletTimer()':
+src/Player.cpp:743:26: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+  743 |     this->fireBulletTimer++;
+      |     ~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp: In member function 'i32 Player::HandlePlayerInputs()':
+src/Player.cpp:1357:37: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1357 |             this->focusMovementTimer++;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp:1393:37: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1393 |             this->focusMovementTimer++;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp:1452:37: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1452 |             this->focusMovementTimer++;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp:1503:37: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1503 |             this->focusMovementTimer++;
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp: In member function 'void Player::UpdateState()':
+src/Player.cpp:1813:35: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1813 |         this->invulnerabilityTimer--;
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp:1850:35: error: no 'operator--(int)' declared for postfix '--' [-fpermissive]
+ 1850 |         this->invulnerabilityTimer--;
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/Player.cpp:1886:35: error: no 'operator++(int)' declared for postfix '++' [-fpermissive]
+ 1886 |         this->invulnerabilityTimer++;
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~^~

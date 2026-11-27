@@ -1,0 +1,133 @@
+From 1a78ec4f5a1cf9d8939ca9e22b71099c05ebc755 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:49:26 -0300
+Subject: [PATCH 08/37] PS2: keep sound effects as 16 bit (mono when possible)
+ to save RAM; handle archive read failures
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/FileSystem.cpp |  7 ++++++-
+ src/ps2audio.cpp   | 35 ++++++++++++++++++++++++++++++-----
+ src/ps2boot.cpp    |  3 +++
+ 3 files changed, 39 insertions(+), 6 deletions(-)
+
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index 2a5a839..2f3c884 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -52,7 +52,12 @@ u8 *FileSystem::OpenFile(const char *filepath, i32 isExternalResource)
+                 return NULL;
+             }
+ 
+-            g_Pbg4Archive.ReadDecompressEntry(filename, buf);
++            if (!g_Pbg4Archive.ReadDecompressEntry(filename, buf))
++            {
++                g_GameErrorContext.Fatal("error : %s could not be read from the archive (out of memory?)\n", filename);
++                free(buf);
++                return NULL;
++            }
+             return buf;
+         }
+     }
+diff --git a/src/ps2audio.cpp b/src/ps2audio.cpp
+index e4753c8..80caee7 100644
+--- a/src/ps2audio.cpp
++++ b/src/ps2audio.cpp
+@@ -148,6 +148,19 @@ ma_result BufLength(ma_data_source *ds, ma_uint64 *l)
+     return MA_SUCCESS;
+ }
+ const ma_data_source_vtable g_bufVtable = {BufRead, BufSeek, BufFormat, BufCursor, BufLength, nullptr, 0};
++// Decoded effects are kept as 16 bit (mono when the source is mono) to save RAM; remember each buffer's layout
++struct PcmInfo
++{
++    const void *ptr;
++    uint32_t channels;
++};
++PcmInfo g_pcmInfo[128];
++int g_pcmCount = 0;
++void RegisterPcm(const void *p, uint32_t ch)
++{
++    if (g_pcmCount < 128)
++        g_pcmInfo[g_pcmCount++] = {p, ch};
++}
+ } // namespace
+ 
+ float ma_volume_db_to_linear(float db)
+@@ -163,6 +176,14 @@ void ma_free(void *p, const void *)
+ ma_audio_buffer_config ma_audio_buffer_config_init(ma_format format, ma_uint32 channels, ma_uint64 sizeInFrames,
+                                                    const void *pData, const void *)
+ {
++    for (int i = 0; i < g_pcmCount; i++)
++    {
++        if (g_pcmInfo[i].ptr == pData)
++        {
++            format = ma_format_s16;
++            channels = g_pcmInfo[i].channels;
++        }
++    }
+     return {format, channels, sizeInFrames, pData};
+ }
+ 
+@@ -190,9 +211,10 @@ static uint16_t Rd16(const uint8_t *p)
+ // A sound that cannot be decoded becomes a short silence instead of an error, so one odd file cannot stop the game.
+ static void MakeSilence(ma_uint64 *pFrameCount, void **ppFrames)
+ {
+-    float *buf = (float *)std::calloc(64, sizeof(float) * 2);
++    int16_t *buf = (int16_t *)std::calloc(64, sizeof(int16_t));
+     *ppFrames = buf;
+     *pFrameCount = 64;
++    RegisterPcm(buf, 1);
+ }
+ 
+ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config *, ma_uint64 *pFrameCount,
+@@ -270,7 +292,8 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+     };
+ 
+     const ma_uint64 outFrames = (ma_uint64)srcFrames * kRate / rate;
+-    float *out = (float *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(float) * 2);
++    const uint32_t outCh = channels > 1 ? 2 : 1;
++    int16_t *out = (int16_t *)std::malloc((size_t)(outFrames ? outFrames : 1) * sizeof(int16_t) * outCh);
+     if (!out)
+     {
+         MakeSilence(pFrameCount, ppFrames);
+@@ -283,10 +306,12 @@ ma_result ma_decode_memory(const void *pData, size_t dataSize, ma_decoder_config
+         const size_t i1 = std::min(i0 + 1, srcFrames - 1);
+         const float t = (float)(pos - (double)i0);
+         float l = sampleAt(i0, 0) * (1 - t) + sampleAt(i1, 0) * t;
+-        float r = channels > 1 ? sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t : l;
+-        out[i * 2] = l;
+-        out[i * 2 + 1] = r;
++        auto toS16 = [](float v) { return (int16_t)(std::clamp(v, -1.0f, 1.0f) * 32767.0f); };
++        out[i * outCh] = toS16(l);
++        if (outCh == 2)
++            out[i * 2 + 1] = toS16(sampleAt(i0, 1) * (1 - t) + sampleAt(i1, 1) * t);
+     }
++    RegisterPcm(out, outCh);
+     *ppFrames = out;
+     *pFrameCount = outFrames;
+     return MA_SUCCESS;
+diff --git a/src/ps2boot.cpp b/src/ps2boot.cpp
+index e453605..fd6327b 100644
+--- a/src/ps2boot.cpp
++++ b/src/ps2boot.cpp
+@@ -2,6 +2,7 @@
+ #include <cstdio>
+ #include <cstring>
+ #include <debug.h>
++#include <malloc.h>
+ #include <unistd.h>
+ 
+ // Where the game files live. PS2 file systems (host:, mass:, cdrom0:) have no usable "current directory" for plain
+@@ -55,6 +56,8 @@ void Ps2ShowExitScreen(int result)
+ {
+     init_scr();
+     scr_printf("\n  Touhou 7 PS2 - the game exited (result %d)\n", result);
++    struct mallinfo mi = mallinfo();
++    scr_printf("  Heap: %d KB in use, %d KB free inside heap\n", (int)(mi.uordblks / 1024), (int)(mi.fordblks / 1024));
+     scr_printf("  Last messages (Japanese text is not shown):\n\n");
+     // Keep only plain ASCII lines, last 24 of them
+     static char lines[40][100];
+-- 
+2.43.0
+
