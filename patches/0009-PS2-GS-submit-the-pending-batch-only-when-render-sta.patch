@@ -1,0 +1,138 @@
+From 79650479623f1b74f9eab9bd1dfba0c15d3a6431 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 26 Nov 2026 12:17:18 -0300
+Subject: [PATCH 09/10] PS2 GS: submit the pending batch only when render state
+ really changes
+
+The state setters (Enable, Disable, SetBlendMode, SetDepthMask, SetDepthFunc,
+SetAlphaTestRef) always submitted the pending batch, even when the value was
+the same. Supervisor::DisableFog also flushed the anm batch before checking
+whether fog was on. AsciiManager::DrawPopups calls DisableFog and SetDepthFunc
+every frame with popups on (enemy kills and spell bonuses), so the batch was
+split again and again. Now an unchanged value returns early, and the fog flush
+only happens when fog is actually turned off. Fog is not a GS state here, so
+Enable/Disable(CAPS_FOG) no longer submit anything. Drawing only.
+
+Risk: a batch that relied on a flush with the same state would now be drawn
+together with later sprites. Not measured on console yet.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/Supervisor.cpp     |  7 +++++++
+ src/graphics/PS2GS.cpp | 45 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 0bbf49f..f46df3e 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -1441,6 +1441,13 @@ i32 Supervisor::EnableFog()
+ 
+ i32 Supervisor::DisableFog()
+ {
++#ifdef __PS2__
++    if (!this->fogEnabled)
++    {
++        // Fog already off: nothing changes, so the anm batch need not be submitted here (DrawPopups calls this every frame)
++        return 0;
++    }
++#endif
+     g_AnmManager->Flush();
+     if (this->fogEnabled)
+     {
+diff --git a/src/graphics/PS2GS.cpp b/src/graphics/PS2GS.cpp
+index c7f213c..0fe66e6 100644
+--- a/src/graphics/PS2GS.cpp
++++ b/src/graphics/PS2GS.cpp
+@@ -310,8 +310,28 @@ void PS2GS::SetViewport(const ZunViewport &vp)
+     viewport = vp;
+ }
+ 
++// The setters below submit the pending batch only when the value really changes. The batch is drawn with the state
++// it sees at submit time, so an unchanged value needs no submit. Calls that repeat every frame (DrawPopups) were
++// splitting the batch each time.
+ void PS2GS::Enable(Capabilities cap)
+ {
++    switch (cap)
++    {
++    case CAPS_BLEND:
++        if (blendEnabled)
++            return;
++        break;
++    case CAPS_DEPTH_TEST:
++        if (depthTest)
++            return;
++        break;
++    case CAPS_ALPHA_TEST:
++        if (alphaTest)
++            return;
++        break;
++    case CAPS_FOG:
++        return; // fog is not a GS state here
++    }
+     FlushPending();
+     switch (cap)
+     {
+@@ -331,6 +351,23 @@ void PS2GS::Enable(Capabilities cap)
+ 
+ void PS2GS::Disable(Capabilities cap)
+ {
++    switch (cap)
++    {
++    case CAPS_BLEND:
++        if (!blendEnabled)
++            return;
++        break;
++    case CAPS_DEPTH_TEST:
++        if (!depthTest)
++            return;
++        break;
++    case CAPS_ALPHA_TEST:
++        if (!alphaTest)
++            return;
++        break;
++    case CAPS_FOG:
++        return; // fog is not a GS state here
++    }
+     FlushPending();
+     switch (cap)
+     {
+@@ -350,6 +387,8 @@ void PS2GS::Disable(Capabilities cap)
+ 
+ void PS2GS::SetBlendMode(BlendMode srcMode, BlendMode dstMode)
+ {
++    if (blendSrc == srcMode && blendDst == dstMode)
++        return;
+     FlushPending();
+     blendSrc = srcMode;
+     blendDst = dstMode;
+@@ -357,12 +396,16 @@ void PS2GS::SetBlendMode(BlendMode srcMode, BlendMode dstMode)
+ 
+ void PS2GS::SetDepthMask(bool enable)
+ {
++    if (depthMask == enable)
++        return;
+     FlushPending();
+     depthMask = enable;
+ }
+ 
+ void PS2GS::SetDepthFunc(DepthFunc func)
+ {
++    if (depthFunc == func)
++        return;
+     FlushPending();
+     depthFunc = func;
+ }
+@@ -381,6 +424,8 @@ void PS2GS::SetClearColor(ZunColor color)
+ 
+ void PS2GS::SetAlphaTestRef(u8 ref)
+ {
++    if (alphaRef == ref)
++        return;
+     FlushPending();
+     alphaRef = ref;
+ }
+-- 
+2.43.0
+

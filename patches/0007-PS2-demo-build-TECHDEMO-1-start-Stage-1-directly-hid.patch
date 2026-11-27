@@ -1,0 +1,102 @@
+From d658163d18505c5dc1dfc6ff3ec172809356a956 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 26 Nov 2026 10:58:08 -0300
+Subject: [PATCH 07/10] PS2 demo build (TECHDEMO=1): start Stage 1 directly,
+ hide the HUD, panel on
+
+Opt-in only: make -f Makefile.ps2 clean && make -f Makefile.ps2 TECHDEMO=1.
+The normal build compiles the same code as before. In the demo build the
+title menu is skipped (Reimu A, Normal, Stage 1), Gui::OnDraw returns early
+so the HUD is hidden (the offset reset is kept), and the R3 diagnostic panel
+starts on. No game logic is changed.
+
+Risk: the direct start uses the restart path from the game-over flow, so
+check the first frames and the return to stage on game over.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ Makefile.ps2       |  6 ++++++
+ src/Gui.cpp        |  4 ++++
+ src/Supervisor.cpp | 19 +++++++++++++++++++
+ 3 files changed, 29 insertions(+)
+
+diff --git a/Makefile.ps2 b/Makefile.ps2
+index bf8b0c4..20659fd 100644
+--- a/Makefile.ps2
++++ b/Makefile.ps2
+@@ -46,6 +46,12 @@ ifeq ($(CT32),1)
+ EE_CXXFLAGS += -DTH07_PS2_CT32
+ endif
+ 
++# TECHDEMO=1 (demo build only; the normal build is unchanged): skips the title menu and starts Stage 1 directly,
++# hides the HUD and starts with the R3 diagnostic panel on. Needs a clean build (no header dependencies).
++ifeq ($(TECHDEMO),1)
++EE_CXXFLAGS += -DTH07_PS2_TECHDEMO
++endif
++
+ EE_LDFLAGS += -Wl,--wrap=fopen -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib
+ 
+ # order matters: SDL2main first, SDL2 after the libraries that depend on it
+diff --git a/src/Gui.cpp b/src/Gui.cpp
+index a63fcf6..4e5178d 100644
+--- a/src/Gui.cpp
++++ b/src/Gui.cpp
+@@ -143,6 +143,10 @@ u32 Gui::OnDraw(Gui *arg)
+ 
+     g_AnmManager->offset.y = 0.0f;
+     g_AnmManager->offset.x = 0.0f;
++#ifdef TH07_PS2_TECHDEMO
++    // Demo build: HUD hidden so the diagnostic panel is easier to read (the offset above is still reset)
++    return CHAIN_CALLBACK_RESULT_CONTINUE;
++#endif
+     if (arg->impl->finishedStage)
+     {
+         stringPos.x = 144.0f;
+diff --git a/src/Supervisor.cpp b/src/Supervisor.cpp
+index 00cbc22..a65279a 100644
+--- a/src/Supervisor.cpp
++++ b/src/Supervisor.cpp
+@@ -49,7 +49,11 @@ extern unsigned g_Ps2TexCount; // PS2GS.cpp
+ extern u32 g_Ps2BindsLastFrame, g_Ps2UploadLastFrame; // PS2GS.cpp: texture binds and texel bytes written last frame
+ extern size_t g_Ps2AudioBytes; // ps2audio.cpp
+ // Diagnostic panel, toggled with R3 (right stick press). Values are refreshed at each fps update.
++#ifdef TH07_PS2_TECHDEMO
++static bool g_Ps2DiagOn = true; // demo build: panel on from the start
++#else
+ static bool g_Ps2DiagOn = false;
++#endif
+ static f32 g_Ps2DiagFps = 0.0f;
+ static f64 g_Ps2DiagGsMs = 0.0;
+ static f64 g_Ps2DiagMs[PS2_T_COUNT]; // average ms per frame for each timer slot (Ps2Timing.hpp)
+@@ -242,12 +246,27 @@ u32 Supervisor::OnUpdate(Supervisor *arg)
+         {
+         case SUPERVISOR_STATE_INIT:
+         CASE_SUPERVISOR_STATE_INIT:
++#ifdef TH07_PS2_TECHDEMO
++            // Demo build: skip the title menu and start Stage 1 directly (Reimu A, Normal, no practice)
++            g_GameManager.practice = 0;
++            g_GameManager.difficulty = 1;
++            g_GameManager.character = 0;
++            g_GameManager.shotType = 0;
++            g_GameManager.currentStage = 0;
++            arg->curState = SUPERVISOR_STATE_GAMEMANAGER;
++            if (GameManager::RegisterChain() != ZUN_SUCCESS)
++            {
++                return CHAIN_CALLBACK_RESULT_EXIT_GAME_SUCCESS;
++            }
++            break;
++#else
+             arg->curState = SUPERVISOR_STATE_MAINMENU;
+             if (MainMenu::RegisterChain() != ZUN_SUCCESS)
+             {
+                 return CHAIN_CALLBACK_RESULT_EXIT_GAME_SUCCESS;
+             }
+             break;
++#endif
+         case SUPERVISOR_STATE_MAINMENU:
+             switch (arg->curState)
+             {
+-- 
+2.43.0
+

@@ -1,0 +1,10 @@
+6d3454c PS2 sprites: bound-check the vertex buffer in PushSprite (fixes TLB miss storm)
+7965047 PS2 GS: submit the pending batch only when render state really changes
+8758d7e PS2 demo build (TECHDEMO=1): play the built-in demo replays in turn
+d658163 PS2 demo build (TECHDEMO=1): start Stage 1 directly, hide the HUD, panel on
+6e40d61 PS2 stage background: skip quads whose projected box is outside the play field
+a7785c9 PS2 effects: skip layer 0 and 3 effect sprites far outside the play field
+f461ac9 PS2 enemies: skip the head sprite of enemies far outside the play field
+8111627 PS2 build: compile EE code with -O3
+af1d055 PS2 bullets: count the visible bullets during the draw walk
+33bc4f1 PS2 GS: trivial reject before building colour and UV

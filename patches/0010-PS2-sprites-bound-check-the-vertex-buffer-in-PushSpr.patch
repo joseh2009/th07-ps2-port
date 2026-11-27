@@ -1,0 +1,46 @@
+From 6d3454cec5eae6454874eebfbce41e7c68c144f9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 26 Nov 2026 17:48:32 -0300
+Subject: [PATCH 10/10] PS2 sprites: bound-check the vertex buffer in
+ PushSprite (fixes TLB miss storm)
+
+spriteVertexBuffer holds 49152 vertices (8192 sprites) with no bound check.
+vertexBufferCurPtr sits right after it in AnmManager, so a frame with more
+sprites wrote past the end and overwrote the pointer. The next sprites were
+then written to small addresses (log: TLB Miss, pc=0x10ca40 PushSprite, store
+at addr 0x0..0xa0). Now PushSprite submits the pending batch and starts again
+from the top of the buffer when the next sprite would not fit. Drawing only;
+the same triangles are sent, possibly in two submits in a very busy frame.
+
+Risk: the diagnosis is from the code and the log; not confirmed on console.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/AnmManager.cpp | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/AnmManager.cpp b/src/AnmManager.cpp
+index fda7fa5..5ce9efc 100644
+--- a/src/AnmManager.cpp
++++ b/src/AnmManager.cpp
+@@ -965,6 +965,16 @@ void AnmManager::Flush()
+ 
+ ZunResult AnmManager::PushSprite(VertexTex1DiffuseXyzrhw *spriteVertex)
+ {
++    // The buffer holds 49152 vertices (8192 sprites). It has no bound check, and vertexBufferCurPtr sits right after
++    // it in the struct: a frame with more sprites wrote past the end, overwrote the pointer itself, and the next
++    // sprites went to small addresses (TLB miss). Submit what is pending and start again from the top.
++    if (this->vertexBufferCurPtr + 6 > this->spriteVertexBuffer + ARRAY_SIZE_SIGNED(this->spriteVertexBuffer))
++    {
++        this->Flush();
++        this->vertexBufferCurPtr = this->spriteVertexBuffer;
++        this->vertexBufferStartPtr = this->vertexBufferCurPtr;
++    }
++
+     this->vertexBufferCurPtr[0] = spriteVertex[0];
+     this->vertexBufferCurPtr[1] = spriteVertex[1];
+     this->vertexBufferCurPtr[2] = spriteVertex[2];
+-- 
+2.43.0
+

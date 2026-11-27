@@ -1,0 +1,721 @@
+=====================================================================
+  TOUHOU 7 (PS2 PORT) - TUTORIAL, HISTORICO E AGRADECIMENTOS
+=====================================================================
+
+Este arquivo explica o que foi feito neste trabalho, como compilar,
+como testar, como ler o painel R3, como usar o redutor de .dat e o que
+ainda esta aberto. Se tiver duvida, comece pela secao 1.
+
+
+---------------------------------------------------------------------
+1. O QUE E ESTE PACOTE
+---------------------------------------------------------------------
+
+O pacote th07-ps2-final-bundle.zip contem:
+
+  README.md                   resumo tecnico (commits, erros abertos)
+  TUTORIAL.txt                este arquivo
+  commits.txt                 lista dos commits desde a correcao de audio
+  th07-ps2-final.elf          build PADRAO do jogo (stripado)
+  th07-ps2-final-demo.elf     build de DEMONSTRACAO (stripado)
+  th07-ps2-otim-2.bundle      repositorio git completo (branches ps2-port e ps2-otim-2)
+  patches/                    um patch por commit, para git am
+
+O arquivo th07_dat_reducer.py (enviado separadamente) e a ferramenta
+para reduzir as texturas do seu th07.dat. Ela nao faz parte do jogo.
+
+
+---------------------------------------------------------------------
+2. OBJETIVO DO TRABALHO
+---------------------------------------------------------------------
+
+Melhorar o desempenho do port PS2 do Touhou 7, principalmente em
+momentos pesados (morte de inimigos, spellcards, muitas balas), SEM
+mudar o jogo:
+
+  - nada de movimento, colisao, RNG, replay, spawn, velocidade,
+    padroes, dificuldade, efeitos ou musica;
+  - so desenho, buffers e sincronizacao podem mudar;
+  - o visual deve continuar igual ao original.
+
+
+---------------------------------------------------------------------
+3. REGRAS QUE FORAM SEGUIDAS
+---------------------------------------------------------------------
+
+  a) Toda mudanca tem um comentario curto explicando o porque.
+  b) Incertezas ficam atras de #define, com o risco escrito.
+  c) Mudancas provadas ficam separadas de hipoteses.
+  d) Nenhum resultado de teste foi inventado: o que nao foi medido
+     esta marcado como "nao medido".
+  e) Cada item sai como commit separado, com patch proprio.
+
+
+---------------------------------------------------------------------
+4. HISTORICO RESUMIDO
+---------------------------------------------------------------------
+
+Fase 1 - Audio sumiu nas builds novas.
+  Causa: o binario do audsrv (audsrv_irx[]) nao estava alinhado em 64
+  bytes. O transporte SIF por DMA exige esse alinhamento (o padman ja
+  estava alinhado). Correcao: __attribute__((aligned(64))).
+  Commit c1aa0a3. Confirmado pelo usuario: "o som saiu 100%".
+
+Fase 2 - Painel R3 e diagnostico.
+  O painel mostra tempos de CALC (atualizacao) e DRAW (desenho) por
+  callback, GS, EE, audio, ANM e uso de textura. Foi a base de todas as
+  medicoes seguintes.
+
+Fase 3 - Itens de otimizacao (lista original A a G).
+  Trabalho anterior, em outros commits do branch ps2-port.
+
+Fase 4 - Itens 1, 2 e 3 (branch ps2-otim-2).
+  Rejeicao trivial de triangulos, contagem de balas no proprio loop
+  de desenho e -O3.
+
+Fase 5 - Cortes de objetos fora da tela.
+  Inimigos, efeitos e quads do fundo fora da area de jogo nao sao
+  enviados ao GS. Mesma regra de margem usada nas balas.
+
+Fase 6 - Demonstracao automatica.
+  Build opt-in (TECHDEMO=1): sem menu, sem HUD, painel ligado, roda os
+  replays de demonstracao do proprio jogo.
+
+Fase 7 - Troca de estado do GS.
+  Setters que descarregavam o lote a cada chamada, mesmo sem mudanca.
+
+Fase 8 - Estouro do buffer de vertices.
+  Causa provavel do erro "TLB Miss ... store" em PushSprite.
+
+
+---------------------------------------------------------------------
+5. CADA MUDANCA, EXPLICADA
+---------------------------------------------------------------------
+
+5.1  Rejeicao trivial de triangulos (33bc4f1)
+  Arquivos: src/graphics/PS2GS.cpp, PS2GS.hpp
+  Como funciona: antes, cada triangulo montava cor e UV mesmo quando
+  estava totalmente fora da tela. Agora o DrawVertices faz quatro
+  passadas: (1) posicao e codigo de recorte de cada vertice; (2)
+  marca quais vertices sao usados por triangulos que nao foram
+  rejeitados; (3) monta cor e UV so para esses vertices; (4) emite
+  os triangulos. Um triangulo so e rejeitado se os tres vertices
+  estiverem fora do mesmo plano.
+  Medicao: nao medido isoladamente.
+
+5.2  Contagem de balas visiveis (af1d055)
+  Arquivo: src/BulletManager.cpp
+  Como funciona: a contagem de balas visiveis passou a ser feita no
+  proprio loop de desenho. Antes havia um percurso extra so para
+  contar. O limite de 256 balas usa a contagem do frame anterior, entao
+  pode haver um frame de atraso.
+  Define: TH07_PS2_BULLET_DRAW_LIMIT (valor 256).
+  Medicao: nao medido isoladamente.
+
+5.3  -O3 (8111627)
+  Arquivo: Makefile.ps2 (EE_OPTFLAGS)
+  Como funciona: compila o codigo da EE com -O3 em vez de -O2.
+  Risco: muda a ordem de operacoes em float. Pode afetar replays.
+  Resultado: o teste com -O2 (o9) deu o mesmo desempenho. -O3 NAO e
+  a causa da lentidao.
+
+5.4  Inimigos fora da tela (f461ac9)
+  Arquivo: src/EnemyManager.cpp
+  Como funciona: um inimigo sem trilha cuja sprite principal esta
+  inteira fora da area de jogo (384x448, mais 64 px e o tamanho da
+  sprite) nao e enviado ao GS. Ele continua sendo atualizado e pode
+  ser atingido normalmente. Inimigos com trilha sempre sao desenhados.
+  Define para desligar: TH07_PS2_NO_ENEMY_CULL.
+  Resultado: o usuario relatou melhora no spawn de inimigos.
+
+5.5  Efeitos fora da tela (a7785c9)
+  Arquivo: src/EffectManager.cpp
+  Como funciona: mesma regra de 5.4, para efeitos das camadas 0 e 3.
+  Efeitos de billboard (camada 2) nao sao cortados.
+  Define para desligar: TH07_PS2_NO_EFFECT_CULL.
+  Medicao: efeitos pesam pouco no painel (cerca de 0.2 ms).
+
+5.6  Quads do fundo fora da tela (6e40d61)
+  Arquivo: src/Stage.cpp
+  Como funciona: o fundo e feito de quads 3D. Para cada quad, o codigo
+  projeta o centro e dois pontos deslocados e calcula um raio na tela.
+  Se a caixa toda ficar fora da area de jogo (mais 64 px), o quad nao e
+  enviado.
+  Define para desligar: TH07_PS2_NO_BG_CULL.
+  Resultado: o usuario testou desligando esse corte e nao viu diferenca
+  no problema de "aparecer do nada". Ou seja, este corte NAO e a causa
+  desse sintoma.
+
+5.7  Demonstracao (d658163 e 8758d7e)
+  Arquivos: src/Supervisor.cpp, src/Gui.cpp, Makefile.ps2
+  Como funciona: com TECHDEMO=1:
+    - nao abre o menu; o INIT inicia o replay de demonstracao do jogo
+      (data/demo/demorpy0.rpy, demorpy1.rpy e demorpy2.rpy), trocando
+      de arquivo a cada ciclo;
+    - se nenhum replay puder ser lido, inicia a fase 1 direto (Reimu A,
+      Normal);
+    - Gui::OnDraw retorna logo no inicio: o HUD nao aparece (o reset do
+      deslocamento do ANM continua);
+    - o painel R3 comeca ligado.
+  Define: TECHDEMO (passado pelo make, nao pelo codigo).
+  Sem TECHDEMO, o build e o normal, sem nenhuma dessas mudancas.
+
+5.8  Troca de estado do GS (7965047)
+  Arquivos: src/graphics/PS2GS.cpp, src/Supervisor.cpp
+  Como funciona: os setters (Enable, Disable, SetBlendMode, SetDepthMask,
+  SetDepthFunc, SetAlphaTestRef) descarregavam o lote pendente
+  (FlushPending) mesmo quando o valor nao mudava. AsciiManager::DrawPopups
+  chama essas funcoes todo frame com popup na tela, o que quebrava o
+  agrupamento de sprites varias vezes por frame. Agora so descarrega
+  quando o valor muda. DisableFog so descarrega o lote ANM quando a
+  nevoa estava ligada. A nevoa nao e um estado do GS aqui, entao
+  Enable/Disable(CAPS_FOG) nao descarregam nada.
+  Medicao: nao medido ainda no mesmo frame.
+
+5.9  Limite do buffer de vertices (6d3454c)
+  Arquivo: src/AnmManager.cpp (PushSprite)
+  Como funciona: o buffer de vertices tem 49152 vertices (8192 sprites)
+  e nao tinha checagem de limite. O ponteiro vertexBufferCurPtr fica
+  logo depois do buffer na struct. Um frame com mais de 8192 sprites
+  escrevia alem do fim e sobrescrevia o proprio ponteiro. Os sprites
+  seguintes eram escritos em enderecos baixos, o que gerava o erro
+  "TLB Miss, pc=0x10ca40 ... store" no log do PCSX2.
+  Agora, se o proximo sprite nao couber, PushSprite descarrega o lote
+  pendente e recomeca do topo do buffer. O mesmo triangulo continua
+  sendo enviado, so que possivelmente em duas submissoes.
+  Status: hipotese confirmada pelo codigo, ainda nao confirmada no
+  console.
+
+
+---------------------------------------------------------------------
+6. COMO COMPILAR
+---------------------------------------------------------------------
+
+6.1  Ambiente (Linux, como usado aqui):
+
+  export PS2DEV=/opt/ps2dev-x/ps2dev
+  export PS2SDK=$PS2DEV/ps2sdk
+  export GSKIT=$PS2DEV/gsKit
+  export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2DEV/iop/bin:$PS2DEV/dvp/bin:$PS2SDK/bin
+
+6.2  Clonar o repositorio a partir do bundle:
+
+  git clone th07-ps2-otim-2.bundle th07 -b ps2-otim-2
+
+  O bundle tem o historico completo (branches ps2-port e ps2-otim-2).
+  Os patches em patches/ aplicam so os 10 commits de otimizacao, com
+  git am, sobre o commit base c1aa0a3.
+
+6.3  Build padrao:
+
+  make -f Makefile.ps2 clean
+  make -f Makefile.ps2 -j8
+
+  O ELF sai como th07.elf na raiz. Para deixar menor:
+  mips64r5900el-ps2-elf-strip th07.elf
+
+6.4  Build de demonstracao:
+
+  make -f Makefile.ps2 clean
+  make -f Makefile.ps2 -j8 TECHDEMO=1
+
+6.5  Importante: o Makefile nao tem dependencia de cabecalho. Depois
+  de mudar um .hpp, sempre faca "clean" antes do build.
+
+6.6  Os logs completos de build estao no pacote como referencia
+  (build_default.log e build_demo.log). Eles nao foram revisados
+  linha a linha: se aparecer aviso, confira no log antes de concluir.
+
+
+---------------------------------------------------------------------
+7. COMO TESTAR NO PCSX2
+---------------------------------------------------------------------
+
+Equipamento usado: PCSX2 no Linux, GPU AMD RX 580 (Vulkan), joystick.
+
+7.1  Demonstracao (a mais importante para o erro de travamento):
+  a) Abra o ELF de demonstracao.
+  b) Deixe rodar sem interagir, sem acelerar. A velocidade do emulador
+     NAO muda o resultado (testado).
+  c) Espere passar pelos tres replays e voltar ao primeiro. Isso leva
+     alguns minutos.
+  d) Mantenha a janela de Registro (log) aberta e procure por:
+        TLB Miss, pc=0x10ca40 ... store
+     Se aparecer, o travamento voltou. Se nao aparecer em todo o ciclo,
+     o estouro de buffer estava causando o problema.
+
+7.2  Comparacao de desempenho (mesmo frame):
+  a) Use o mesmo replay nas builds que quer comparar (v26, o9, o12,
+     build atual).
+  b) Compare, no mesmo numero de frame (#NNNN no canto superior),
+     os valores FPS, EE, DRAW, GS e aud.
+  c) Tire capturas nesse frame, uma por build, lado a lado.
+
+7.3  Pop-in (objeto aparecendo do nada):
+  a) Fase com muitas balas (por exemplo, Stage 5 ou 6).
+  b) Anote o tipo do objeto (bala, inimigo ou efeito), onde apareceu
+     (borda da area de jogo ou meio da tela) e o numero do frame.
+
+7.4  Morte de inimigo e spellcard:
+  a) Anote os valores do painel R3 nesses momentos.
+  b) Se der para, faca um replay com spellcard e outro so com inimigos
+     comuns.
+
+
+---------------------------------------------------------------------
+8. COMO LER O PAINEL R3
+---------------------------------------------------------------------
+
+O painel aparece sobre o jogo quando o R3 e apertado (ou ja aparece
+na build de demonstracao). As linhas, de cima para baixo:
+
+  FILES / PAD / RAM / TEX / SFX
+      Informacoes de arquivos lidos, memoria livre e uso de texturas.
+
+  FPS xx   GS xx.xx   EE xx.x ms/frame
+      FPS: quadros por segundo.
+      GS: tempo que o GS passou ocupado no frame (ms).
+      EE: tempo de CPU por frame (ms). Abaixo de ~16.6 ms o jogo roda
+      a 60 FPS; acima, cai.
+
+  RENDER xx.xx   aud x.xx   snd x.xx   anm x.xx   GS x.xx
+      Subtempos do render: aud (mistura de audio), snd (atualizacao de
+      som), anm (ANM) e GS. Os nomes sao aproximados: confira no codigo
+      de Ps2Timing.hpp se quiser a definicao exata.
+
+  CALC x.xx   DRAW x.xx   untimed x.xx
+      CALC: soma dos callbacks de atualizacao (logica) do frame.
+      DRAW: soma dos callbacks de desenho do frame.
+      untimed: tempo nao medido pelos callbacks.
+
+  CALC callbacks (address, ms/frame)
+  DRAW callbacks (address, ms/frame)
+      Os maiores callbacks do frame, com o endereco e o tempo. O
+      endereco pode ser transformado em nome de funcao com os simbolos
+      do ELF (o comando nm, no toolchain PS2). Exemplo usado aqui:
+
+        mips64r5900el-ps2-elf-nm -n arquivo.elf > syms.txt
+
+      Depois procure o maior endereco menor ou igual ao do painel.
+      ATENCAO: o endereco so vale para o mesmo build. Se o ELF mudou,
+      o endereco mudou tambem.
+
+  TEX binds N   upload OK per frame
+      TEX binds: quantas vezes a textura trocou no frame. Quanto mais
+      trocas, mais descargas de lote.
+      upload: se as texturas estao sendo enviadas sem erro.
+
+
+---------------------------------------------------------------------
+9. O REDUTOR DE .DAT (th07_dat_reducer.py)
+---------------------------------------------------------------------
+
+O que faz: le o SEU th07.dat, diminui as texturas grandes dos arquivos
+ANM e grava um novo .dat com o mesmo formato. Nao traz o arquivo do
+jogo; voce usa a sua copia.
+
+Requisitos: Python 3, Pillow (pip install pillow).
+Para a janela: tkinter (Ubuntu/Debian: sudo apt install python3-tk).
+
+Uso com janela:
+  python3 th07_dat_reducer.py
+
+Uso pela linha de comando:
+  python3 th07_dat_reducer.py th07.dat th07_reduzido.dat
+  python3 th07_dat_reducer.py th07.dat th07_reduzido.dat --factor 0.5 --min-side 512
+
+Opcoes:
+  --factor   fator de reducao das texturas (ex.: 0.5 = metade)
+  --min-side nao reduz texturas com lado menor que esse valor
+
+Antes de usar no jogo:
+  - Faca copia do th07.dat original.
+  - Teste o .dat reduzido: carregue o jogo, passe pelo menu e por uma
+    fase. Se algo estiver errado, volte ao original.
+  - Esta ferramenta NAO foi testada contra o seu .dat nesta sessao.
+
+
+---------------------------------------------------------------------
+10. ERROS E LIMITACOES ABERTAS
+---------------------------------------------------------------------
+
+  1. Travamento "TLB Miss ... store" na demonstracao: corrigido por
+     hipotese (commit 6d3454c), nao confirmado no console.
+  2. Pop-in de balas no meio da tela: nao resolvido. Descartados o
+     corte do fundo e o limite de balas. Suspeitos restantes: cortes de
+     efeito e inimigo na borda e a rejeicao trivial de triangulos.
+  3. Lentidao em morte de inimigo e spellcard: reduzida em parte, nao
+     medida no mesmo frame de todos os commits.
+  4. Aviso do PCSX2 "Possible incorrect Q value used in COP2" (vdiv Q):
+     nao se sabe se o codigo e nosso ou do jogo.
+  5. Strip de primitivas no gsKit (item 4 da lista): nao feito.
+  6. Mistura de audio no EE (item 5): nao feito.
+  7. CT8 com CLUT (item 6): nao feito.
+  8. Cache de texto do HUD: nao feito.
+  9. Push para o GitHub: bloqueado pela sessao; use o bundle.
+
+
+---------------------------------------------------------------------
+11. AGRADECIMENTOS
+---------------------------------------------------------------------
+
+  - Ao ZUN, criador do Touhou, pelo jogo que torna este trabalho
+    possivel.
+  - Ao time por tras do PCSX2, pelo emulador usado nos testes.
+  - Ao toolchain PS2 (ps2dev, PS2SDK e gsKit), que permite compilar
+    para o PlayStation 2 em Linux.
+  - Ao projeto THTK, usado pela ferramenta de texturas para ler e
+    gravar arquivos do jogo.
+  - E a voce, que testou cada build no emulador, mandou capturas
+    do painel R3 e apontou o que parecia errado. Sem esses testes, a
+    maior parte das decisoes nao teria sido possivel.
+
+
+---------------------------------------------------------------------
+12. ARQUIVOS DO PACOTE
+---------------------------------------------------------------------
+
+  README.md                  resumo tecnico
+  TUTORIAL.txt               este arquivo
+  commits.txt                commits desde c1aa0a3
+  th07-ps2-final.elf         build padrao (stripado)
+  th07-ps2-final-demo.elf    build de demonstracao (stripado)
+  th07-ps2-otim-2.bundle     repositorio git completo (branches ps2-port e ps2-otim-2)
+  patches/                   10 patches, um por commit
+
+O redutor de .dat foi enviado separadamente: th07_dat_reducer.py
+
+=====================================================================
+  FIM
+=====================================================================
+
+
+
+=====================================================================
+  ANEXO A - REPOSITORIOS, LINHA DO TEMPO E ESTADO ATUAL
+=====================================================================
+
+Este anexo junta o que a pagina "Touhou 7 - Port PS2" mostra, em texto
+simples. Periodo: 22 a 26 de novembro de 2026. Nada aqui foi medido no
+console real: os testes foram feitos no PCSX2 (Linux), e o que nao foi
+confirmado esta marcado.
+
+Numeros do git:
+  - 64 commits do port (de 16367b3 a 6d3454c)
+  - 10 commits de otimizacao (branch ps2-otim-2, depois de c1aa0a3)
+  - 38 arquivos alterados desde a base, +8518 / -106 linhas
+  - autores: 54 commits "Claude" e 10 "claude"
+
+
+---------------------------------------------------------------------
+A.1  REPOSITORIOS USADOS
+---------------------------------------------------------------------
+
+Eu li o README, o historico de commits e a estrutura de cada um. Nao
+afirmo ter lido todas as linhas de cada um; onde o uso e apenas de
+referencia, isso esta escrito.
+
+1) some100/th07  (BASE DO PORT)
+   https://github.com/some100/th07
+   Reconstrucao em C++ do Touhou 7 (1.00b). O port fica no branch
+   ps2-port e as otimizacoes no ps2-otim-2. Os branches portable e
+   reallyportable estao no mesmo repositorio.
+
+2) GensokyoClub/th06  (REFERENCIA DE CODIGO)
+   https://github.com/GensokyoClub/th06
+   Copia local: gensokyoclub/th06
+   Decompilacao do Touhou 6. O README do th07 credita este projeto como
+   fonte de tipos, nomes de funcao, nomes de arquivo e organizacao do
+   codigo. Tem tambem um port PS2 proprio (README-PS2.md, PS2GS,
+   Makefile.ps2), usado como referencia de estrutura.
+
+3) makmal0962/th06-ps2  (REFERENCIA DE BACKEND)
+   https://github.com/makmal0962/th06-ps2
+   Copia local: refs/makmal0962
+   Port do Touhou 6 para PS2 com ps2sdk, SDL2 e ps2gl. Serviu de
+   comparacao para o caminho de build e para a organizacao de um port
+   PS2 desse tipo.
+
+4) sammwyy/th06-ps2 (EoSD-PS2)  (REFERENCIA DE BACKEND)
+   https://github.com/sammwyy/th06-ps2
+   Copia local: refs/sammwyy
+   Port PS2 com backend gsKit proprio (GsKitGfx.cpp) e Makefile simples
+   com ps2dev. Serviu de comparacao para o backend de GS.
+
+5) N0zoM1z0/th07  (FORK DO TH07, CONSULTA)
+   https://github.com/N0zoM1z0/th07
+   Copia local: n0zom1z0/th07
+   Fork do some100/th07 com arquivos de fluxo para agentes (AGENTS.md,
+   .agents) e notas de matching. Usado como consulta; nao entrou no
+   codigo do port.
+
+6) TH06.ELF e th06.asm  (BINARIO DE REFERENCIA)
+   Copia local: ref06/
+   Um ELF do Touhou 6 para PS2 e a desmontagem dele (th06.asm). Serviu
+   para conferir como o gsKit monta a fila de comandos no ELF de
+   referencia. Nao ha autoria identificada nesses arquivos.
+
+Ferramentas e bibliotecas externas:
+  - ps2dev / PS2SDK / gsKit: toolchain MIPS para EE e IOP, bibliotecas
+    de sistema e o driver de GS usado pelo backend PS2GS.
+  - audsrv (IRX embutido): audio no IOP. O buffer do IRX precisa de
+    alinhamento de 64 bytes para o DMA por SIF (corrigido em c1aa0a3).
+  - PCSX2 (Linux): emulador usado nos testes. O log mostra "TLB Miss"
+    e avisos de COP2.
+  - THTK (thdat, thanm): leitura e gravacao dos arquivos .dat e .anm.
+  - Pillow (Python): reducao de texturas no th07_dat_reducer.py.
+
+
+---------------------------------------------------------------------
+A.2  LINHA DO TEMPO DO PORT
+---------------------------------------------------------------------
+
+Datas e mensagens vem do historico do git. A base do repositorio e
+anterior ao port; o port comeca em 16367b3.
+
+10/10 e 11/11 - base do repositorio (antes do port)
+  13fca73  correcao de atraso de audio no SoundPlayer (OSS)
+  7f16bd4  correcao de desalocacao
+
+22/11 - primeira versao do port
+  16367b3  port experimental: backend PS2GS sobre gsKit e audio SDL2
+           simulado (15 arquivos, +1704 linhas)
+  df29309  tela de inicializacao listando os arquivos necessarios
+  f817edd  entrada pelo libpad nativo, audio audsrv, sem joystick SDL
+  0c9cdaf  deteccao da pasta do jogo (host:, mass:, ...)
+  6ad6a56  texturas com potencia de dois e UVs escalados
+  13bbfc2  limite de 160 inimigos simultaneos (libera ~6,5 MB de RAM)
+  5edc3d6  armazenamento CT16 para texturas de 16 bits, forcavel por
+           TH07_PS2_TEX16_ALL
+  b704469  BGM em streaming e MAX_BULLETS em 512
+  2965285  efeitos sonoros em 22050 Hz; d967d00 depois em mono
+
+23/11 - desempenho e robustez
+  61ddd57  lotes de desenho so sao enviados quando o estado de render
+           ou a textura muda
+  dca8ddd  cache de texto renderizado por DrawStringFormat, por textura
+  7ea2761  rotacao do desenho de balas quando ha balas demais
+  1b25994  vertices alinhados a grade de pixels do framebuffer
+  a19c5ef  texto em Shift-JIS convertido sem SDL_iconv
+  d10f04c  correcoes da auditoria: upload de textura por faixas, sem
+           vetor de heap por desenho, pool do gsKit de 512 KB, escritas
+           seguras no audio
+
+24/11 - diagnostico (painel R3)
+  3cd82d7  R3 liga o painel de diagnostico (fps, GS, heap, texturas, pad)
+  476874d, cc4c48f, 9fad0f2, f95fc51  tempo por callback de calculo e
+           desenho, com enderecos
+  9017321, feddc28, c073dc5  pad: padman embutido, reabertura da porta,
+           modo analogico
+  ad8d023  LZSS com leitor de bits com buffer de bytes
+  87007c7  balas muito fora da area de jogo nao sao desenhadas
+
+25/11 - otimizacoes e correcao de audio
+  e3f9aa8  log por printf desligado por padrao
+  5297582  sobreposicao EE/GS opcional, atras de TH07_PS2_GS_PIPELINE
+  00859ca, 163ee53, f77ff16  envio so do estado de render que mudou;
+           piso inteiro no lugar de std::floor; sprites em tela sem
+           divisao por w
+  ac1f242  medicao de binds e uploads de textura por frame
+  fc68453  o flicker conta so as balas que sao desenhadas
+  c1aa0a3  CORRECAO DO AUDIO: buffer do audsrv alinhado em 64 bytes
+           (confirmado pelo usuario no console)
+  33bc4f1, af1d055, 8111627, f461ac9, a7785c9, 6e40d61  itens 1, 2 e 3 e
+           cortes de inimigo, efeito e fundo (ver A.4)
+
+26/11 - demonstracao e buffer de vertices
+  d658163  build TECHDEMO=1: comeca na fase 1, sem HUD, painel ligado
+  8758d7e  build de demo roda os tres replays do jogo em sequencia
+  7965047  setters do GS so descarregam o lote quando o valor muda
+  6d3454c  PushSprite checa o limite do buffer de vertices (hipotese
+           para o TLB Miss)
+
+
+---------------------------------------------------------------------
+A.3  COMO O PORT FUNCIONA
+---------------------------------------------------------------------
+
+O jogo continua sendo o mesmo codigo do th07. O port troca a camada de
+grafico, o audio e a entrada, e mantem a logica intacta.
+
+Fluxo de desenho:
+  1) Jogo: atualiza balas, inimigos e efeitos. Nao sabe que esta no PS2.
+  2) ANM: AnmManager monta os sprites em um buffer de vertices
+     (8192 sprites).
+  3) PS2GS: recorta, descarta o que esta fora e agrupa em lotes por
+     textura e estado.
+  4) gsKit: monta a fila de comandos e envia pelo DMA.
+  5) GS: rasteriza no framebuffer (CT32, ou CT16 com TH07_PS2_TEX16_ALL).
+
+Audio: o IRX do audsrv fica embutido no ELF e e carregado no IOP. O EE
+envia PCM por SIF. Efeitos sonoros ficam em 22050 Hz e sao convertidos
+na mistura. A musica e lida em streaming de thbgm.dat, com buffer de
+32 KB.
+
+Entrada: pad pelo libpad nativo. Se os modulos X nao existirem, o port
+tenta SIO2MAN e PADMAN. A porta e reaberta apos 10 s sem leitura. Um
+pad digital clone recebe um pedido, uma vez, para mudar para o modo
+analogico.
+
+Arquivos: th07.dat e thbgm.dat sao lidos da pasta do jogo, com o
+prefixo detectado (host:, mass:, ...). O LZSS foi reescrito com
+verificacao de limites. Os dados do jogo nao fazem parte do pacote.
+
+Painel R3: mostra fps, tempo de GS e EE, audio, ANM, texturas, heap e
+pad. Os callbacks mais caros aparecem com o endereco, e o endereco vira
+nome com nm sobre o ELF. Guia completo na secao 8 deste arquivo.
+
+
+---------------------------------------------------------------------
+A.4  OTIMIZACOES E O QUE CADA UMA FAZ
+---------------------------------------------------------------------
+
+Regra em todas: nada de logica (movimento, colisao, RNG, replay, spawn,
+velocidade, padroes, dificuldade). So desenho, buffers e sincronizacao
+mudam. Cada mudanca tem um #define para desligar quando e incerta.
+
+  33bc4f1  Rejeicao trivial de triangulos antes de montar cor e UV.
+           DrawVertices em quatro passadas.
+           Define: nenhum.            Status: compila, nao medido.
+
+  af1d055  Conta as balas visiveis no proprio loop de desenho.
+           Define: TH07_PS2_BULLET_DRAW_LIMIT.
+           Status: compila, nao medido.
+
+  8111627  Compila o codigo da EE com -O3. Nao e a causa da lentidao
+           (o teste com -O2 deu o mesmo resultado).
+           Define: Makefile.ps2.      Status: compila.
+
+  f461ac9  Inimigos sem trilha e totalmente fora da area nao sao
+           enviados ao GS. Continuam atualizando e podem ser atingidos.
+           Define: TH07_PS2_ENEMY_CULL_MARGIN, TH07_PS2_NO_ENEMY_CULL.
+           Status: usuario confirmou que o spawn melhorou.
+
+  a7785c9  Efeitos das camadas 0 e 3 fora da area nao sao enviados.
+           Define: TH07_PS2_EFFECT_CULL_MARGIN, TH07_PS2_NO_EFFECT_CULL.
+           Status: compila, nao medido.
+
+  6e40d61  Quads do fundo cuja caixa projetada esta fora da area nao sao
+           enviados.
+           Define: TH07_PS2_BG_CULL_MARGIN, TH07_PS2_NO_BG_CULL.
+           Status: usuario: sem mudanca no pop-in.
+
+  d658163  Build de demo (TECHDEMO=1): comeca na fase 1, esconde o HUD,
+           liga o painel.     Define: TECHDEMO.   Status: usado nos testes.
+
+  8758d7e  Build de demo roda demorpy0.rpy, demorpy1.rpy e demorpy2.rpy
+           em sequencia.      Define: TECHDEMO.
+           Status: rodou ate o carregamento.
+
+  7965047  Setters do GS (Enable, Disable, blend, profundidade, alpha
+           test) so descarregam o lote quando o valor muda.
+           Status: compila, nao medido.
+
+  6d3454c  PushSprite checa o limite de 8192 sprites. Se nao couber,
+           descarrega e recomeca do topo.
+           Status: hipotese, nao confirmada.
+
+Medicoes de diagnostico (painel R3, captura do usuario):
+  - DRAW: AsciiManager::OnDrawPopups, cerca de 2,5 ms. Os popups de
+    pontuacao e de captura de spellcard trocam a funcao de profundidade
+    e a nevoa a cada frame. O 7965047 reduziu as descargas repetidas, mas
+    a troca ida e volta continua.
+  - CALC: BulletManager::OnUpdate, cerca de 1,8 ms. Os efeitos pesam
+    so cerca de 0,2 ms.
+  - GS: 8 a 14 ms por frame em cenas de spellcard. E carga de
+    rasterizacao e blend, nao de CPU.
+  - Audio: cerca de 2,75 ms de EE com audio ligado, na build atual. A
+    v26 nao tinha audio, entao parte da diferenca de tempo de EE vem daí.
+
+
+---------------------------------------------------------------------
+A.5  TESTES: CONFIRMADO E NAO CONFIRMADO
+---------------------------------------------------------------------
+
+Confirmado pelo usuario (relato no PCSX2):
+  - O audio voltou a funcionar com a correcao do c1aa0a3.
+  - O spawn de inimigos melhorou com f461ac9.
+  - O corte do fundo (6e40d61) deu uma leve melhora na queda de frames,
+    mas o "aparecer do nada" continuou.
+  - A demo rodou alem do segundo replay em uma sessao, sem erro, e
+    passou para o carregamento.
+  - A velocidade do emulador (357%) nao mudou o travamento.
+
+Nao confirmado:
+  - Que o "TLB Miss ... store" sumiu apos 6d3454c. Em um log, o erro
+    apareceu em torno de 29,7 s.
+  - Que os commits de desenho reduziram a lentidao na morte de inimigo e
+    de spellcard no mesmo frame.
+  - Qualquer medicao commit a commit com o mesmo replay.
+  - O redutor de .dat contra o arquivo real do usuario.
+
+Nada disso foi executado aqui em console real.
+
+
+---------------------------------------------------------------------
+A.6  ERROS QUE CONTINUAM ABERTOS
+---------------------------------------------------------------------
+
+1) Travamento "TLB Miss, pc=0x10ca40 ... store" (PushSprite)
+   Estado: hipotese corrigida (6d3454c), nao confirmada.
+   Proximo passo: rodar o ciclo completo da demo. Se voltar, a causa nao
+   e o estouro do buffer; procurar qual desenho roda antes do primeiro
+   ResetVertexBuffer do frame.
+
+2) Balas, inimigos e efeitos que aparecem do nada
+   Estado: nao resolvido.
+   Descartados: corte do fundo e limite de balas.
+   Restam: cortes de inimigo e efeito na borda, e a rejeicao trivial de
+   triangulos (33bc4f1), que e o proximo teste.
+
+3) Lentidao na morte de inimigo e no spellcard
+   Estado: reduzida em parte.
+   Proximo passo: medir cada commit com o mesmo replay e no mesmo frame.
+
+4) Aviso "Possible incorrect Q value used in COP2" (vdiv)
+   Estado: origem desconhecida.
+   Proximo passo: comparar com a v26 para ver se ja existia.
+
+5) Cache do HUD (AddFormatText)
+   Estado: nao feito. O cache por textura do DrawStringFormat (dca8ddd)
+   existe; o do HUD nao. Cachear a lista de vertices muda o caminho de
+   envio, so depois de medir.
+
+6) Item 4 da lista original (strip de primitivas no gsKit)
+   Estado: nao feito. O layout das primitivas conflita com o recorte.
+
+7) Item 5 (mistura de audio na EE)
+   Estado: nao feito. Medir com audio ligado e desligado.
+
+8) Item 6 (CT8 com CLUT)
+   Estado: nao feito. Verificar o suporte a CLUT no TexManager do gsKit.
+
+9) Push para o GitHub
+   Estado: bloqueado. Os commits estao so localmente. O bundle traz os repositorio git completo (branches ps2-port e ps2-otim-2).
+
+
+---------------------------------------------------------------------
+A.7  AGRADECIMENTOS (AMPLIADOS)
+---------------------------------------------------------------------
+
+  - ZUN, criador do Touhou, pelo jogo.
+  - some100, pela reconstrucao do th07 que serviu de base.
+  - GensokyoClub, pelas decomposicoes do th06 e do th08. O th06 deu tipos
+    e nomes para o th07; o th08 deu a implementacao de LZSS.
+  - EstexNT, pelo pragma var_order para MSVC 7.
+  - makmal0962 e sammwyy, pelos ports de Touhou 6 para PS2 usados como
+    referencia.
+  - N0zoM1z0, pelo fork do th07 usado como consulta.
+  - Equipe do PCSX2, pelo emulador usado nos testes.
+  - Equipes do ps2dev, PS2SDK, gsKit e audsrv, pelo toolchain e pelas
+    bibliotecas.
+  - Projeto THTK, para ler e gravar os arquivos do jogo.
+  - Voce, que testou cada build, enviou capturas e logs e apontou o que
+    parecia errado. Os testes sao o que separa o provado da hipotese.
+
+Os dados do jogo (th07.dat, thbgm.dat) nao fazem parte deste trabalho e
+devem vir de uma copia legitima. O Touhou e de ZUN / Team Shanghai Alice.
+
+=====================================================================
+  FIM DO ANEXO
+=====================================================================

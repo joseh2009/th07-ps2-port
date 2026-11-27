@@ -1,0 +1,521 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Touhou 7 · Port PS2</title>
+<style>
+/* Layout: uma coluna de leitura, linha do tempo vertical, tabelas em contêiner com rolagem própria. */
+/* Cores: tinta azulada + marfim quente + âmbar como único acento. */
+:root {
+  --bg: #f4f2ee;
+  --surface: #ffffff;
+  --fg: #1d2128;
+  --muted: #5d6573;
+  --line: #d9d6cf;
+  --accent: #a4661b;
+  --ok: #2f7a4b;
+  --warn: #9a5b00;
+  --bad: #a3342a;
+  --code-bg: #ebe8e2;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d;
+    --surface: #1a2029;
+    --fg: #ebe7de;
+    --muted: #9aa3b2;
+    --line: #2c3442;
+    --accent: #e0a85a;
+    --ok: #6cc38b;
+    --warn: #e6b04a;
+    --bad: #f0786c;
+    --code-bg: #232a36;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d;
+  --surface: #1a2029;
+  --fg: #ebe7de;
+  --muted: #9aa3b2;
+  --line: #2c3442;
+  --accent: #e0a85a;
+  --ok: #6cc38b;
+  --warn: #e6b04a;
+  --bad: #f0786c;
+  --code-bg: #232a36;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 64px;
+  margin: 0;
+}
+.wrap { max-width: 880px; margin: 0 auto; min-width: 0; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(2rem, 6vw, 3rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.5rem; margin-top: 56px; margin-bottom: 8px; }
+h3 { font-size: 1.05rem; margin-bottom: 6px; }
+p { margin: 0 0 12px; max-width: 65ch; }
+.lede { font-size: 1.12rem; color: var(--muted); margin-top: 14px; }
+.eyebrow {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--accent); margin-bottom: 10px; font-weight: 600;
+}
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Cabeçalho */
+.hero { padding-top: 32px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; margin-top: 28px;
+}
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.stat b { display: block; font-size: 1.7rem; font-variant-numeric: tabular-nums; color: var(--fg); }
+.stat span { font-size: 0.85rem; color: var(--muted); }
+
+/* Índice */
+.toc { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 20px; font-size: 0.92rem; }
+.toc a { text-decoration: none; color: var(--muted); }
+.toc a:hover { color: var(--accent); }
+
+/* Repositórios */
+.repos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+.card .url { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+.card p { font-size: 0.93rem; margin-top: 8px; }
+.tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); margin-bottom: 8px;
+}
+.tag.base { color: var(--accent); border-color: var(--accent); }
+
+/* Linha do tempo */
+.timeline { position: relative; margin: 20px 0 0; padding-left: 26px; }
+.timeline::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+.phase { position: relative; margin-bottom: 28px; min-width: 0; }
+.phase::before {
+  content: ""; position: absolute; left: -26px; top: 6px; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--bg); border: 2px solid var(--accent);
+}
+.phase .date { font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.phase ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.95rem; }
+.phase li { margin-bottom: 4px; }
+
+/* Tabelas */
+.table-wrap { overflow-x: auto; margin-top: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 560px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { font-variant-numeric: tabular-nums; }
+.status { font-weight: 600; white-space: nowrap; }
+.status.ok { color: var(--ok); }
+.status.partial { color: var(--warn); }
+.status.open { color: var(--bad); }
+
+/* Fluxo de funcionamento */
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 18px 0; }
+.flow div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; font-size: 0.9rem; min-width: 0; }
+.flow div b { display: block; color: var(--accent); font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
+
+/* Listas de erros e testes */
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+.panel ul { margin: 0; padding-left: 18px; font-size: 0.93rem; }
+.panel li { margin-bottom: 8px; }
+.note { font-size: 0.9rem; color: var(--muted); border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 14px 0; }
+
+.files { font-family: var(--font-mono); font-size: 0.85rem; background: var(--code-bg); border-radius: 8px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+
+footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 0.88rem; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Port PlayStation 2 · Touhou 7</div>
+  <h1>Touhou 7 no PS2: o port do zero à otimização</h1>
+  <p class="lede">
+    Histórico completo do port, dos repositórios de referência, do que cada commit faz e do que ainda está aberto.
+    Período: 22 a 26 de novembro de 2026. Nada aqui foi medido no console real; os testes foram feitos no PCSX2 (Linux).
+  </p>
+
+  <div class="stats">
+    <div class="stat"><b>64</b><span>commits do port (16367b3 → 6d3454c)</span></div>
+    <div class="stat"><b>10</b><span>commits de otimização (ps2-otim-2)</span></div>
+    <div class="stat"><b>38</b><span>arquivos alterados desde a base</span></div>
+    <div class="stat"><b>+8.5k</b><span>linhas inseridas (106 removidas)</span></div>
+  </div>
+
+  <nav class="toc" aria-label="Seções">
+    <a href="#repos">Repositórios</a>
+    <a href="#historia">Linha do tempo</a>
+    <a href="#como">Como funciona</a>
+    <a href="#otimizacoes">Otimizações</a>
+    <a href="#testes">Testes</a>
+    <a href="#erros">Erros abertos</a>
+    <a href="#entregas">Entregas</a>
+    <a href="#agradecimentos">Agradecimentos</a>
+  </nav>
+</header>
+
+<section id="repos">
+  <h2>Repositórios usados</h2>
+  <p>Estes são os repositórios que estão no seu ambiente de trabalho, com o papel que cada um tem no port. Eu li o README, o histórico de commits e a estrutura de cada um. Não afirmo ter lido todas as linhas de cada um; onde o uso é apenas de referência, está escrito.</p>
+
+  <div class="repos">
+    <article class="card">
+      <span class="tag base">Base do port</span>
+      <h3>some100/th07</h3>
+      <div class="url">github.com/some100/th07</div>
+      <p>Reconstrução em C++ do Touhou 7 (1.00b). Foi o ponto de partida: o port fica no branch <code>ps2-port</code> e as otimizações no <code>ps2-otim-2</code>. Os branches <code>portable</code> e <code>reallyportable</code> estão no mesmo repositório.</p>
+    </article>
+    <article class="card">
+      <span class="tag">Referência de código</span>
+      <h3>GensokyoClub/th06</h3>
+      <div class="url">github.com/GensokyoClub/th06 · cópia local em gensokyoclub/th06</div>
+      <p>Decompilação do Touhou 6. O README do th07 credita este projeto como fonte de tipos, nomes de função, nomes de arquivo e organização do código. Também tem um port PS2 próprio (<code>README-PS2.md</code>, <code>PS2GS</code>, <code>Makefile.ps2</code>), usado como referência de estrutura.</p>
+    </article>
+    <article class="card">
+      <span class="tag">Referência de backend</span>
+      <h3>makmal0962/th06-ps2</h3>
+      <div class="url">github.com/makmal0962/th06-ps2 · cópia local em refs/makmal0962</div>
+      <p>Port do Touhou 6 para PS2 com ps2sdk, SDL2 e ps2gl. Serviu de comparação para o caminho de build e para a organização de um port PS2 deste tipo.</p>
+    </article>
+    <article class="card">
+      <span class="tag">Referência de backend</span>
+      <h3>sammwyy/th06-ps2 (EoSD-PS2)</h3>
+      <div class="url">github.com/sammwyy/th06-ps2 · cópia local em refs/sammwyy</div>
+      <p>Port PS2 com backend gsKit próprio (<code>GsKitGfx.cpp</code>) e Makefile simples com ps2dev. Serviu de comparação para o backend de GS.</p>
+    </article>
+    <article class="card">
+      <span class="tag">Fork do th07</span>
+      <h3>N0zoM1z0/th07</h3>
+      <div class="url">github.com/N0zoM1z0/th07 · cópia local em n0zom1z0/th07</div>
+      <p>Fork do some100/th07 com arquivos de fluxo de trabalho para agentes (<code>AGENTS.md</code>, <code>.agents</code>) e notas de matching. Usado como consulta; não entrou no código do port.</p>
+    </article>
+    <article class="card">
+      <span class="tag">Binário de referência</span>
+      <h3>TH06.ELF e th06.asm</h3>
+      <div class="url">cópia local em ref06/</div>
+      <p>Um ELF do Touhou 6 para PS2 e a desmontagem dele (<code>th06.asm</code>). Serviu para conferir como o gsKit monta a fila de comandos no ELF de referência. Não há autoria identificada nos arquivos.</p>
+    </article>
+  </div>
+
+  <h3 style="margin-top:24px">Ferramentas e bibliotecas externas</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ferramenta</th><th>Para que serviu</th></tr></thead>
+      <tbody>
+        <tr><td>ps2dev / PS2SDK / gsKit</td><td>Toolchain MIPS para EE e IOP, bibliotecas de sistema e o driver de GS usado pelo backend <code>PS2GS</code>.</td></tr>
+        <tr><td>audsrv (IRX embutido)</td><td>Áudio no IOP. O buffer do IRX precisa de alinhamento de 64 bytes para o DMA por SIF (corrigido em <code>c1aa0a3</code>).</td></tr>
+        <tr><td>PCSX2 (Linux)</td><td>Emulador usado nos testes. O log mostra <code>TLB Miss</code> e avisos de COP2.</td></tr>
+        <tr><td>THTK (thdat, thanm)</td><td>Leitura e gravação dos arquivos <code>.dat</code> e <code>.anm</code> do jogo.</td></tr>
+        <tr><td>Pillow (Python)</td><td>Redução de texturas no <code>th07_dat_reducer.py</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="historia">
+  <h2>Linha do tempo do port</h2>
+  <p>Datas e mensagens vêm do histórico do git. A base do repositório é anterior ao port; o port começa em <code>16367b3</code>.</p>
+
+  <div class="timeline">
+    <div class="phase">
+      <div class="date">10/10 e 11/11 · base do repositório</div>
+      <h3>Código do th07 antes do port</h3>
+      <ul>
+        <li><code>13fca73</code> correção de atraso de áudio no SoundPlayer (OSS)</li>
+        <li><code>7f16bd4</code> correção de desalocação</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="date">22/11 · primeira versão do port</div>
+      <h3>Port experimental com gsKit</h3>
+      <ul>
+        <li><code>16367b3</code> port experimental: backend <code>PS2GS</code> sobre gsKit e áudio SDL2 simulado (15 arquivos, +1704 linhas)</li>
+        <li><code>df29309</code> tela de inicialização listando os arquivos necessários</li>
+        <li><code>f817edd</code> entrada pelo libpad nativo, áudio audsrv, sem joystick do SDL</li>
+        <li><code>0c9cdaf</code> detecção da pasta do jogo (host:, mass:, ...)</li>
+        <li><code>6ad6a56</code> texturas com potência de dois e UVs escalados</li>
+        <li><code>13bbfc2</code> limite de 160 inimigos simultâneos (libera cerca de 6,5 MB de RAM estática)</li>
+        <li><code>5edc3d6</code> armazenamento CT16 para texturas de 16 bits, forçável por <code>TH07_PS2_TEX16_ALL</code></li>
+        <li><code>b704469</code> BGM em streaming e <code>MAX_BULLETS</code> em 512</li>
+        <li><code>2965285</code>, <code>d967d00</code> efeitos sonoros em 22050 Hz, depois mono</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="date">23/11 · desempenho e robustez</div>
+      <h3>Lotes de desenho e auditoria</h3>
+      <ul>
+        <li><code>61ddd57</code> lotes de desenho só são enviados quando o estado de render ou a textura muda</li>
+        <li><code>dca8ddd</code> cache de texto renderizado por <code>DrawStringFormat</code>, por textura</li>
+        <li><code>7ea2761</code> rotação do desenho de balas quando há balas demais</li>
+        <li><code>1b25994</code> vértices alinhados à grade de pixels do framebuffer</li>
+        <li><code>a19c5ef</code> texto em Shift-JIS convertido sem o <code>SDL_iconv</code></li>
+        <li><code>d10f04c</code> correções da auditoria: upload de textura por faixas, sem vetor de heap por desenho, pool do gsKit de 512 KB, escritas seguras no áudio</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="date">24/11 · diagnóstico (painel R3)</div>
+      <h3>Medir antes de otimizar</h3>
+      <ul>
+        <li><code>3cd82d7</code> R3 liga um painel de diagnóstico (fps, tempo de GS, heap, texturas, pad)</li>
+        <li><code>476874d</code>, <code>cc4c48f</code>, <code>9fad0f2</code>, <code>f95fc51</code> tempo por callback de cálculo e desenho, com endereços</li>
+        <li><code>9017321</code>, <code>feddc28</code>, <code>c073dc5</code> trabalho com o pad: padman embutido, reabertura da porta, modo analógico</li>
+        <li><code>ad8d023</code> LZSS com leitor de bits com buffer de bytes</li>
+        <li><code>87007c7</code> balas muito fora da área de jogo não são desenhadas</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="date">25/11 · otimizações e correção de áudio</div>
+      <h3>Itens de otimização e áudio</h3>
+      <ul>
+        <li><code>e3f9aa8</code> log por printf desligado por padrão</li>
+        <li><code>5297582</code> sobreposição EE/GS opcional, atrás de <code>TH07_PS2_GS_PIPELINE</code></li>
+        <li><code>00859ca</code>, <code>163ee53</code>, <code>f77ff16</code> envio só do estado de render que mudou; piso inteiro no lugar de <code>std::floor</code>; sprites em tela sem divisão por w</li>
+        <li><code>ac1f242</code> medição de binds e uploads de textura por frame</li>
+        <li><code>fc68453</code> o flicker conta só as balas que são desenhadas</li>
+        <li><code>c1aa0a3</code> <strong>correção do áudio</strong>: buffer do audsrv alinhado em 64 bytes (confirmado no console)</li>
+        <li><code>33bc4f1</code>, <code>af1d055</code>, <code>8111627</code>, <code>f461ac9</code>, <code>a7785c9</code>, <code>6e40d61</code> itens 1, 2 e 3, cortes de inimigo, efeito e fundo (detalhes na seção de otimizações)</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="date">26/11 · demonstração e buffer de vértices</div>
+      <h3>Build de demo e estouro de buffer</h3>
+      <ul>
+        <li><code>d658163</code> build <code>TECHDEMO=1</code>: começa na fase 1, sem HUD, painel ligado</li>
+        <li><code>8758d7e</code> build de demo roda os três replays do jogo em sequência</li>
+        <li><code>7965047</code> setters do GS só descarregam o lote quando o valor muda</li>
+        <li><code>6d3454c</code> <code>PushSprite</code> checa o limite do buffer de vértices (hipótese para o <code>TLB Miss</code>)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="como">
+  <h2>Como o port funciona</h2>
+  <p>O jogo continua sendo o mesmo código do th07. O port troca a camada de gráfico, o áudio e a entrada, e mantém a lógica intacta.</p>
+
+  <div class="flow" aria-label="Fluxo de desenho">
+    <div><b>1 · Jogo</b>Atualiza balas, inimigos e efeitos. Não sabe que está no PS2.</div>
+    <div><b>2 · ANM</b><code>AnmManager</code> monta os sprites em um buffer de vértices (8192 sprites).</div>
+    <div><b>3 · PS2GS</b>Recorta, descarta o que está fora e agrupa em lotes por textura e estado.</div>
+    <div><b>4 · gsKit</b>Monta a fila de comandos e envia pelo DMA.</div>
+    <div><b>5 · GS</b>Rasteriza no framebuffer (CT32 ou CT16 com <code>TH07_PS2_TEX16_ALL</code>).</div>
+  </div>
+
+  <div class="two">
+    <div class="panel">
+      <h3>Áudio</h3>
+      <p>O IRX do audsrv fica embutido no ELF e é carregado no IOP. O EE envia PCM por SIF. Efeitos sonoros ficam em 22050 Hz e são convertidos na mistura. A música é lida em streaming de <code>thbgm.dat</code>, com buffer de 32 KB.</p>
+    </div>
+    <div class="panel">
+      <h3>Entrada</h3>
+      <p>Pad pelo libpad nativo. Se os módulos X não existirem, o port tenta o SIO2MAN e o PADMAN. A porta é reaberta após 10 s sem leitura. Um pad digital clone recebe um pedido, uma vez, para mudar para o modo analógico.</p>
+    </div>
+    <div class="panel">
+      <h3>Arquivos</h3>
+      <p>O <code>th07.dat</code> e o <code>thbgm.dat</code> são lidos da pasta do jogo, com o prefixo detectado (host:, mass:, ...). O LZSS foi reescrito com verificação de limites. Os dados do jogo não fazem parte do pacote.</p>
+    </div>
+    <div class="panel">
+      <h3>Painel R3</h3>
+      <p>Mostra fps, tempo de GS e EE, áudio, ANM, texturas, heap e o pad. Os callbacks mais caros aparecem com o endereço, e o endereço vira nome com <code>nm</code> sobre o ELF. Guia completo no TUTORIAL.txt.</p>
+    </div>
+  </div>
+</section>
+
+<section id="otimizacoes">
+  <h2>Otimizações e o que cada uma faz</h2>
+  <p>Regra seguida em todas: nada de lógica (movimento, colisão, RNG, replay, spawn, velocidade, padrões, dificuldade). Só desenho, buffers e sincronização mudam. Cada mudança tem um <code>#define</code> para desligar quando é incerta.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Commit</th><th>O que faz</th><th>Define</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono">33bc4f1</td><td>Rejeição trivial de triângulos antes de montar cor e UV. <code>DrawVertices</code> em quatro passadas.</td><td class="mono">—</td><td class="status partial">Compila, não medido</td></tr>
+        <tr><td class="mono">af1d055</td><td>Conta as balas visíveis no próprio loop de desenho, sem percurso extra.</td><td class="mono">TH07_PS2_BULLET_DRAW_LIMIT</td><td class="status partial">Compila, não medido</td></tr>
+        <tr><td class="mono">8111627</td><td>Compila o código da EE com <code>-O3</code>. Não é a causa da lentidão (o teste com -O2 deu o mesmo).</td><td class="mono">Makefile.ps2</td><td class="status partial">Compila</td></tr>
+        <tr><td class="mono">f461ac9</td><td>Inimigos sem trilha e totalmente fora da área não são enviados ao GS. Continuam atualizando e podem ser atingidos.</td><td class="mono">TH07_PS2_ENEMY_CULL_MARGIN, TH07_PS2_NO_ENEMY_CULL</td><td class="status ok">Usuário: spawn melhorou</td></tr>
+        <tr><td class="mono">a7785c9</td><td>Efeitos das camadas 0 e 3 fora da área não são enviados.</td><td class="mono">TH07_PS2_EFFECT_CULL_MARGIN, TH07_PS2_NO_EFFECT_CULL</td><td class="status partial">Compila, não medido</td></tr>
+        <tr><td class="mono">6e40d61</td><td>Quads do fundo cuja caixa projetada está fora da área não são enviados.</td><td class="mono">TH07_PS2_BG_CULL_MARGIN, TH07_PS2_NO_BG_CULL</td><td class="status partial">Usuário: sem mudança no pop-in</td></tr>
+        <tr><td class="mono">d658163</td><td>Build de demo (<code>TECHDEMO=1</code>): começa na fase 1, esconde o HUD, liga o painel.</td><td class="mono">TECHDEMO</td><td class="status ok">Compila; usado nos testes</td></tr>
+        <tr><td class="mono">8758d7e</td><td>Build de demo roda os replays <code>demorpy0.rpy</code>, <code>demorpy1.rpy</code> e <code>demorpy2.rpy</code> em sequência.</td><td class="mono">TECHDEMO</td><td class="status ok">Rodou até o carregamento</td></tr>
+        <tr><td class="mono">7965047</td><td>Setters do GS (<code>Enable</code>, <code>Disable</code>, blend, profundidade, alpha test) só descarregam o lote quando o valor muda.</td><td class="mono">—</td><td class="status partial">Compila, não medido</td></tr>
+        <tr><td class="mono">6d3454c</td><td><code>PushSprite</code> checa o limite de 8192 sprites. Se não couber, descarrega e recomeça do topo.</td><td class="mono">—</td><td class="status partial">Hipótese, não confirmada</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:24px">Medições de diagnóstico</h3>
+  <div class="two">
+    <div class="panel">
+      <h3>Custo de desenho (DRAW)</h3>
+      <p><code>AsciiManager::OnDrawPopups</code>, cerca de 2,5 ms. Os popups de pontuação e de captura de spellcard trocam a função de profundidade e a névoa a cada frame. O <code>7965047</code> reduziu as descargas repetidas, mas a troca ida e volta continua.</p>
+    </div>
+    <div class="panel">
+      <h3>Custo de cálculo (CALC)</h3>
+      <p><code>BulletManager::OnUpdate</code>, cerca de 1,8 ms. Os efeitos pesam só cerca de 0,2 ms.</p>
+    </div>
+    <div class="panel">
+      <h3>GS</h3>
+      <p>8 a 14 ms por frame em cenas de spellcard. É carga de rasterização e blend, não de CPU. Reduzir isso sem mudar o visual é difícil.</p>
+    </div>
+    <div class="panel">
+      <h3>Áudio</h3>
+      <p>Cerca de 2,75 ms de EE com áudio ligado, na build atual. A v26 não tinha áudio, então parte da diferença de tempo de EE vem daí.</p>
+    </div>
+  </div>
+</section>
+
+<section id="testes">
+  <h2>Testes: o que foi confirmado e o que não foi</h2>
+  <p>Separação importante. O que está em "confirmado" veio de relato do usuário no PCSX2. O resto é código compilado ou hipótese.</p>
+
+  <div class="two">
+    <div class="panel">
+      <h3>Confirmado pelo usuário</h3>
+      <ul>
+        <li>O áudio voltou a funcionar com a correção do <code>c1aa0a3</code>.</li>
+        <li>O spawn de inimigos melhorou com <code>f461ac9</code>.</li>
+        <li>O corte do fundo (<code>6e40d61</code>) deu uma leve melhora na queda de frames, mas o "aparecer do nada" continuou.</li>
+        <li>A demo rodou além do segundo replay em uma sessão, sem erro, e passou para o carregamento.</li>
+        <li>A velocidade do emulador (357%) não mudou o travamento.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Não confirmado</h3>
+      <ul>
+        <li>Que o <code>TLB Miss ... store</code> sumiu após <code>6d3454c</code>. Em um log, o erro apareceu em torno de 29,7 s.</li>
+        <li>Que os commits de desenho reduziram o tempo de morte de inimigo e de spellcard no mesmo frame.</li>
+        <li>Qualquer medição de commit a commit com o mesmo replay.</li>
+        <li>O redutor de <code>.dat</code> contra o arquivo real do usuário.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note">Nada disso foi executado aqui em console real. Os valores acima vêm das capturas e dos relatos do PCSX2 durante a sessão.</div>
+</section>
+
+<section id="erros">
+  <h2>Erros que continuam abertos</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Problema</th><th>Estado</th><th>Próximo passo</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Travamento <code>TLB Miss, pc=0x10ca40 ... store</code></strong> (PushSprite)</td>
+          <td class="status open">Hipótese corrigida</td>
+          <td>Rodar o ciclo completo da demo e ver se o erro volta. Se voltar, a causa não é o estouro do buffer; procurar qual desenho roda antes do primeiro <code>ResetVertexBuffer</code> do frame.</td>
+        </tr>
+        <tr>
+          <td><strong>Balas, inimigos e efeitos que aparecem do nada</strong></td>
+          <td class="status open">Não resolvido</td>
+          <td>Descartados: corte do fundo e limite de balas. Restam os cortes de inimigo e efeito na borda e a rejeição trivial de triângulos (<code>33bc4f1</code>), que é o próximo teste.</td>
+        </tr>
+        <tr>
+          <td><strong>Lentidão na morte de inimigo e no spellcard</strong></td>
+          <td class="status partial">Reduzida em parte</td>
+          <td>Medir cada commit com o mesmo replay e no mesmo frame.</td>
+        </tr>
+        <tr>
+          <td><strong>Aviso <code>Possible incorrect Q value used in COP2</code></strong> (vdiv)</td>
+          <td class="status open">Origem desconhecida</td>
+          <td>Comparar com a v26 para ver se já existia antes das mudanças do port.</td>
+        </tr>
+        <tr>
+          <td><strong>Cache do HUD (<code>AddFormatText</code>)</strong></td>
+          <td class="status open">Não feito</td>
+          <td>Cachear a lista de vértices muda o caminho de envio. Só depois de medir.</td>
+        </tr>
+        <tr>
+          <td><strong>Item 4 (strip de primitivas no gsKit)</strong></td>
+          <td class="status open">Não feito</td>
+          <td>O layout das primitivas conflita com o recorte. Precisa de documentação do gsKit.</td>
+        </tr>
+        <tr>
+          <td><strong>Item 5 (mistura de áudio na EE)</strong></td>
+          <td class="status open">Não feito</td>
+          <td>Medir com áudio ligado e desligado.</td>
+        </tr>
+        <tr>
+          <td><strong>Item 6 (CT8 com CLUT)</strong></td>
+          <td class="status open">Não feito</td>
+          <td>Verificar o suporte a CLUT no <code>TexManager</code> do gsKit.</td>
+        </tr>
+        <tr>
+          <td><strong>Push para o GitHub</strong></td>
+          <td class="status open">Bloqueado</td>
+          <td>Os commits estão só localmente. O bundle tem tudo.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="entregas">
+  <h2>O que foi entregue</h2>
+  <div class="files">th07-ps2-final-bundle.zip
+  ├── README.md               resumo técnico (commits, erros)
+  ├── TUTORIAL.txt            tutorial, histórico e agradecimentos
+  ├── commits.txt             lista dos commits de otimização
+  ├── build_default.log       log do build padrão
+  ├── build_demo.log          log do build de demonstração
+  ├── th07-ps2-final.elf      build padrão (stripado)
+  ├── th07-ps2-final-demo.elf build de demonstração (stripado)
+  ├── th07-ps2-otim-2.bundle  repositório git completo (ps2-port e ps2-otim-2)
+  └── patches/                10 patches, um por commit (git am)
+
+th07_dat_reducer.py         redutor de texturas do th07.dat (enviado separado)</div>
+
+  <p style="margin-top:16px">O bundle tem o histórico completo (branches <code>ps2-port</code> e <code>ps2-otim-2</code>). Para clonar: <code>git clone th07-ps2-otim-2.bundle th07 -b ps2-otim-2</code>. Os patches em <code>patches/</code> aplicam os 10 commits de otimização com <code>git am</code>.</p>
+
+  <h3 style="margin-top:20px">Redutor de <code>th07.dat</code></h3>
+  <p>Lê o seu <code>th07.dat</code>, reduz as texturas grandes dos ANM e grava um novo arquivo no mesmo formato. Usa Pillow; a janela precisa de tkinter. Opções: <code>--factor</code> (fator, por exemplo 0,5) e <code>--min-side</code> (não reduz texturas menores que esse lado). Ainda não foi testado com o seu arquivo: faça cópia do original antes de usar.</p>
+</section>
+
+<section id="agradecimentos">
+  <h2>Agradecimentos</h2>
+  <div class="panel">
+    <ul>
+      <li><strong>ZUN</strong>, criador do Touhou, pelo jogo.</li>
+      <li><strong>some100</strong>, pela reconstrução do th07 que serviu de base.</li>
+      <li><strong>GensokyoClub</strong>, pelas decomposições do th06 e do th08. O th06 deu tipos e nomes para o th07; o th08 deu a implementação de LZSS.</li>
+      <li><strong>EstexNT</strong>, pelo pragma <code>var_order</code> para MSVC 7.</li>
+      <li><strong>makmal0962</strong> e <strong>sammwyy</strong>, pelos ports de Touhou 6 para PS2 usados como referência.</li>
+      <li><strong>N0zoM1z0</strong>, pelo fork do th07 usado como consulta.</li>
+      <li><strong>Equipe do PCSX2</strong>, pelo emulador usado nos testes.</li>
+      <li><strong>Equipes do ps2dev, PS2SDK, gsKit e audsrv</strong>, pelo toolchain e pelas bibliotecas.</li>
+      <li><strong>Projeto THTK</strong>, para ler e gravar os arquivos do jogo.</li>
+      <li><strong>Você</strong>, que testou cada build, enviou capturas e logs e apontou o que parecia errado. Os testes são o que separa o que foi provado do que era só hipótese.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  Os dados do jogo (<code>th07.dat</code>, <code>thbgm.dat</code>) não fazem parte deste trabalho e devem vir de uma cópia legítima. O Touhou é de ZUN / Team Shanghai Alice.
+</footer>
+
+</div>

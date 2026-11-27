@@ -1,0 +1,78 @@
+From f461ac976f7b50ad0ec57488f482a01474fbcd94 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 25 Nov 2026 21:50:59 -0300
+Subject: [PATCH 04/10] PS2 enemies: skip the head sprite of enemies far
+ outside the play field
+
+Drawing only: enemies with no trail whose main sprite is entirely outside
+the play field (384x448, plus 64 px and their own size) are not sent to
+the GS. They are still updated and still collide. Enemies with a trail are
+always drawn. Set TH07_PS2_NO_ENEMY_CULL to disable.
+
+Risk: a sprite drawn further out than the margin would disappear early. The
+margin matches the bullet cull, which was already accepted on console.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019yH2brr5GjCGyCE62bYyXR
+---
+ src/EnemyManager.cpp | 37 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/src/EnemyManager.cpp b/src/EnemyManager.cpp
+index 68d4e5b..ffa188e 100644
+--- a/src/EnemyManager.cpp
++++ b/src/EnemyManager.cpp
+@@ -14,6 +14,41 @@
+ #include "ZunResult.hpp"
+ #include "utils.hpp"
+ 
++#ifdef __PS2__
++#ifndef TH07_PS2_ENEMY_CULL_MARGIN
++// An enemy's main sprite is skipped when it is further than this (plus its own size) outside the play field
++// (384x448, same convention as the bullet cull). Drawing only: the enemy keeps updating and can still be hit.
++#define TH07_PS2_ENEMY_CULL_MARGIN 64.0f
++#endif
++// Returns false when the head sprite of an enemy with no trail is entirely outside the cull area.
++// Trails are drawn from the enemy history, so an enemy with a trail is always drawn (see ActualOnDraw).
++// Set TH07_PS2_NO_ENEMY_CULL to draw every enemy as before.
++static inline bool Ps2EnemyHeadVisible(const Enemy *enemy)
++{
++#ifndef TH07_PS2_NO_ENEMY_CULL
++    if (enemy->trailFlags != 0)
++    {
++        return true;
++    }
++    const AnmVm *vm = &enemy->primaryVm;
++    const f32 r = 0.5f * (vm->sprite->widthPx * vm->scale.x + vm->sprite->heightPx * vm->scale.y) +
++                  TH07_PS2_ENEMY_CULL_MARGIN;
++    const f32 x = enemy->pos.x + vm->offset.x;
++    const f32 y = enemy->pos.y + vm->offset.y;
++    return !(x < -r || x > 384.0f + r || y < -r || y > 448.0f + r);
++#else
++    (void)enemy;
++    return true;
++#endif
++}
++#else
++static inline bool Ps2EnemyHeadVisible(const Enemy *enemy)
++{
++    (void)enemy;
++    return true;
++}
++#endif
++
+ u32 g_SpellcardScore[SPELLCARD_COUNT] = {
+     2000000, 2000000, 2200000, 2200000, 2400000, 2400000, 2400000, 2400000, 2400000, 2400000,
+     2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000, 2600000,
+@@ -1166,7 +1201,7 @@ u32 EnemyManager::ActualOnDraw(EnemyManager *arg, i32 first, i32 last)
+             }
+             enemy->primaryVm.pos = enemy->pos + enemy->primaryVm.offset;
+             enemy->primaryVm.pos.z = 0.29f;
+-            if ((enemy->trailFlags & 16) == 0 && !enemy->invisibleOnBomb)
++            if ((enemy->trailFlags & 16) == 0 && !enemy->invisibleOnBomb && Ps2EnemyHeadVisible(enemy))
+             {
+                 enemy->primaryVm.pos.x += g_GameManager.arcadeRegionTopLeftPos.x;
+                 enemy->primaryVm.pos.y += g_GameManager.arcadeRegionTopLeftPos.y;
+-- 
+2.43.0
+
